@@ -40,6 +40,7 @@ export function getMyCountryId() { return myCountryId; }
 export function setMyCountryId(id) { myCountryId = id; window._myCountryId = id; }
 
 export function isGameActive() { return gameActive; }
+export function getGameActive() { return gameActive; }  // <-- ДОБАВЛЕНО
 export function setGameActive(active) { gameActive = active; }
 
 export function getGameSpeed() { return gameSpeed; }
@@ -102,12 +103,37 @@ export function processDay() {
     // Тренировка
     units.forEach(u => { if (u.trainingDaysLeft > 0) u.trainingDaysLeft--; });
     
+    // Движение юнитов
+    units.forEach(u => {
+        if (u.path && u.path.length > 0) {
+            if (!u.moveCooldown) u.moveCooldown = 0;
+            u.moveCooldown++;
+            if (u.moveCooldown >= 2) {
+                u.moveCooldown = 0;
+                const next = u.path[0];
+                if (gridData[next]) {
+                    const isWar = wars.some(w => (w.a === u.owner && w.b === gridData[next]) || (w.b === u.owner && w.a === gridData[next]));
+                    if (isWar) {
+                        u.path.shift();
+                        gridData[next] = u.owner;
+                        u.pos = next;
+                    } else if (gridData[next] === u.owner) {
+                        u.path.shift();
+                        u.pos = next;
+                    } else {
+                        u.path = [];
+                    }
+                }
+            }
+        }
+    });
+    
     // Стройка
-    if (buildingQueue.length > 0) {
+    if (buildingQueue.length > 0 && buildingQueue[0]) {
         buildingQueue[0].daysLeft--;
         if (buildingQueue[0].daysLeft <= 0) {
             const finished = buildingQueue.shift();
-            const cell = getCellStats()[finished.pos];
+            const cell = cellStats[finished.pos];
             if (cell) {
                 if (finished.type === 'factory') cell.factories = (cell.factories || 0) + 1;
                 if (finished.type === 'port') cell.buildings = [...(cell.buildings || []), 'port'];
