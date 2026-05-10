@@ -3,6 +3,18 @@ import { getMyCountryId, getWars, getAlliances, getUnits, getResources, getBuild
 import { UNIT_STATS, BUILDING_STATS } from './data.js';
 import { declareWar, proposeAlliance } from './diplomacy.js';
 
+// Определение мобильного устройства
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+if (isMobile) {
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('button, .tab-btn, .speed-btn').forEach(btn => {
+            btn.style.minHeight = '44px';
+            btn.style.touchAction = 'manipulation';
+        });
+    });
+}
+
 // ЭКСПОРТ ДЛЯ main.js
 export function openTab(tab) {
     console.log('openTab called:', tab);
@@ -40,7 +52,6 @@ export function closeWindow() {
     if (windowDiv) windowDiv.classList.add('hidden');
 }
 
-// Глобальные версии для onclick
 window.openTab = openTab;
 window.closeWindow = closeWindow;
 
@@ -76,7 +87,7 @@ function renderArmy(container) {
         const canAfford = resources.equipment >= u.cost && resources.manpower >= u.manpower;
         html += `
             <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-yellow-500">
-                <div class="flex justify-between items-center">
+                <div class="flex justify-between items-center flex-wrap gap-2">
                     <div>
                         <span class="text-2xl">${u.icon}</span>
                         <span class="font-bold text-white ml-2">${u.name}</span>
@@ -108,7 +119,7 @@ function renderArmy(container) {
             const hpPercent = u.hp ? (u.hp / stats.hp * 100) : 100;
             html += `
                 <div class="bg-gray-700 p-2 rounded-lg">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
                         <div>
                             <span class="text-xl">${stats.icon}</span>
                             <span class="font-bold text-white ml-1">${stats.name}</span>
@@ -172,7 +183,7 @@ function renderBuild(container) {
             <div class="font-bold text-yellow-500 text-sm mb-2">📦 ДОСТУПНЫЕ ПОСТРОЙКИ</div>
             <div class="space-y-2">
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-blue-500">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
                         <div>
                             <span class="text-2xl">🏭</span>
                             <span class="font-bold text-white ml-2">ВОЕННЫЙ ЗАВОД</span>
@@ -189,7 +200,7 @@ function renderBuild(container) {
                     </div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-cyan-500">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
                         <div>
                             <span class="text-2xl">⚓</span>
                             <span class="font-bold text-white ml-2">МОРСКОЙ ПОРТ</span>
@@ -235,16 +246,17 @@ function renderDiplomacy(container) {
             <div class="bg-gray-700 p-3 rounded-lg">
                 <div class="font-bold text-emerald-400 mb-2">🤝 СОЮЗНИКИ</div>
                 ${allies.length === 0 ? '<div class="text-gray-400 text-sm text-center py-2">Нет союзников</div>' : ''}
-                ${allies.map(a => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center"><span class="text-white">${getCountryInfo(a).name}</span><span class="text-emerald-400 text-xs">★ в альянсе</span></div>`).join('')}
+                ${allies.map(a => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center flex-wrap"><span class="text-white">${getCountryInfo(a).name}</span><span class="text-emerald-400 text-xs">★ в альянсе</span></div>`).join('')}
             </div>
             <div class="bg-gray-700 p-3 rounded-lg">
                 <div class="font-bold text-red-400 mb-2">⚔️ ВОЙНЫ</div>
                 ${enemies.length === 0 ? '<div class="text-gray-400 text-sm text-center py-2">Мирное время</div>' : ''}
-                ${enemies.map(e => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center"><span class="text-white">${getCountryInfo(e).name}</span><span class="text-red-400 text-xs">⚔️ война</span></div>`).join('')}
+                ${enemies.map(e => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center flex-wrap"><span class="text-white">${getCountryInfo(e).name}</span><span class="text-red-400 text-xs">⚔️ война</span></div>`).join('')}
             </div>
             <div class="bg-gray-700 p-3 rounded-lg">
                 <div class="font-bold text-blue-400 mb-2">ℹ️ ИНФОРМАЦИЯ</div>
                 <div class="text-xs text-gray-300">Кликните ПКМ по любой клетке на карте, чтобы посмотреть информацию о стране и дипломатические действия.</div>
+                <div class="text-xs text-gray-300 mt-1">На телефоне: долгое нажатие</div>
             </div>
         </div>
     `;
@@ -261,7 +273,7 @@ function renderResearch(container) {
             </div>
             <div class="space-y-2">
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-blue-500">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap">
                         <div>
                             <span class="font-bold text-white">🏭 ПРОМЫШЛЕННОСТЬ</span>
                             <div class="text-xs text-gray-300">Увеличивает производство снаряжения на +5% за уровень</div>
@@ -273,7 +285,7 @@ function renderResearch(container) {
                     </div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-green-500">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap">
                         <div>
                             <span class="font-bold text-white">💂 ПЕХОТА</span>
                             <div class="text-xs text-gray-300">+5% атака/защита, +10% стоимость за уровень</div>
@@ -285,7 +297,7 @@ function renderResearch(container) {
                     </div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-orange-500">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center flex-wrap">
                         <div>
                             <span class="font-bold text-white">🚜 ТАНКИ</span>
                             <div class="text-xs text-gray-300">+5% атака/броня за уровень</div>
