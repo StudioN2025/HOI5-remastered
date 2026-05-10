@@ -1,4 +1,4 @@
-import { calculateCountryStats, getCellData } from './utils.js';
+import { calculateCountryStats } from './utils.js';
 import { UNIT_STATS } from './data.js';
 
 // СОСТОЯНИЕ
@@ -14,6 +14,9 @@ let gameDate = new Date(1936, 0, 1);
 let resources = { equipment: 1000, factories: 0, manpower: 0 };
 let buildingQueue = [];
 let activeResearch = null;
+let activeFocus = null;
+let completedFocuses = new Set();
+let selectedUnitId = null;
 
 // GETTERS / SETTERS
 export function getGridData() { return gridData; }
@@ -25,6 +28,7 @@ export function setCellStats(data) { cellStats = data; }
 export function getUnits() { return units; }
 export function setUnits(data) { units = data; }
 export function addUnit(u) { units.push(u); }
+export function removeUnit(id) { units = units.filter(u => u.id !== id); }
 
 export function getWars() { return wars; }
 export function setWars(data) { wars = data; }
@@ -49,9 +53,19 @@ export function setResources(r) { resources = r; }
 
 export function getBuildingQueue() { return buildingQueue; }
 export function setBuildingQueue(q) { buildingQueue = q; }
+export function addToBuildingQueue(item) { buildingQueue.push(item); }
 
 export function getActiveResearch() { return activeResearch; }
 export function setActiveResearch(r) { activeResearch = r; }
+
+export function getActiveFocus() { return activeFocus; }
+export function setActiveFocus(f) { activeFocus = f; }
+
+export function getCompletedFocuses() { return completedFocuses; }
+export function addCompletedFocus(id) { completedFocuses.add(id); }
+
+export function getSelectedUnitId() { return selectedUnitId; }
+export function setSelectedUnitId(id) { selectedUnitId = id; }
 
 export function updateTopBar() {
     if (!myCountryId) return;
@@ -80,11 +94,26 @@ export function processDay() {
     const dateEl = document.getElementById('game-date');
     if (dateEl) dateEl.innerHTML = `${gameDate.getDate()} ${months[gameDate.getMonth()]} ${gameDate.getFullYear()}`;
     
+    // Производство
     const production = resources.factories * 1.5;
     const maintenance = units.reduce((acc, u) => acc + (u.owner === myCountryId ? (UNIT_STATS[u.type]?.maintenance || 0) : 0), 0);
     resources.equipment = Math.max(0, resources.equipment + production - maintenance);
     
+    // Тренировка
     units.forEach(u => { if (u.trainingDaysLeft > 0) u.trainingDaysLeft--; });
+    
+    // Стройка
+    if (buildingQueue.length > 0) {
+        buildingQueue[0].daysLeft--;
+        if (buildingQueue[0].daysLeft <= 0) {
+            const finished = buildingQueue.shift();
+            const cell = getCellStats()[finished.pos];
+            if (cell) {
+                if (finished.type === 'factory') cell.factories = (cell.factories || 0) + 1;
+                if (finished.type === 'port') cell.buildings = [...(cell.buildings || []), 'port'];
+            }
+        }
+    }
     
     updateTopBar();
 }
