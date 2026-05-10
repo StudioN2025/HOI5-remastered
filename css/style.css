@@ -28,7 +28,6 @@ body, html {
     color: white;
 }
 
-/* Главное меню */
 #main-menu {
     position: fixed;
     inset: 0;
@@ -71,7 +70,6 @@ body, html {
     box-shadow: 6px 6px 0px #000;
 }
 
-/* Контейнер игры */
 #game-container {
     position: relative;
     width: 100vw;
@@ -84,7 +82,6 @@ canvas {
     display: block;
 }
 
-/* Верхняя панель */
 #top-bar {
     position: absolute;
     top: 0;
@@ -125,7 +122,6 @@ canvas {
     border-color: var(--gold);
 }
 
-/* Вкладки */
 .hoi-tab-container {
     position: absolute;
     top: 40px;
@@ -151,7 +147,6 @@ canvas {
     background: var(--army-green);
 }
 
-/* Окно */
 #hoi-window {
     position: absolute;
     top: 75px;
@@ -191,7 +186,6 @@ canvas {
     border-radius: 4px;
 }
 
-/* Сайдбар разведки */
 #intel-sidebar {
     position: absolute;
     left: 570px;
@@ -204,7 +198,6 @@ canvas {
     z-index: 500;
 }
 
-/* Боковая панель */
 #ui-wrapper {
     position: absolute;
     right: 0;
@@ -231,7 +224,6 @@ canvas {
     gap: 12px;
 }
 
-/* Уведомления */
 #notification-box {
     position: absolute;
     bottom: 20px;
@@ -277,7 +269,6 @@ canvas {
     transition: all 0.2s;
 }
 
-/* Прогресс бары */
 .research-node {
     background: #1e1e1e;
     border: 1px solid #444;
@@ -316,7 +307,6 @@ canvas {
     transition: width 0.3s linear;
 }
 
-/* Утилиты */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
 .items-center { align-items: center; }
