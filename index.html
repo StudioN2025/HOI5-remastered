@@ -4,102 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hearts of Iron V: Remastered</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
-    <style>
-        * {
-            user-select: none;
-            font-family: 'Special Elite', 'Courier New', monospace;
-        }
-        
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #0a0a0a;
-        }
-        
-        /* ПРИНУДИТЕЛЬНЫЕ СТИЛИ ДЛЯ ИГРЫ */
-        #game-container {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: #0a0a0a !important;
-            z-index: 10 !important;
-        }
-        
-        #map-canvas {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            cursor: crosshair !important;
-            background: #1b3a4b !important;
-            z-index: 5 !important;
-            display: block !important;
-        }
-        
-        #main-menu, #country-select {
-            z-index: 100 !important;
-        }
-        
-        .hidden {
-            display: none !important;
-        }
-        
-        .speed-btn {
-            background: #374151;
-            padding: 4px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            color: white;
-            transition: all 0.2s;
-        }
-        
-        .speed-btn.active {
-            background: #ca8a04;
-            color: black;
-        }
-        
-        .tab-btn {
-            background: #1f2937;
-            padding: 6px 12px;
-            border-radius: 4px 4px 0 0;
-            cursor: pointer;
-            color: white;
-            border: 1px solid #4b5563;
-        }
-        
-        .tab-btn.active {
-            background: #854d0e;
-            border-color: #ca8a04;
-        }
-        
-        .unit-card {
-            background: #374151;
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 4px solid #ca8a04;
-            margin-bottom: 8px;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-100%); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        
-        .notification-slide {
-            animation: slideIn 0.3s ease-out;
-        }
-        
-        #top-bar {
-            background: rgba(17, 24, 39, 0.95);
-            backdrop-filter: blur(4px);
-        }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -109,8 +17,8 @@
     <div class="bg-[#e3d1b5] text-black p-8 rounded-lg border-4 border-amber-800 w-[550px] shadow-2xl">
         <h1 class="text-6xl font-black text-center mb-6 border-b-4 border-black/30 pb-4">HOI V</h1>
         <p class="text-center text-sm mb-8 italic text-gray-700">Hearts of Iron V: Remastered</p>
-        <button id="btn-start" class="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-xl font-bold border-2 border-black mb-4 shadow-md">СТАРТ</button>
-        <button id="btn-load-map" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 text-lg font-bold border-2 border-black mb-3">ЗАГРУЗИТЬ КАРТУ</button>
+        <button id="btn-start" class="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-xl font-bold border-2 border-black mb-4 shadow-md transition-all">СТАРТ</button>
+        <button id="btn-load-map" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 text-lg font-bold border-2 border-black mb-3 transition-all">ЗАГРУЗИТЬ КАРТУ</button>
         <input type="file" id="map-file-input" class="hidden" accept=".json">
         <p class="text-center text-[10px] text-gray-500 mt-6">GitHub Pages Ready</p>
     </div>
@@ -121,49 +29,82 @@
     <div class="bg-[#e3d1b5] p-6 rounded-lg border-4 border-amber-800 w-[450px] max-h-[80vh] overflow-auto">
         <h2 class="text-2xl font-bold text-center mb-4 border-b border-black/20 pb-2">ВЫБЕРИТЕ</h2>
         <div id="country-list" class="space-y-2"></div>
-        <button id="btn-cancel" class="w-full mt-4 bg-red-800 hover:bg-red-700 text-white py-2 text-sm font-bold">НАЗАД</button>
+        <button id="btn-cancel" class="w-full mt-4 bg-red-800 hover:bg-red-700 text-white py-2 text-sm font-bold rounded">НАЗАД</button>
     </div>
 </div>
 
 <!-- ИГРА -->
 <div id="game-container" class="hidden relative w-full h-full">
-    <div id="top-bar" class="absolute top-0 left-0 right-0 h-12 bg-gray-900/95 border-b border-gray-700 flex items-center px-4 gap-4 z-20 text-sm">
+    <!-- Верхняя панель -->
+    <div id="top-bar" class="absolute top-0 left-0 right-0 h-12 bg-gray-900/95 border-b border-gray-700 flex items-center px-4 gap-4 z-20 text-sm backdrop-blur-sm">
         <span id="country-name" class="font-bold text-yellow-500 text-lg min-w-[150px]">—</span>
-        <span>👥 <span id="val-manpower">0</span></span>
-        <span>🏭 <span id="val-factories">0</span></span>
-        <span>🔫 <span id="val-equipment">0</span></span>
+        <span class="text-gray-400">|</span>
+        <div class="flex items-center gap-2 text-white">
+            <span>👥</span>
+            <span id="val-manpower" class="font-mono">0</span>
+        </div>
+        <div class="flex items-center gap-2 text-white">
+            <span>🏭</span>
+            <span id="val-factories" class="font-mono">0</span>
+        </div>
+        <div class="flex items-center gap-2 text-white">
+            <span>🔫</span>
+            <span id="val-equipment" class="font-mono">0</span>
+        </div>
+        
         <div class="flex-1"></div>
-        <div class="flex gap-1">
+        
+        <div id="research-indicator" class="hidden text-blue-400 text-xs animate-pulse">🔬 ИССЛЕДОВАНИЕ...</div>
+        <div id="focus-indicator" class="hidden text-yellow-500 text-xs animate-pulse">⭐ ФОКУС...</div>
+        <div id="build-indicator" class="hidden text-emerald-400 text-xs animate-pulse">🏗️ СТРОЙКА...</div>
+        
+        <div class="flex gap-1 bg-black/50 px-3 py-1 rounded">
             <button class="speed-btn" data-speed="0">⏸</button>
             <button class="speed-btn" data-speed="1">1x</button>
             <button class="speed-btn" data-speed="3">3x</button>
             <button class="speed-btn" data-speed="5">5x</button>
         </div>
-        <span id="game-date" class="bg-black/50 px-3 py-1 rounded font-mono">1 ЯНВ 1936</span>
+        
+        <span id="game-date" class="bg-black/50 px-3 py-1 rounded font-mono min-w-[130px] text-center border border-gray-600 text-white">1 ЯНВ 1936</span>
     </div>
     
+    <!-- Вкладки -->
     <div id="game-tabs" class="absolute top-12 left-4 flex gap-1 z-20">
-        <button class="tab-btn" data-tab="army">АРМИЯ</button>
-        <button class="tab-btn" data-tab="build">СТРОЙКА</button>
-        <button class="tab-btn" data-tab="diplomacy">ДИПЛОМАТИЯ</button>
+        <button class="tab-btn" onclick="window.openTab('army')">🎖️ АРМИЯ</button>
+        <button class="tab-btn" onclick="window.openTab('build')">🏗️ СТРОЙКА</button>
+        <button class="tab-btn" onclick="window.openTab('diplomacy')">🤝 ДИПЛОМАТИЯ</button>
+        <button class="tab-btn" onclick="window.openTab('research')">🔬 ТЕХНОЛОГИИ</button>
+        <button class="tab-btn" onclick="window.openTab('focus')">⭐ ФОКУСЫ</button>
     </div>
     
-    <div id="info-window" class="absolute top-24 left-4 w-[500px] bg-gray-800 border border-gray-600 rounded-lg hidden z-30">
-        <div class="flex justify-between p-3 bg-gray-900 border-b border-gray-700 rounded-t-lg">
+    <!-- Окно с контентом -->
+    <div id="info-window" class="absolute top-24 left-4 w-[580px] bg-gray-800 border-2 border-gray-600 rounded-lg hidden z-30 flex flex-col shadow-2xl">
+        <div class="flex justify-between items-center p-3 bg-gray-900 border-b border-gray-700 rounded-t-lg">
             <span id="window-title" class="font-bold text-yellow-500">ОКНО</span>
-            <button id="close-window" class="text-red-500 hover:text-red-400">✖</button>
+            <button id="close-window" class="text-red-500 hover:text-red-400 text-xl leading-none" onclick="window.closeWindow()">✖</button>
         </div>
-        <div id="window-content" class="p-4 max-h-96 overflow-auto"></div>
+        <div id="window-content" class="p-4 max-h-[70vh] overflow-y-auto"></div>
     </div>
     
-    <canvas id="map-canvas"></canvas>
+    <!-- Canvas карты -->
+    <canvas id="map-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
     
-    <div id="sidebar" class="absolute right-4 top-24 w-72 bg-gray-900/95 border border-gray-600 rounded-lg p-3 hidden z-20">
-        <h3 id="sidebar-title" class="font-bold text-yellow-500 text-lg">—</h3>
+    <!-- Боковая панель информации -->
+    <div id="sidebar" class="absolute right-4 top-24 w-80 bg-gray-900/95 border-2 border-gray-600 rounded-lg p-3 hidden z-20 backdrop-blur-sm">
+        <div class="flex justify-between items-start mb-2">
+            <h3 id="sidebar-title" class="font-bold text-yellow-500 text-xl">—</h3>
+            <button id="close-sidebar" class="text-gray-400 hover:text-white" onclick="document.getElementById('sidebar').classList.add('hidden')">✖</button>
+        </div>
         <div id="sidebar-actions" class="mt-3"></div>
     </div>
     
-    <div id="notifications" class="absolute bottom-4 left-4 w-80 space-y-2 z-40"></div>
+    <!-- Подсказки -->
+    <div id="hint" class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 px-5 py-2 rounded-full text-yellow-400 text-xs hidden z-30 whitespace-nowrap border border-yellow-500/50">
+        💡 <span id="hint-text"></span>
+    </div>
+    
+    <!-- Нотификации -->
+    <div id="notifications" class="absolute bottom-4 left-4 w-80 z-40 space-y-2 pointer-events-none"></div>
 </div>
 
 <script type="module" src="js/main.js"></script>
