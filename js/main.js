@@ -4,7 +4,7 @@ import {
     setGridData, setCellStats, setMyCountryId, setGameActive, 
     setGameSpeed, setGameDate, setUnits, updateTopBar,
     getGridData, getMyCountryId, setResources, getResources,
-    getGameActive
+    isGameActive
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
 import { openTab, closeWindow, showCountryInfo } from './ui.js';
@@ -60,7 +60,7 @@ async function init() {
     
     // Запускаем рендер цикла
     function animate() {
-        if (getGameActive()) {
+        if (isGameActive()) {
             renderMap();
         }
         requestAnimationFrame(animate);
@@ -365,7 +365,7 @@ function startGame(countryId) {
     setTimeout(() => {
         resizeCanvas();
         renderMap();
-        console.log('Карта отрендерена, активна:', getGameActive());
+        console.log('Карта отрендерена, активна:', isGameActive());
     }, 100);
     
     addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
@@ -383,7 +383,7 @@ function setupCanvasClick() {
         const myId = getMyCountryId();
         const resources = getResources();
         
-        if (!getGameActive()) return;
+        if (!isGameActive()) return;
         
         // Рекрутинг
         if (pendingRecruit) {
