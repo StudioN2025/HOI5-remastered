@@ -381,9 +381,8 @@ function startGame(countryId) {
     setUnits([]);
     setResources({ equipment: 1000, factories: 0, manpower: 0 });
     
-    // Обновляем ресурсы из статистики страны
-    const { updateTopBar: updateBar } = await import('./game.js');
-    updateBar();
+    // Убираем await - updateTopBar синхронная функция
+    updateTopBar();
     
     // Показываем игровой интерфейс
     const gameContainer = document.getElementById('game-container');
@@ -418,6 +417,7 @@ function setupCanvasClick() {
             const unitStats = UNIT_STATS[pendingRecruit];
             if (gridData[key] === myId) {
                 if (resources.equipment >= unitStats.cost && resources.manpower >= unitStats.manpower) {
+                    // Убираем async/await, используем import().then()
                     import('./game.js').then(({ addUnit, getResources, setResources }) => {
                         const res = getResources();
                         res.equipment -= unitStats.cost;
@@ -456,7 +456,7 @@ function setupCanvasClick() {
                 const cost = buildType === 'factory' ? 500 : 300;
                 
                 if (resources.equipment >= cost) {
-                    import('./game.js').then(({ getResources, setResources, addToBuildingQueue, BUILDING_STATS }) => {
+                    import('./game.js').then(({ getResources, setResources, addToBuildingQueue }) => {
                         const res = getResources();
                         res.equipment -= cost;
                         setResources(res);
@@ -501,7 +501,6 @@ function setupCanvasClick() {
         }
     });
 }
-
 function gameLoop(timestamp) {
     renderMap();
     requestAnimationFrame(gameLoop);
