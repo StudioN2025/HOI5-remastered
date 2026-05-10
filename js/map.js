@@ -61,10 +61,6 @@ export function renderMap() {
         return;
     }
     
-    // ТЕСТ: закрасить красным
-    ctx.fillStyle = '#ff0000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    console.log('renderMap вызван, canvas size:', canvas.width, canvas.height);
     
     const gridData = getGridData();
     const units = getUnits();
