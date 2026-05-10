@@ -555,3 +555,103 @@ button {
     border-radius: 8px !important;
     cursor: pointer !important;
 }
+/* === МОБИЛЬНЫЕ СТИЛИ ДЛЯ МЕНЮ === */
+@media (max-width: 768px) {
+    #main-menu > div {
+        padding: 20px !important;
+        width: 90% !important;
+    }
+    
+    #main-menu h1 {
+        font-size: 28px !important;
+        margin-bottom: 16px !important;
+        padding-bottom: 12px !important;
+    }
+    
+    #main-menu p {
+        font-size: 10px !important;
+        margin-top: 16px !important;
+    }
+    
+    #btn-start, #btn-load-map {
+        padding: 12px !important;
+        font-size: 16px !important;
+    }
+    
+    #country-select > div {
+        padding: 16px !important;
+        width: 90% !important;
+    }
+    
+    #country-select h2 {
+        font-size: 18px !important;
+        margin-bottom: 12px !important;
+    }
+    
+    #country-list button {
+        padding: 10px !important;
+        font-size: 12px !important;
+    }
+    
+    /* Фикс порядка элементов */
+    #game-tabs {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        justify-content: flex-start !important;
+        gap: 4px !important;
+    }
+    
+    .tab-btn {
+        order: 0 !important;
+        flex: 0 0 auto !important;
+    }
+    
+    #top-bar {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        height: auto !important;
+        min-height: 44px !important;
+        padding: 4px 8px !important;
+        gap: 6px !important;
+    }
+    
+    #top-bar .stat-item {
+        font-size: 10px !important;
+    }
+    
+    .speed-buttons {
+        order: 10 !important;
+    }
+    
+    #game-date {
+        order: 11 !important;
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+    }
+}
+
+/* Очень маленькие телефоны */
+@media (max-width: 480px) {
+    #top-bar {
+        gap: 4px !important;
+    }
+    
+    #top-bar .stat-item span:first-child {
+        font-size: 8px !important;
+    }
+    
+    #top-bar .stat-item {
+        font-size: 9px !important;
+    }
+    
+    .speed-btn {
+        padding: 2px 6px !important;
+        font-size: 8px !important;
+    }
+    
+    #country-list button {
+        font-size: 10px !important;
+        padding: 8px !important;
+    }
+}
