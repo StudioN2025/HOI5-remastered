@@ -1,270 +1,215 @@
-import { getCountryInfo, getCellData, addNotification, isAtWar, areAllies } from './utils.js';
-import { getMyCountryId, getWars, getAlliances, getGridData, getCellStats, getPlayerResources, getUnits, getBuildingQueue } from './game.js';
-import { UNIT_STATS, BUILDING_STATS, TECH_TREE } from './data.js';
-import { startRecruitment, setSelectedUnitId } from './military.js';
-import { declareWar, proposeAlliance, kickFromAlliance, getWarsList, getAlliancesList } from './diplomacy.js';
-import { startResearch, getTechLevel, updateResearchUI } from './tech.js';
-import { startFocus, updateFocusUI, getAvailableFocuses } from './focuses.js';
+import { COUNTRIES, DEFAULT_MAP, UNIT_STATS } from './data.js';
+import { getCountryInfo, addNotification } from './utils.js';
+import { 
+    setGridData, setCellStats, setMyCountryId, setGameActive, 
+    setGameSpeed, setGameDate, setUnits, updateTopBar,
+    getGridData, getMyCountryId
+} from './game.js';
+import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
+import { openTab, closeWindow, showCountryInfo } from './ui.js';
 
-let currentOpenTab = null;
+let pendingRecruit = null;
 
-export function openWindow(tab) {
-    const windowDiv = document.getElementById('info-window');
-    const content = document.getElementById('window-content');
-    const title = document.getElementById('window-title');
-    
-    windowDiv.classList.remove('hidden');
-    currentOpenTab = tab;
-    
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tab);
-    });
-    
-    if (tab === 'army') {
-        title.innerText = 'АРМИЯ';
-        renderArmyUI(content);
-    } else if (tab === 'research') {
-        title.innerText = 'ТЕХНОЛОГИИ';
-        updateResearchUI();
-    } else if (tab === 'focus') {
-        title.innerText = 'НАЦИОНАЛЬНЫЕ ФОКУСЫ';
-        updateFocusUI();
-    } else if (tab === 'diplomacy') {
-        title.innerText = 'ДИПЛОМАТИЯ';
-        renderDiplomacyUI(content);
-    } else if (tab === 'build') {
-        title.innerText = 'СТРОИТЕЛЬСТВО';
-        renderBuildUI(content);
-    } else if (tab === 'economy') {
-        title.innerText = 'ЭКОНОМИКА';
-        renderEconomyUI(content);
-    }
-}
+window.openTab = openTab;
+window.closeWindow = closeWindow;
+window.showCountryInfo = showCountryInfo;
 
-export function closeWindow() {
-    document.getElementById('info-window').classList.add('hidden');
-    currentOpenTab = null;
-}
-
-function renderArmyUI(container) {
-    const units = getUnits();
-    const myCountryId = getMyCountryId();
-    const myUnits = units.filter(u => u.owner === myCountryId);
-    
-    let html = `
-        <div class="space-y-3 mb-4">
-            <div class="bg-gray-700 p-3 rounded">
-                <div class="font-bold mb-2">🆕 НАБОР</div>
-                <div class="grid grid-cols-2 gap-2">
-    `;
-    
-    Object.entries(UNIT_STATS).forEach(([key, u]) => {
-        html += `
-            <button onclick="window.openRecruitPanel('${key}')" class="bg-emerald-800 hover:bg-emerald-700 p-2 rounded text-sm">
-                ${u.icon} ${u.name}
-            </button>
-        `;
-    });
-    
-    html += `
-                </div>
-            </div>
-            <div class="font-bold text-yellow-500">⚔️ ВОЙСКА (${myUnits.length})</div>
-    `;
-    
-    if (myUnits.length === 0) {
-        html += '<div class="text-center text-gray-400 py-4">Нет войск</div>';
-    } else {
-        myUnits.forEach(u => {
-            const stats = UNIT_STATS[u.type];
-            html += `
-                <div class="unit-card">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <span class="font-bold">${stats.icon} ${stats.name}</span>
-                            ${u.trainingDaysLeft > 0 ? `<span class="text-xs text-yellow-500 ml-2">(тренировка: ${u.trainingDaysLeft} дн.)</span>` : ''}
-                        </div>
-                        <button onclick="window.selectUnit('${u.id}')" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 text-xs rounded">ВЫБРАТЬ</button>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-1">❤️ HP: ${Math.floor(u.hp || 100)}/${stats.hp}</div>
-                    ${u.path?.length > 0 ? `<div class="text-xs text-blue-400">🚶 В движении</div>` : ''}
-                </div>
-            `;
-        });
-    }
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-window.openRecruitPanel = (unitType) => {
+// Рекрутинг через глобальное окно
+window.recruitUnit = (type) => {
     closeWindow();
-    const hint = document.getElementById('hint');
-    const hintText = document.getElementById('hint-text');
-    hintText.innerText = `Выберите провинцию для развертывания ${UNIT_STATS[unitType].name}`;
-    hint.classList.remove('hidden');
+    pendingRecruit = type;
     
-    window._pendingRecruit = unitType;
-    setTimeout(() => {
-        hint.classList.add('hidden');
-        window._pendingRecruit = null;
-    }, 10000);
+    // Удаляем старую подсказку если есть
+    const oldHint = document.getElementById('recruit-hint');
+    if (oldHint) oldHint.remove();
+    
+    const hint = document.createElement('div');
+    hint.id = 'recruit-hint';
+    hint.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-black/90 px-5 py-2 rounded-full text-yellow-400 text-xs z-30 whitespace-nowrap border border-yellow-500/50';
+    hint.innerHTML = `💡 Выберите провинцию для развертывания ${UNIT_STATS[type].icon} ${UNIT_STATS[type].name}`;
+    document.body.appendChild(hint);
+    
+    setTimeout(() => hint.remove(), 15000);
 };
 
-window.selectUnit = (unitId) => {
-    setSelectedUnitId(unitId);
-    closeWindow();
-    const hint = document.getElementById('hint');
-    const hintText = document.getElementById('hint-text');
-    hintText.innerText = `Выберите цель для движения`;
-    hint.classList.remove('hidden');
-    setTimeout(() => hint.classList.add('hidden'), 5000);
-};
-
-function renderDiplomacyUI(container) {
-    const myCountryId = getMyCountryId();
-    const enemies = getWarsList();
-    const allies = getAlliancesList();
+function init() {
+    console.log('🚀 HOI V Remastered загружается...');
     
-    let html = `
-        <div class="mb-6">
-            <div class="font-bold text-emerald-500 mb-2">🤝 СОЮЗНИКИ</div>
-            ${allies.length === 0 ? '<div class="text-gray-400 text-sm">Нет союзников</div>' : ''}
-            ${allies.map(a => `
-                <div class="bg-gray-700 p-2 rounded mb-1 flex justify-between items-center">
-                    <span>${getCountryInfo(a).name}</span>
-                    <button onclick="window.kickAlly('${a}')" class="text-red-400 text-xs hover:text-red-300">ИСКЛЮЧИТЬ</button>
-                </div>
-            `).join('')}
-        </div>
-        <div>
-            <div class="font-bold text-red-500 mb-2">⚔️ ВОЙНЫ</div>
-            ${enemies.length === 0 ? '<div class="text-gray-400 text-sm">Мирное время</div>' : ''}
-            ${enemies.map(e => `
-                <div class="bg-gray-700 p-2 rounded mb-1">
-                    <span>${getCountryInfo(e).name}</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    resizeCanvas();
+    setupMapEvents();
     
-    container.innerHTML = html;
-}
-
-function renderBuildUI(container) {
-    const buildingQueue = getBuildingQueue();
+    // Кнопки меню
+    const startBtn = document.getElementById('btn-start');
+    const loadBtn = document.getElementById('btn-load-map');
+    const cancelBtn = document.getElementById('btn-cancel');
+    const closeWindowBtn = document.getElementById('close-window');
+    const mapFileInput = document.getElementById('map-file-input');
     
-    let html = '';
+    if (startBtn) startBtn.onclick = () => loadDefaultMap();
+    if (loadBtn) loadBtn.onclick = () => mapFileInput?.click();
+    if (cancelBtn) cancelBtn.onclick = () => document.getElementById('country-select')?.classList.add('hidden');
+    if (closeWindowBtn) closeWindowBtn.onclick = () => document.getElementById('info-window')?.classList.add('hidden');
     
-    if (buildingQueue.length > 0) {
-        const current = buildingQueue[0];
-        const stats = BUILDING_STATS[current.type];
-        html += `
-            <div class="bg-blue-900/30 border border-blue-500 p-3 rounded mb-4">
-                <div class="flex justify-between text-sm">
-                    <span>🏗️ ${stats?.name || 'Стройка'}</span>
-                    <span>${current.daysLeft} дн.</span>
-                </div>
-                <div class="progress-bar mt-2">
-                    <div class="progress-fill bg-blue-500" style="width: ${((stats?.buildTime - current.daysLeft) / stats?.buildTime) * 100}%"></div>
-                </div>
-            </div>
-        `;
+    if (mapFileInput) {
+        mapFileInput.onchange = (e) => {
+            if (e.target.files[0]) loadMapFromFile(e.target.files[0]);
+        };
     }
     
-    html += '<div class="grid grid-cols-2 gap-2">';
-    Object.entries(BUILDING_STATS).forEach(([key, b]) => {
-        html += `
-            <button onclick="window.openBuildMode('${key}')" class="bg-blue-800 hover:bg-blue-700 p-3 rounded text-center">
-                <div class="text-2xl">${b.icon}</div>
-                <div class="text-xs font-bold">${b.name}</div>
-                <div class="text-[10px] text-gray-300">${b.costEquipment} 🔫</div>
-            </button>
-        `;
+    // Кнопки скорости
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.onclick = () => {
+            const speed = parseInt(btn.dataset.speed);
+            setGameSpeed(speed);
+            document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        };
     });
-    html += '</div>';
     
-    container.innerHTML = html;
+    setupCanvasClick();
+    
+    // Запуск игрового цикла
+    requestAnimationFrame(gameLoop);
+    
+    console.log('✅ Готово! Жду загрузки карты...');
 }
 
-window.openBuildMode = (buildType) => {
-    closeWindow();
-    const hint = document.getElementById('hint');
-    const hintText = document.getElementById('hint-text');
-    hintText.innerText = `Выберите провинцию для строительства ${BUILDING_STATS[buildType].name}`;
-    hint.classList.remove('hidden');
+function setupCanvasClick() {
+    const canvas = document.getElementById('map-canvas');
+    if (!canvas) return;
     
-    window._pendingBuild = buildType;
-    setTimeout(() => {
-        hint.classList.add('hidden');
-        window._pendingBuild = null;
-    }, 10000);
-};
-
-function renderEconomyUI(container) {
-    const resources = getPlayerResources();
-    const myCountryId = getMyCountryId();
-    
-    let html = `
-        <div class="space-y-4">
-            <div class="bg-gray-700 p-4 rounded">
-                <div class="text-sm text-gray-400">РЕСУРСЫ</div>
-                <div class="text-2xl font-bold text-yellow-500">🔫 ${Math.floor(resources.equipment).toLocaleString()}</div>
-                <div class="text-lg">👥 ${Math.floor(resources.manpower).toLocaleString()}</div>
-                <div class="text-lg">🏭 ${resources.factories}</div>
-            </div>
-            <div class="bg-gray-700 p-4 rounded">
-                <div class="text-sm text-gray-400">ПРОИЗВОДСТВО</div>
-                <div class="text-sm">+${Math.floor(resources.factories * 1.5)} 🔫 в день</div>
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-export function showCountryInfo(countryId, posKey) {
-    const info = getCountryInfo(countryId);
-    const cell = getCellData(posKey, getCellStats());
-    const myCountryId = getMyCountryId();
-    
-    document.getElementById('sidebar-title').innerText = info.name;
-    document.getElementById('sidebar-leader').innerText = info.leader;
-    document.getElementById('sidebar-ideology').innerText = info.ideology;
-    document.getElementById('sidebar-pop').innerText = cell.population.toLocaleString();
-    document.getElementById('sidebar-factories').innerText = cell.factories;
-    
-    const actionsDiv = document.getElementById('sidebar-actions');
-    if (countryId !== myCountryId) {
-        actionsDiv.classList.remove('hidden');
-        const isAtWarFlag = isAtWar(myCountryId, countryId, getWars());
-        const isAllied = areAllies(myCountryId, countryId, getAlliances());
+    canvas.addEventListener('click', (e) => {
+        const world = screenToWorld(e.clientX, e.clientY);
+        const key = `${world.x},${world.y}`;
+        const gridData = getGridData();
+        const myId = getMyCountryId();
         
-        actionsDiv.innerHTML = `
-            ${!isAtWarFlag ? `<button id="btn-war" class="w-full bg-red-700 hover:bg-red-600 py-2 text-sm font-bold mb-2 rounded">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>` : '<div class="text-red-500 text-sm text-center mb-2">⚔️ В СОСТОЯНИИ ВОЙНЫ</div>'}
-            ${!isAllied && !isAtWarFlag ? `<button id="btn-ally" class="w-full bg-emerald-700 hover:bg-emerald-600 py-2 text-sm font-bold rounded">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>` : ''}
-        `;
-        
-        const warBtn = document.getElementById('btn-war');
-        const allyBtn = document.getElementById('btn-ally');
-        if (warBtn) warBtn.onclick = () => { declareWar(countryId); showCountryInfo(countryId, posKey); };
-        if (allyBtn) allyBtn.onclick = () => { proposeAlliance(countryId); showCountryInfo(countryId, posKey); };
-    } else {
-        actionsDiv.classList.add('hidden');
-    }
-    
-    document.getElementById('info-sidebar').classList.remove('hidden');
-}
-
-export function setupUIEvents() {
-    // Закрытие сайдбара при клике вне
-    document.addEventListener('click', (e) => {
-        const sidebar = document.getElementById('info-sidebar');
-        const sidebarActions = document.getElementById('sidebar-actions');
-        if (sidebar && !sidebar.contains(e.target) && !sidebarActions?.contains(e.target)) {
-            if (e.target !== canvas) {
-                sidebar.classList.add('hidden');
+        // Рекрутинг
+        if (pendingRecruit) {
+            if (gridData[key] === myId) {
+                import('./game.js').then(({ addUnit }) => {
+                    addUnit({
+                        id: Math.random().toString(36).substr(2, 8),
+                        pos: key,
+                        owner: myId,
+                        type: pendingRecruit,
+                        trainingDaysLeft: 10,
+                        hp: UNIT_STATS[pendingRecruit].hp,
+                        path: []
+                    });
+                    addNotification(`${UNIT_STATS[pendingRecruit].name} развернута!`, 'info');
+                    pendingRecruit = null;
+                    const hint = document.getElementById('recruit-hint');
+                    if (hint) hint.remove();
+                    renderMap();
+                });
+            } else {
+                addNotification('Можно развертывать только на своей территории!', 'war');
             }
+            return;
+        }
+        
+        // Показ информации о стране
+        if (gridData[key]) {
+            showCountryInfo(gridData[key], key);
         }
     });
+}
+
+function loadDefaultMap() {
+    console.log('Загрузка дефолтной карты...');
+    setGridData(DEFAULT_MAP.gridData);
+    setCellStats(DEFAULT_MAP.cellStats || {});
+    
+    const countries = [...new Set(Object.values(DEFAULT_MAP.gridData))];
+    if (countries.length === 0) {
+        addNotification('Ошибка: карта пуста!', 'war');
+        return;
+    }
+    
+    showCountrySelection(countries);
+}
+
+function loadMapFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            setGridData(data.gridData || {});
+            setCellStats(data.cellStats || {});
+            
+            const countries = [...new Set(Object.values(data.gridData))];
+            if (countries.length === 0) {
+                addNotification('Ошибка: на карте нет стран!', 'war');
+                return;
+            }
+            
+            addNotification(`Карта "${file.name}" загружена!`, 'info');
+            showCountrySelection(countries);
+        } catch(err) {
+            addNotification('Ошибка JSON: ' + err.message, 'war');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function showCountrySelection(countries) {
+    const container = document.getElementById('country-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    countries.forEach(id => {
+        const info = getCountryInfo(id);
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-3 border border-gray-300 rounded bg-white/50 hover:bg-white font-bold text-sm transition mb-2';
+        btn.style.borderLeftColor = info.color;
+        btn.style.borderLeftWidth = '4px';
+        btn.innerHTML = `
+            <div class="font-bold">${info.name}</div>
+            <div class="text-xs text-gray-600">${info.ideology} • ${info.leader}</div>
+        `;
+        btn.onclick = () => startGame(id);
+        container.appendChild(btn);
+    });
+    
+    const countrySelect = document.getElementById('country-select');
+    const mainMenu = document.getElementById('main-menu');
+    if (countrySelect) countrySelect.classList.remove('hidden');
+    if (mainMenu) mainMenu.classList.add('hidden');
+}
+
+function startGame(countryId) {
+    console.log('Старт игры за', countryId);
+    
+    setMyCountryId(countryId);
+    setGameActive(true);
+    setGameSpeed(1);
+    setGameDate(new Date(1936, 0, 1));
+    setUnits([]);
+    
+    const gameContainer = document.getElementById('game-container');
+    const countrySelect = document.getElementById('country-select');
+    const gameTabs = document.getElementById('game-tabs');
+    
+    if (gameContainer) gameContainer.classList.remove('hidden');
+    if (countrySelect) countrySelect.classList.add('hidden');
+    if (gameTabs) gameTabs.classList.remove('hidden');
+    
+    updateTopBar();
+    renderMap();
+    
+    addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
+}
+
+function gameLoop(timestamp) {
+    renderMap();
+    requestAnimationFrame(gameLoop);
+}
+
+// Запуск после загрузки DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
 }
