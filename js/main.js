@@ -58,10 +58,18 @@ async function init() {
     await loadMapsList();
     setupCanvasClick();
     
-    // Запускаем рендер цикла
+    // Оптимизированный анимационный цикл
+    let lastRenderTime = 0;
+    let frameCount = 0;
+    
     function animate() {
-        if (isGameActive()) {
-            renderMap();
+        frameCount++;
+        const now = performance.now();
+        if (now - lastRenderTime >= 33) {
+            lastRenderTime = now;
+            if (isGameActive()) {
+                renderMap();
+            }
         }
         requestAnimationFrame(animate);
     }
@@ -340,7 +348,6 @@ function showCountrySelection(countries) {
 function startGame(countryId) {
     console.log('Старт игры за', countryId);
     
-    // Инициализация игрового состояния
     setMyCountryId(countryId);
     setGameActive(true);
     setGameSpeed(1);
@@ -350,7 +357,6 @@ function startGame(countryId) {
     
     updateTopBar();
     
-    // Скрываем меню выбора
     const countrySelect = document.getElementById('country-select');
     const mainMenu = document.getElementById('main-menu');
     const gameContainer = document.getElementById('game-container');
@@ -361,15 +367,15 @@ function startGame(countryId) {
     if (gameContainer) gameContainer.classList.remove('hidden');
     if (gameTabs) gameTabs.classList.remove('hidden');
     
-    // Принудительно рендерим карту
+    // Единственный рендер
     setTimeout(() => {
         resizeCanvas();
         renderMap();
-        console.log('Карта отрендерена, активна:', isGameActive());
-    }, 100);
+        console.log('Карта отрендерена');
+    }, 50);
     
     addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
-    addNotification(`Ваши ресурсы: ${Math.floor(getResources().equipment)} снаряжения, ${Math.floor(getResources().manpower)} людей`, 'info');
+    addNotification(`Ваши ресурсы: ${Math.floor(getResources().equipment)} снаряжения`, 'info');
 }
 
 function setupCanvasClick() {
