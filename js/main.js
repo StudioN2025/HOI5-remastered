@@ -229,6 +229,13 @@ function showCountrySelect() {
         btn.addEventListener('click', () => {
             state.myCountryId = id;
             state.isGameMode = true;
+            
+            // Инициализируем ресурсы игрока на основе выбранной страны
+            const stats = calculateCountryStats(id);
+            state.playerResources.factories = stats.totalFactories;
+            state.playerResources.equipment = stats.totalFactories * 50;
+            state.playerResources.manpower = stats.totalPop;
+            
             setSpeed(1);
             updateTopBar();
             domCache.playMenu.style.display = 'none';
