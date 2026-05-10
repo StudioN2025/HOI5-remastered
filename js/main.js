@@ -1,8 +1,8 @@
 import { CONFIG } from './config.js';
 import { state, months } from './state.js';
-import { initMap, renderMap, getCellData, screenToWorld, updateCamera, calculateCountryStats } from './map.js';
-import { getUnitStats, processCombat, isAtWar, areAllies, renderUnits } from './units.js';
-import { updateTopBar, updateDate, createAlert, openWindow, closeWindow, showIntel, setSpeed, openFocusTree, updateFocusUI } from './ui.js';
+import { initMap, renderMap, getCellData, screenToWorld, updateCamera, calculateCountryStats, centerCameraOnMap } from './map.js';
+import { getUnitStats, processCombat, isAtWar, areAllies, renderUnits, checkCapitulation } from './units.js';
+import { updateTopBar, updateDate, createAlert, openWindow, closeWindow, showIntel, setSpeed, openFocusTree, updateFocusUI, resetMapMode } from './ui.js';
 import { runCountryAI } from './ai.js';
 import { nationalFocuses } from './data/focuses.js';
 import { getCountryInfo } from './data/countries.js';
@@ -15,8 +15,21 @@ async function loadMap() {
     try {
         const response = await fetch(CONFIG.MAP_PATH);
         const data = await response.json();
-        state.gridData = data.gridData || {};
+        
+        // Очищаем ключи от пробелов
+        state.gridData = {};
+        if (data.gridData) {
+            Object.entries(data.gridData).forEach(([key, value]) => {
+                const cleanKey = key.trim();
+                const cleanValue = typeof value === 'string' ? value.trim() : value;
+                state.gridData[cleanKey] = cleanValue;
+            });
+        }
         state.cellStats = data.cellStats || {};
+        
+        // Центрируем камеру на карте
+        centerCameraOnMap();
+        
         return true;
     } catch (e) {
         console.error('Ошибка загрузки карты:', e);
@@ -54,7 +67,7 @@ function gameLoop(currentTime) {
 // Обработка дня
 function onDayPassed() {
     const oldDate = new Date(state.gameDate);
-    state.gameDate = new Date(state.gameDate.getTime() + 3600000); // +1 час
+    state.gameDate = new Date(state.gameDate.getTime() + 3600000);
     
     if (state.gameDate.getDate() !== oldDate.getDate()) {
         // Фокусы
@@ -148,6 +161,7 @@ function onDayPassed() {
                         state.gridData[nextStep] = u.owner;
                         u.pos = nextStep;
                         u.path.shift();
+                        checkCapitulation(targetOwner, u.owner);
                     } else if (targetOwner === u.owner || areAllies(u.owner, targetOwner)) {
                         u.pos = nextStep;
                         u.path.shift();
@@ -177,6 +191,12 @@ function showCountrySelect() {
     const ids = [...new Set(Object.values(state.gridData))];
     const list = document.getElementById('play-country-list');
     list.innerHTML = '';
+    
+    if (ids.length === 0) {
+        alert('Карта пуста! Создайте карту в редакторе.');
+        location.reload();
+        return;
+    }
     
     ids.forEach(id => {
         const btn = document.createElement('button');
@@ -214,7 +234,7 @@ window.startResearch = (type, level) => {
     document.getElementById('research-indicator').classList.remove('hidden');
 };
 window.selectBuildType = (type) => {
-    const b = getUnitStats().factory;
+    const b = getBuildingStats().factory;
     if (state.playerResources.equipment < b.costEquipment) {
         createAlert("НЕДОСТАТОЧНО СНАРЯЖЕНИЯ", 3, 'war');
         return;
@@ -231,6 +251,8 @@ window.startRecruitment = (type) => {
 window.setSpeed = setSpeed;
 window.openWindow = openWindow;
 window.closeWindow = closeWindow;
+window.resetMapMode = resetMapMode;
+window.closePlayMenu = () => { document.getElementById('play-menu').style.display = 'none'; };
 
 // Обработчики событий
 window.addEventListener('keydown', e => {
