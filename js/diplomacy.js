@@ -1,78 +1,45 @@
-import { getWars, setWars, getAlliances, setAlliances, getMyCountryId } from './game.js';
-import { isAtWar, areAllies, addNotification } from './utils.js';
-import { getCountryInfo } from './utils.js';
+import { getWars, setWars, getMyCountryId, getAlliances, setAlliances } from './game.js';
+import { getCountryInfo, addNotification } from './utils.js';
 
-export function declareWar(targetCountryId) {
-    const myCountryId = getMyCountryId();
+export function declareWar(targetId) {
+    const myId = getMyCountryId();
     const wars = getWars();
     
-    if (isAtWar(myCountryId, targetCountryId, wars)) {
+    // Проверка что не уже в войне
+    const alreadyAtWar = wars.some(w => (w.a === myId && w.b === targetId) || (w.b === myId && w.a === targetId));
+    if (alreadyAtWar) {
         addNotification('Уже в состоянии войны!', 'war');
-        return false;
+        return;
     }
     
-    wars.push({ a: myCountryId, b: targetCountryId });
+    wars.push({ a: myId, b: targetId });
     setWars(wars);
-    addNotification(`${getCountryInfo(myCountryId).name} объявляет войну ${getCountryInfo(targetCountryId).name}!`, 'war');
-    return true;
+    addNotification(`${getCountryInfo(myId).name} объявляет войну ${getCountryInfo(targetId).name}!`, 'war');
+    
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.add('hidden');
 }
 
-export function proposeAlliance(targetCountryId) {
-    const myCountryId = getMyCountryId();
+export function proposeAlliance(targetId) {
+    const myId = getMyCountryId();
     const alliances = getAlliances();
     
-    if (areAllies(myCountryId, targetCountryId, alliances)) {
+    // Проверка что не уже в альянсе
+    const alreadyAllied = alliances.some(a => a.has(myId) && a.has(targetId));
+    if (alreadyAllied) {
         addNotification('Уже в альянсе!', 'info');
-        return false;
+        return;
     }
     
     // 80% шанс согласия
     if (Math.random() < 0.8) {
-        alliances.push(new Set([myCountryId, targetCountryId]));
+        alliances.push(new Set([myId, targetId]));
         setAlliances(alliances);
-        addNotification(`${getCountryInfo(myCountryId).name} и ${getCountryInfo(targetCountryId).name} заключили альянс!`, 'info');
-        return true;
+        addNotification(`${getCountryInfo(myId).name} и ${getCountryInfo(targetId).name} заключили альянс!`, 'info');
     } else {
-        addNotification(`${getCountryInfo(targetCountryId).name} отклонил предложение альянса.`, 'info');
-        return false;
+        addNotification(`${getCountryInfo(targetId).name} отклонил предложение альянса.`, 'info');
     }
-}
-
-export function kickFromAlliance(allyId) {
-    const myCountryId = getMyCountryId();
-    let alliances = getAlliances();
     
-    alliances = alliances.filter(a => !(a.has(myCountryId) && a.has(allyId)));
-    setAlliances(alliances);
-    addNotification(`Альянс с ${getCountryInfo(allyId).name} расторгнут!`, 'info');
-    return true;
-}
-
-export function getWarsList() {
-    const myCountryId = getMyCountryId();
-    const wars = getWars();
-    const enemies = [];
-    
-    wars.forEach(w => {
-        if (w.a === myCountryId) enemies.push(w.b);
-        if (w.b === myCountryId) enemies.push(w.a);
-    });
-    
-    return [...new Set(enemies)];
-}
-
-export function getAlliancesList() {
-    const myCountryId = getMyCountryId();
-    const alliances = getAlliances();
-    const allies = [];
-    
-    alliances.forEach(a => {
-        if (a.has(myCountryId)) {
-            a.forEach(id => {
-                if (id !== myCountryId) allies.push(id);
-            });
-        }
-    });
-    
-    return [...new Set(allies)];
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.add('hidden');
 }
