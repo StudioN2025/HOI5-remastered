@@ -1,25 +1,7 @@
-import { getUnits, setUnits, getMyCountryId, getWars, isGameActive } from './game.js';
+import { getUnits, setUnits, getMyCountryId, getWars, getSelectedUnitId, setSelectedUnitId } from './game.js';
 import { UNIT_STATS } from './data.js';
 import { isAtWar, addNotification } from './utils.js';
 import { renderMap } from './map.js';
-
-let selectedUnitId = null;
-
-export function getSelectedUnitId() { return selectedUnitId; }
-export function setSelectedUnitId(id) { selectedUnitId = id; }
-
-export function addUnit(unit) {
-    const units = getUnits();
-    units.push(unit);
-    setUnits(units);
-    renderMap();
-}
-
-export function removeUnit(id) {
-    const units = getUnits();
-    setUnits(units.filter(u => u.id !== id));
-    renderMap();
-}
 
 export function moveUnit(unitId, targetPos) {
     const units = getUnits();
@@ -31,39 +13,20 @@ export function moveUnit(unitId, targetPos) {
     
     let path = [];
     let cx = sx, cy = sy;
-    while (cx !== tx || cy !== ty) {
+    let steps = 0;
+    const maxSteps = 50;
+    
+    while ((cx !== tx || cy !== sy) && steps < maxSteps) {
         if (cx < tx) cx++;
         else if (cx > tx) cx--;
         if (cy < ty) cy++;
         else if (cy > ty) cy--;
         path.push(`${cx},${cy}`);
+        steps++;
     }
     
     unit.path = path;
     setUnits(units);
-    renderMap();
-    return true;
-}
-
-export function startRecruitment(unitType, posKey) {
-    const myCountryId = getMyCountryId();
-    const units = getUnits();
-    
-    const stats = UNIT_STATS[unitType];
-    if (!stats) return false;
-    
-    units.push({
-        id: Math.random().toString(36).substr(2, 9),
-        pos: posKey,
-        owner: myCountryId,
-        type: unitType,
-        trainingDaysLeft: 10,
-        path: [],
-        hp: stats.hp
-    });
-    
-    setUnits(units);
-    addNotification(`Дивизия ${stats.name} развернута!`, 'info');
     renderMap();
     return true;
 }
@@ -76,8 +39,10 @@ export function processCombat() {
     // Находим коллизии
     for (let i = 0; i < units.length; i++) {
         for (let j = i + 1; j < units.length; j++) {
-            if (units[i].pos === units[j].pos && isAtWar(units[i].owner, units[j].owner, wars)) {
-                battles.push([units[i], units[j]]);
+            if (units[i].pos === units[j].pos && units[i].owner !== units[j].owner) {
+                if (isAtWar(units[i].owner, units[j].owner, wars)) {
+                    battles.push([units[i], units[j]]);
+                }
             }
         }
     }
@@ -87,11 +52,16 @@ export function processCombat() {
         const aStats = UNIT_STATS[a.type];
         const bStats = UNIT_STATS[b.type];
         
-        // Урон
-        a.hp = (a.hp || 100) - Math.max(1, bStats.attack * (Math.random() * 0.5 + 0.5));
-        b.hp = (b.hp || 100) - Math.max(1, aStats.attack * (Math.random() * 0.5 + 0.5));
+        if (!aStats || !bStats) return;
         
-        addNotification(`⚔️ Бой между ${aStats.name} и ${bStats.name}!`, 'war');
+        // Урон
+        const aDamage = Math.max(1, Math.floor(aStats.attack * (Math.random() * 0.5 + 0.5)));
+        const bDamage = Math.max(1, Math.floor(bStats.attack * (Math.random() * 0.3 + 0.3)));
+        
+        a.hp = (a.hp || aStats.hp) - bDamage;
+        b.hp = (b.hp || bStats.hp) - aDamage;
+        
+        addNotification(`⚔️ Бой: ${aStats.name} vs ${bStats.name}!`, 'war');
         
         // Смерть
         if (a.hp <= 0) {
@@ -104,11 +74,39 @@ export function processCombat() {
         }
     });
     
-    // Регенерация
-    const myCountryId = getMyCountryId();
+    // Движение юнитов
+    const myId = getMyCountryId();
     units.forEach(u => {
-        if (u.owner === myCountryId && u.hp < UNIT_STATS[u.type].hp) {
-            u.hp = Math.min(UNIT_STATS[u.type].hp, u.hp + 2);
+        if (u.path && u.path.length > 0) {
+            if (!u.moveCooldown) u.moveCooldown = 0;
+            u.moveCooldown++;
+            if (u.moveCooldown >= 2) {
+                u.moveCooldown = 0;
+                const next = u.path[0];
+                const gridData = window._gridData || {};
+                
+                if (!gridData[next]) return;
+                
+                if (isAtWar(u.owner, gridData[next], wars)) {
+                    u.path.shift();
+                    gridData[next] = u.owner;
+                    u.pos = next;
+                    window._gridData = gridData;
+                } else if (gridData[next] === u.owner) {
+                    u.path.shift();
+                    u.pos = next;
+                } else {
+                    u.path = [];
+                }
+            }
+        }
+    });
+    
+    // Регенерация
+    units.forEach(u => {
+        const stats = UNIT_STATS[u.type];
+        if (stats && u.hp < stats.hp && u.owner === myId) {
+            u.hp = Math.min(stats.hp, u.hp + 1);
         }
     });
     
