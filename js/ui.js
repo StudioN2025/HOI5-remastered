@@ -1,11 +1,10 @@
 import { getCountryInfo, addNotification } from './utils.js';
-import { getMyCountryId, getWars, getAlliances, getUnits, getResources, getBuildingQueue, updateTopBar } from './game.js';
+import { getMyCountryId, getWars, getAlliances, getUnits, getResources, getBuildingQueue } from './game.js';
 import { UNIT_STATS, BUILDING_STATS } from './data.js';
 import { declareWar, proposeAlliance } from './diplomacy.js';
-import { renderMap } from './map.js';
 
-// Глобальные функции для вызова из onclick
-window.openTab = function(tab) {
+// ЭКСПОРТ ДЛЯ main.js
+export function openTab(tab) {
     console.log('openTab called:', tab);
     const windowDiv = document.getElementById('info-window');
     const content = document.getElementById('window-content');
@@ -34,13 +33,15 @@ window.openTab = function(tab) {
         title.innerText = '⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ';
         renderFocus(content);
     }
-};
+}
 
 export function closeWindow() {
     const windowDiv = document.getElementById('info-window');
     if (windowDiv) windowDiv.classList.add('hidden');
 }
 
+// Глобальные версии для onclick
+window.openTab = openTab;
 window.closeWindow = closeWindow;
 
 function renderArmy(container) {
@@ -265,10 +266,10 @@ function renderResearch(container) {
                             <span class="font-bold text-white">🏭 ПРОМЫШЛЕННОСТЬ</span>
                             <div class="text-xs text-gray-300">Увеличивает производство снаряжения на +5% за уровень</div>
                         </div>
-                        <div class="text-yellow-400">Ур. ${window.getTechLevel?.('industry') || 1}/5</div>
+                        <div class="text-yellow-400">Ур. 1/5</div>
                     </div>
                     <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-blue-500 h-full rounded-full" style="width: ${((window.getTechLevel?.('industry') || 1) / 5) * 100}%"></div>
+                        <div class="bg-blue-500 h-full rounded-full" style="width: 20%"></div>
                     </div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-green-500">
@@ -277,10 +278,10 @@ function renderResearch(container) {
                             <span class="font-bold text-white">💂 ПЕХОТА</span>
                             <div class="text-xs text-gray-300">+5% атака/защита, +10% стоимость за уровень</div>
                         </div>
-                        <div class="text-yellow-400">Ур. ${window.getTechLevel?.('infantry') || 1}/5</div>
+                        <div class="text-yellow-400">Ур. 1/5</div>
                     </div>
                     <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-green-500 h-full rounded-full" style="width: ${((window.getTechLevel?.('infantry') || 1) / 5) * 100}%"></div>
+                        <div class="bg-green-500 h-full rounded-full" style="width: 20%"></div>
                     </div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-orange-500">
@@ -289,10 +290,10 @@ function renderResearch(container) {
                             <span class="font-bold text-white">🚜 ТАНКИ</span>
                             <div class="text-xs text-gray-300">+5% атака/броня за уровень</div>
                         </div>
-                        <div class="text-yellow-400">Ур. ${window.getTechLevel?.('tank') || 1}/5</div>
+                        <div class="text-yellow-400">Ур. 1/5</div>
                     </div>
                     <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-orange-500 h-full rounded-full" style="width: ${((window.getTechLevel?.('tank') || 1) / 5) * 100}%"></div>
+                        <div class="bg-orange-500 h-full rounded-full" style="width: 20%"></div>
                     </div>
                 </div>
             </div>
@@ -401,11 +402,3 @@ document.addEventListener('click', (e) => {
         }
     }
 });
-
-// Добавляем глобальные функции для технологий
-window.getTechLevel = (type) => {
-    return 1; // временно, пока нет системы технологий
-};
-
-// Экспортируем всё необходимое
-export { renderArmy, renderBuild, renderDiplomacy };
