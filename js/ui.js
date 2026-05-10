@@ -1,9 +1,10 @@
 import { getCountryInfo, addNotification } from './utils.js';
-import { getMyCountryId, getWars, getAlliances, getUnits, getResources, getGridData } from './game.js';
-import { UNIT_STATS } from './data.js';
+import { getMyCountryId, getWars, getAlliances, getUnits, getResources } from './game.js';
+import { UNIT_STATS, BUILDING_STATS } from './data.js';
 import { declareWar, proposeAlliance } from './diplomacy.js';
 
-export function openTab(tab) {
+// Глобальная функция для открытия окон
+window.openTab = function(tab) {
     const windowDiv = document.getElementById('info-window');
     const content = document.getElementById('window-content');
     const title = document.getElementById('window-title');
@@ -22,12 +23,12 @@ export function openTab(tab) {
         title.innerText = 'ДИПЛОМАТИЯ';
         renderDiplomacy(content);
     }
-}
+};
 
-export function closeWindow() {
+window.closeWindow = function() {
     const windowDiv = document.getElementById('info-window');
     if (windowDiv) windowDiv.classList.add('hidden');
-}
+};
 
 function renderArmy(container) {
     const units = getUnits();
@@ -36,7 +37,7 @@ function renderArmy(container) {
     const resources = getResources();
     
     let html = '<div class="space-y-3 mb-4">';
-    html += `<div class="bg-gray-700 p-2 rounded text-sm text-center">🔫 Снаряжение: ${Math.floor(resources.equipment)} | 👥 Люди: ${Math.floor(resources.manpower)}</div>`;
+    html += `<div class="bg-gray-700 p-2 rounded text-sm text-center text-white">🔫 Снаряжение: ${Math.floor(resources.equipment)} | 👥 Люди: ${Math.floor(resources.manpower)}</div>`;
     html += '<div class="space-y-2">';
     
     Object.entries(UNIT_STATS).forEach(([key, u]) => {
@@ -45,12 +46,12 @@ function renderArmy(container) {
             <div class="unit-card flex justify-between items-center">
                 <div>
                     <span class="text-xl">${u.icon}</span>
-                    <span class="font-bold">${u.name}</span>
-                    <div class="text-xs text-gray-400">⚔️${u.attack} 🛡️${u.defense} ❤️${u.hp}</div>
-                    <div class="text-[10px] text-gray-500">${u.cost}🔫 ${u.manpower}👥</div>
+                    <span class="font-bold text-white">${u.name}</span>
+                    <div class="text-xs text-gray-300">⚔️${u.attack} 🛡️${u.defense} ❤️${u.hp}</div>
+                    <div class="text-[10px] text-gray-400">${u.cost}🔫 ${u.manpower}👥</div>
                 </div>
                 <button onclick="window.recruitUnit('${key}')" 
-                    class="px-3 py-1 text-xs rounded ${canAfford ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-gray-600 cursor-not-allowed'}"
+                    class="px-3 py-1 text-xs rounded ${canAfford ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-gray-600 cursor-not-allowed'} text-white"
                     ${!canAfford ? 'disabled' : ''}>
                     НАБРАТЬ
                 </button>
@@ -65,9 +66,9 @@ function renderArmy(container) {
     } else {
         myUnits.forEach(u => {
             html += `
-                <div class="bg-gray-700 p-2 rounded text-sm flex justify-between items-center">
+                <div class="bg-gray-700 p-2 rounded text-sm flex justify-between items-center text-white">
                     <span>${UNIT_STATS[u.type]?.icon} ${UNIT_STATS[u.type]?.name}</span>
-                    <span class="text-xs ${u.trainingDaysLeft > 0 ? 'text-yellow-500' : 'text-green-500'}">
+                    <span class="text-xs ${u.trainingDaysLeft > 0 ? 'text-yellow-400' : 'text-green-400'}">
                         ${u.trainingDaysLeft > 0 ? `тренировка ${u.trainingDaysLeft} дн.` : 'готов'}
                     </span>
                 </div>
@@ -83,28 +84,28 @@ function renderBuild(container) {
     const resources = getResources();
     
     let html = '<div class="space-y-3">';
-    html += `<div class="bg-gray-700 p-2 rounded text-sm text-center">🔫 Снаряжение: ${Math.floor(resources.equipment)}</div>`;
+    html += `<div class="bg-gray-700 p-2 rounded text-sm text-center text-white">🔫 Снаряжение: ${Math.floor(resources.equipment)}</div>`;
     html += `
         <div class="unit-card">
             <div class="flex justify-between items-center">
-                <div><span class="text-2xl">🏭</span> <span class="font-bold">ВОЕННЫЙ ЗАВОД</span></div>
-                <div class="text-yellow-500">500 🔫</div>
+                <div><span class="text-2xl">🏭</span> <span class="font-bold text-white">ВОЕННЫЙ ЗАВОД</span></div>
+                <div class="text-yellow-400">500 🔫</div>
             </div>
-            <div class="text-xs text-gray-400 mt-1">Увеличивает производство снаряжения</div>
+            <div class="text-xs text-gray-300 mt-1">Увеличивает производство снаряжения</div>
             <button onclick="window.buildFactory()" 
-                class="mt-2 w-full bg-blue-700 hover:bg-blue-600 py-1 text-sm rounded ${resources.equipment >= 500 ? '' : 'opacity-50 cursor-not-allowed'}"
+                class="mt-2 w-full bg-blue-700 hover:bg-blue-600 py-1 text-sm rounded text-white ${resources.equipment >= 500 ? '' : 'opacity-50 cursor-not-allowed'}"
                 ${resources.equipment >= 500 ? '' : 'disabled'}>
                 ПОСТРОИТЬ
             </button>
         </div>
         <div class="unit-card">
             <div class="flex justify-between items-center">
-                <div><span class="text-2xl">⚓</span> <span class="font-bold">МОРСКОЙ ПОРТ</span></div>
-                <div class="text-yellow-500">300 🔫</div>
+                <div><span class="text-2xl">⚓</span> <span class="font-bold text-white">МОРСКОЙ ПОРТ</span></div>
+                <div class="text-yellow-400">300 🔫</div>
             </div>
-            <div class="text-xs text-gray-400 mt-1">Позволяет морские переброски</div>
+            <div class="text-xs text-gray-300 mt-1">Позволяет морские переброски</div>
             <button onclick="window.buildPort()" 
-                class="mt-2 w-full bg-blue-700 hover:bg-blue-600 py-1 text-sm rounded ${resources.equipment >= 300 ? '' : 'opacity-50 cursor-not-allowed'}"
+                class="mt-2 w-full bg-blue-700 hover:bg-blue-600 py-1 text-sm rounded text-white ${resources.equipment >= 300 ? '' : 'opacity-50 cursor-not-allowed'}"
                 ${resources.equipment >= 300 ? '' : 'disabled'}>
                 ПОСТРОИТЬ
             </button>
@@ -134,14 +135,14 @@ function renderDiplomacy(container) {
     
     let html = `
         <div class="mb-4">
-            <div class="font-bold text-emerald-500 mb-2">🤝 СОЮЗНИКИ</div>
+            <div class="font-bold text-emerald-400 mb-2">🤝 СОЮЗНИКИ</div>
             ${allies.length === 0 ? '<div class="text-gray-400 text-sm">Нет союзников</div>' : ''}
-            ${allies.map(a => `<div class="bg-gray-700 p-2 rounded mb-1">${getCountryInfo(a).name}</div>`).join('')}
+            ${allies.map(a => `<div class="bg-gray-700 p-2 rounded mb-1 text-white">${getCountryInfo(a).name}</div>`).join('')}
         </div>
         <div>
-            <div class="font-bold text-red-500 mb-2">⚔️ ВОЙНЫ</div>
+            <div class="font-bold text-red-400 mb-2">⚔️ ВОЙНЫ</div>
             ${enemies.length === 0 ? '<div class="text-gray-400 text-sm">Мирное время</div>' : ''}
-            ${enemies.map(e => `<div class="bg-gray-700 p-2 rounded mb-1">${getCountryInfo(e).name}</div>`).join('')}
+            ${enemies.map(e => `<div class="bg-gray-700 p-2 rounded mb-1 text-white">${getCountryInfo(e).name}</div>`).join('')}
         </div>
     `;
     
@@ -149,11 +150,15 @@ function renderDiplomacy(container) {
 }
 
 window.buildFactory = () => {
-    addNotification('Выберите провинцию для строительства завода (в разработке)', 'info');
+    addNotification('Выберите провинцию для строительства завода (ПКМ по клетке)', 'info');
+    window.pendingBuild = 'factory';
+    setTimeout(() => { window.pendingBuild = null; }, 15000);
 };
 
 window.buildPort = () => {
-    addNotification('Выберите провинцию для строительства порта (в разработке)', 'info');
+    addNotification('Выберите провинцию для строительства порта (ПКМ по клетке)', 'info');
+    window.pendingBuild = 'port';
+    setTimeout(() => { window.pendingBuild = null; }, 15000);
 };
 
 export function showCountryInfo(countryId, posKey) {
@@ -169,8 +174,8 @@ export function showCountryInfo(countryId, posKey) {
     
     if (countryId !== myId) {
         actions.innerHTML = `
-            <button onclick="window.declareWarOn('${countryId}')" class="w-full bg-red-700 hover:bg-red-600 py-2 text-sm rounded mb-2">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>
-            <button onclick="window.proposeAlly('${countryId}')" class="w-full bg-emerald-700 hover:bg-emerald-600 py-2 text-sm rounded">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>
+            <button onclick="window.declareWarOn('${countryId}')" class="w-full bg-red-700 hover:bg-red-600 py-2 text-sm rounded mb-2 text-white">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>
+            <button onclick="window.proposeAlly('${countryId}')" class="w-full bg-emerald-700 hover:bg-emerald-600 py-2 text-sm rounded text-white">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>
         `;
     } else {
         actions.innerHTML = '<div class="text-center text-gray-400 text-sm">Это ваша страна</div>';
@@ -181,14 +186,3 @@ export function showCountryInfo(countryId, posKey) {
 
 window.declareWarOn = (id) => declareWar(id);
 window.proposeAlly = (id) => proposeAlliance(id);
-
-// Клик вне сайдбара для закрытия
-document.addEventListener('click', (e) => {
-    const sidebar = document.getElementById('sidebar');
-    const sidebarActions = document.getElementById('sidebar-actions');
-    if (sidebar && !sidebar.contains(e.target) && !sidebarActions?.contains(e.target)) {
-        if (e.target !== document.getElementById('map-canvas')) {
-            sidebar.classList.add('hidden');
-        }
-    }
-});
