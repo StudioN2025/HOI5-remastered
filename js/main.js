@@ -223,9 +223,10 @@ function showCountrySelect() {
     
     ids.forEach(id => {
         const btn = document.createElement('button');
-        btn.className = "w-full text-left p-3 border-b border-black/10 font-bold uppercase text-xs";
+        btn.className = "w-full text-left p-3 border-b border-black/10 font-bold uppercase text-xs hover:bg-black/10 transition-colors cursor-pointer";
         btn.innerText = getCountryInfo(id).name;
-        btn.onclick = () => {
+        btn.style.cursor = 'pointer';
+        btn.addEventListener('click', () => {
             state.myCountryId = id;
             state.isGameMode = true;
             setSpeed(1);
@@ -234,7 +235,7 @@ function showCountrySelect() {
             domCache.uiWrapper.classList.add('hidden-panel');
             domCache.gameTabs.classList.remove('hidden');
             document.getElementById('top-country-name').innerText = getCountryInfo(id).name.toUpperCase();
-        };
+        });
         list.appendChild(btn);
     });
     
