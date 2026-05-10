@@ -7,6 +7,13 @@ let ctx = canvas.getContext('2d');
 const CELL_SIZE = 20;
 let camera = { x: 0, y: 0, zoom: 1 };
 let hoverCell = null;
+export function renderMap() {
+    // ТЕСТ: закрасить весь canvas красным
+    if (!ctx) return;
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    console.log('renderMap, canvas size:', canvas.width, canvas.height);
+}
 
 export function getCamera() { return camera; }
 export function setCamera(newCamera) { camera = newCamera; }
