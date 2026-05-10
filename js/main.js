@@ -15,6 +15,10 @@ let availableMaps = [];
 window.openTab = openTab;
 window.closeWindow = closeWindow;
 window.showCountryInfo = showCountryInfo;
+// Глобальные переменные
+window.pendingRecruit = null;
+window.pendingBuild = null;
+window.selectedUnitId = null;
 
 // Рекрутинг
 window.recruitUnit = (type) => {
