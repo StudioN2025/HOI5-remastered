@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&display=swap');
+
+* {
+    user-select: none;
+    font-family: 'Special Elite', 'Courier New', monospace;
+}
+
+#main-menu {
+    background: radial-gradient(circle, rgba(0,0,0,0.5), rgba(0,0,0,0.95)), 
+                url('https://images.unsplash.com/photo-1505673542670-a5e3ff5b14a3?auto=format&fit=crop&q=80&w=1600');
+    background-size: cover;
+    background-position: center;
+}
+
+.speed-btn {
+    @apply px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-all;
+}
+
+.speed-btn.active {
+    @apply bg-yellow-600 text-black;
+}
+
+.tab-btn {
+    @apply px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-t font-bold tracking-wider;
+}
+
+.tab-btn.active {
+    @apply bg-yellow-700 border-yellow-500 text-white;
+}
+
+.unit-card {
+    @apply bg-gray-700 p-3 rounded border-l-4 border-yellow-500 mb-2;
+}
+
+.progress-bar {
+    @apply w-full h-1.5 bg-gray-600 rounded-full overflow-hidden;
+}
+
+.progress-fill {
+    @apply h-full bg-yellow-500 transition-all duration-300;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.notification-slide {
+    animation: slideIn 0.3s ease-out;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1f1f1f;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
