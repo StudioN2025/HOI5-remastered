@@ -26,6 +26,7 @@ body {
     cursor: crosshair !important;
     z-index: 1 !important;
     display: block !important;
+    touch-action: none !important;
 }
 
 /* === ИГРОВОЙ КОНТЕЙНЕР === */
@@ -58,12 +59,30 @@ body {
     color: white !important;
 }
 
-#top-bar span {
-    color: white !important;
+#top-bar .separator {
+    color: #6b7280 !important;
 }
 
-#top-bar .text-yellow-500 {
-    color: #eab308 !important;
+#top-bar .stat-item {
+    white-space: nowrap !important;
+}
+
+#top-bar .date-display {
+    background: rgba(0, 0, 0, 0.5) !important;
+    padding: 4px 12px !important;
+    border-radius: 6px !important;
+    font-family: monospace !important;
+    min-width: 130px !important;
+    text-align: center !important;
+    border: 1px solid #4b5563 !important;
+}
+
+.speed-buttons {
+    display: flex !important;
+    gap: 4px !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
 }
 
 /* === ВКЛАДКИ === */
@@ -74,6 +93,7 @@ body {
     display: flex !important;
     gap: 4px !important;
     z-index: 100 !important;
+    flex-wrap: wrap !important;
 }
 
 .tab-btn {
@@ -86,6 +106,7 @@ body {
     font-size: 11px !important;
     font-weight: bold !important;
     transition: all 0.2s !important;
+    touch-action: manipulation !important;
 }
 
 .tab-btn:hover {
@@ -118,6 +139,9 @@ body {
     background: #111827 !important;
     padding: 12px 16px !important;
     border-bottom: 1px solid #374151 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
 }
 
 #window-title {
@@ -132,6 +156,7 @@ body {
     line-height: 1 !important;
     background: none !important;
     border: none !important;
+    padding: 4px 8px !important;
 }
 
 #window-content {
@@ -147,6 +172,7 @@ body {
     top: 100px !important;
     right: 16px !important;
     width: 320px !important;
+    max-width: calc(100vw - 32px) !important;
     background: #1f2937 !important;
     border: 1px solid #4b5563 !important;
     border-radius: 12px !important;
@@ -155,11 +181,26 @@ body {
     backdrop-filter: blur(8px) !important;
 }
 
+#sidebar > div:first-child {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 12px !important;
+}
+
 #sidebar-title {
     font-size: 20px !important;
     font-weight: bold !important;
     color: #eab308 !important;
-    margin-bottom: 12px !important;
+}
+
+#close-sidebar {
+    color: #9ca3af !important;
+    cursor: pointer !important;
+    background: none !important;
+    border: none !important;
+    font-size: 18px !important;
+    padding: 4px 8px !important;
 }
 
 /* === НОТИФИКАЦИИ === */
@@ -168,6 +209,7 @@ body {
     bottom: 16px !important;
     left: 16px !important;
     width: 320px !important;
+    max-width: calc(100vw - 32px) !important;
     z-index: 200 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -185,17 +227,11 @@ body {
 }
 
 @keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+    from { opacity: 0; transform: translateX(-100%); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
-/* === КНОПКИ СКОРОСТИ === */
+/* === КНОПКИ === */
 .speed-btn {
     background: #374151 !important;
     padding: 4px 12px !important;
@@ -205,6 +241,7 @@ body {
     transition: all 0.2s !important;
     font-size: 11px !important;
     border: none !important;
+    touch-action: manipulation !important;
 }
 
 .speed-btn:hover {
@@ -214,6 +251,10 @@ body {
 .speed-btn.active {
     background: #ca8a04 !important;
     color: black !important;
+}
+
+button {
+    touch-action: manipulation !important;
 }
 
 /* === КАРТОЧКИ ЮНИТОВ === */
@@ -258,22 +299,135 @@ body {
     background: #9ca3af !important;
 }
 
-/* === МЕНЮ ВЫБОРА СТРАНЫ === */
-#country-select {
-    z-index: 1000 !important;
-}
-
-#country-list button {
-    transition: all 0.2s !important;
-}
-
-#country-list button:hover {
-    transform: scale(1.02) !important;
-}
-
 /* === ПОДСКАЗКИ === */
 #hint {
-    z-index: 300 !important;
+    position: fixed !important;
+    bottom: 24px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    padding: 8px 16px !important;
+    border-radius: 999px !important;
+    color: #eab308 !important;
     font-size: 12px !important;
+    z-index: 300 !important;
     white-space: nowrap !important;
+    border: 1px solid #eab308 !important;
+    pointer-events: none !important;
 }
+
+/* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
+@media (max-width: 768px) {
+    #top-bar {
+        height: 44px !important;
+        padding: 0 8px !important;
+        gap: 8px !important;
+        font-size: 10px !important;
+    }
+    
+    .stat-item span:first-child {
+        font-size: 12px !important;
+    }
+    
+    #top-bar .date-display {
+        padding: 2px 8px !important;
+        min-width: 100px !important;
+        font-size: 9px !important;
+    }
+    
+    .speed-buttons {
+        padding: 2px 4px !important;
+    }
+    
+    .speed-btn {
+        padding: 2px 8px !important;
+        font-size: 10px !important;
+    }
+    
+    #game-tabs {
+        top: 48px !important;
+        left: 8px !important;
+        right: 8px !important;
+        gap: 4px !important;
+    }
+    
+    .tab-btn {
+        padding: 6px 10px !important;
+        font-size: 10px !important;
+        flex: 1 !important;
+        text-align: center !important;
+    }
+    
+    #info-window, #sidebar {
+        top: 90px !important;
+        left: 8px !important;
+        right: 8px !important;
+        width: auto !important;
+        max-width: none !important;
+    }
+    
+    #sidebar {
+        right: 8px !important;
+        left: 8px !important;
+    }
+    
+    #window-content {
+        padding: 12px !important;
+        font-size: 11px !important;
+    }
+    
+    .unit-card {
+        padding: 8px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .tab-btn span:first-child {
+        display: none !important;
+    }
+    
+    .tab-btn {
+        font-size: 9px !important;
+        padding: 6px 6px !important;
+    }
+    
+    #top-bar .stat-item span:first-child {
+        font-size: 10px !important;
+    }
+    
+    #top-bar .separator {
+        display: none !important;
+    }
+}
+
+/* Touch-оптимизации */
+@media (hover: none) and (pointer: coarse) {
+    .tab-btn, .speed-btn, button {
+        min-height: 44px !important;
+    }
+    
+    #map-canvas {
+        cursor: default !important;
+    }
+}
+
+/* Альбомная ориентация */
+@media (max-width: 900px) and (orientation: landscape) {
+    #top-bar {
+        height: 40px !important;
+    }
+    
+    #game-tabs {
+        top: 44px !important;
+    }
+    
+    #info-window, #sidebar {
+        max-height: 60vh !important;
+        top: 80px !important;
+    }
+    
+    .tab-btn {
+        padding: 4px 8px !important;
+        font-size: 9px !important;
+    }
+                          }
