@@ -457,6 +457,86 @@ canvas {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
+
+/* Стили загрузчика */
+#game-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: radial-gradient(circle, rgba(20,20,20,0.95) 0%, rgba(0,0,0,0.98) 100%),
+                url('https://images.unsplash.com/photo-1505673542670-a5e3ff5b14a3?auto=format&fit=crop&q=80&w=1600') center/cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease-out;
+}
+
+#game-loader.loader-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loader-content {
+    text-align: center;
+    color: #e3d1b5;
+    padding: 3rem;
+    background: rgba(46, 46, 46, 0.9);
+    border: 2px solid #8b4513;
+    border-radius: 4px;
+    box-shadow: 0 0 50px rgba(0,0,0,0.9);
+    min-width: 400px;
+}
+
+.loader-title {
+    font-family: 'Special Elite', 'Courier New', Courier, monospace;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    color: #c5a059;
+    border-bottom: 2px solid rgba(139, 69, 19, 0.5);
+    padding-bottom: 1rem;
+}
+
+.loader-status {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.loader-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(197, 160, 89, 0.2);
+    border-top-color: #c5a059;
+    border-radius: 50%;
+    margin: 0 auto 1.5rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loader-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(197, 160, 89, 0.3);
+}
+
+.loader-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b4513, #c5a059);
+    width: 0%;
+    transition: width 0.3s ease-out;
+}
+
 .leading-tight { line-height: 1.25; }
 .text-left { text-align: left; }
 .grid { display: grid; }

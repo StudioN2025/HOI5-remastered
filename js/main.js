@@ -6,6 +6,7 @@ import { updateTopBar, updateDate, createAlert, openWindow, closeWindow, showInt
 import { runCountryAI } from './ai.js';
 import { nationalFocuses } from './data/focuses.js';
 import { getCountryInfo } from './data/countries.js';
+import { showLoader, updateLoaderStatus, updateLoaderProgress, hideLoader } from './core/loader.js';
 
 const canvas = document.getElementById('grid-canvas');
 const ctx = canvas.getContext('2d');
@@ -206,12 +207,9 @@ export async function startGame() {
 async function initGameAfterCountrySelect() {
     domCache.gameContainer.classList.remove('hidden');
     
-    const loaded = await loadMap();
-    if (!loaded) return;
+    // Карта уже загружена в initGame(), просто центрируем камеру
+    centerCameraOnMap();
     
-    initMap();
-    setSpeed(1);
-    updateTopBar();
     domCache.uiWrapper.classList.add('hidden-panel');
     domCache.gameTabs.classList.remove('hidden');
     gameLoop(0);
@@ -295,6 +293,53 @@ const exposeFunctions = () => {
 
 // Экспортируем функции сразу при загрузке модуля
 exposeFunctions();
+
+// Инициализация игры с экраном загрузки
+async function initGame() {
+    // Показываем экран загрузки
+    showLoader();
+    
+    let progress = 0;
+    
+    // Шаг 1: Загрузка данных стран
+    updateLoaderStatus('ЗАГРУЗКА ДАННЫХ СТРАН...');
+    updateLoaderProgress(progress += 10);
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 2: Загрузка карты
+    updateLoaderStatus('ЗАГРУЗКА КАРТЫ ЕВРОПЫ...');
+    updateLoaderProgress(progress += 20);
+    const mapLoaded = await loadMap();
+    if (!mapLoaded) {
+        updateLoaderStatus('ОШИБКА ЗАГРУЗКИ КАРТЫ!');
+        return;
+    }
+    updateLoaderProgress(progress += 20);
+    
+    // Шаг 3: Инициализация карты
+    updateLoaderStatus('ИНИЦИАЛИЗАЦИЯ КАРТЫ...');
+    initMap();
+    updateLoaderProgress(progress += 15);
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 4: Подготовка интерфейса
+    updateLoaderStatus('ПОДГОТОВКА ИНТЕРФЕЙСА...');
+    updateLoaderProgress(progress += 15);
+    setSpeed(1);
+    updateTopBar();
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 5: Финализация
+    updateLoaderStatus('ГОТОВО К БОЮ...');
+    updateLoaderProgress(100);
+    await new Promise(r => setTimeout(r, 500));
+    
+    // Скрываем загрузчик и показываем меню
+    hideLoader();
+}
+
+// Запускаем инициализацию при загрузке страницы
+initGame();
 
 // Обработчики событий для кнопок меню
 document.getElementById('btn-start-game').addEventListener('click', startGame);
