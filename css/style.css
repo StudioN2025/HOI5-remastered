@@ -431,3 +431,127 @@ button {
         font-size: 9px !important;
     }
                           }
+/* === МЕНЮ === */
+#main-menu {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('../assets/hoi5-backend.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+}
+
+#main-menu > div {
+    background: #e3d1b5 !important;
+    color: black !important;
+    padding: 32px !important;
+    border-radius: 12px !important;
+    border: 4px solid #854d0e !important;
+    width: 550px !important;
+    max-width: 90vw !important;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important;
+}
+
+#main-menu h1 {
+    font-size: clamp(32px, 10vw, 60px) !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    margin-bottom: 24px !important;
+    padding-bottom: 16px !important;
+    border-bottom: 4px solid rgba(0,0,0,0.3) !important;
+    letter-spacing: 0.2em !important;
+}
+
+#main-menu p {
+    text-align: center !important;
+    font-size: 14px !important;
+    margin-top: 24px !important;
+    color: #4b5563 !important;
+}
+
+#btn-start, #btn-load-map {
+    width: 100% !important;
+    background: #1f2937 !important;
+    color: white !important;
+    padding: 16px !important;
+    font-size: 20px !important;
+    font-weight: bold !important;
+    border: 2px solid black !important;
+    margin-bottom: 16px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+#btn-start:hover, #btn-load-map:hover {
+    background: #374151 !important;
+    transform: translateY(-2px) !important;
+}
+
+#btn-load-map {
+    background: #374151 !important;
+}
+
+/* === ВЫБОР СТРАНЫ === */
+#country-select {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0,0,0,0.9) !important;
+}
+
+#country-select > div {
+    background: #e3d1b5 !important;
+    padding: 24px !important;
+    border-radius: 12px !important;
+    border: 4px solid #854d0e !important;
+    width: 450px !important;
+    max-width: 90vw !important;
+    max-height: 80vh !important;
+    overflow: auto !important;
+}
+
+#country-select h2 {
+    font-size: 24px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid rgba(0,0,0,0.2) !important;
+}
+
+#country-list button {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 12px !important;
+    border: 1px solid #9ca3af !important;
+    border-radius: 8px !important;
+    margin-bottom: 8px !important;
+    font-weight: bold !important;
+    transition: all 0.2s !important;
+}
+
+#country-list button:hover {
+    transform: scale(1.02) !important;
+}
+
+#btn-cancel {
+    width: 100% !important;
+    margin-top: 16px !important;
+    background: #991b1b !important;
+    color: white !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+}
