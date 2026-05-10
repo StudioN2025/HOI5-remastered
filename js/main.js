@@ -8,7 +8,6 @@ import {
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
 import { openTab, closeWindow, showCountryInfo } from './ui.js';
-
 let pendingRecruit = null;
 let availableMaps = [];
 
