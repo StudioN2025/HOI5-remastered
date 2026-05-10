@@ -11,7 +11,10 @@ export function updateTopBar() {
     const stats = calculateCountryStats(state.myCountryId);
     state.playerResources.factories = stats.totalFactories;
     const totalManpower = stats.totalPop * CONFIG.MANPOWER_USAGE_PERCENT;
-    const usedManpower = state.units.reduce((acc, u) => acc + (getUnitStats()[u.type].costManpower), 0);
+    
+    // Оптимизация: кэшируем getUnitStats
+    const unitStats = getUnitStats();
+    const usedManpower = state.units.reduce((acc, u) => acc + unitStats[u.type].costManpower, 0);
     
     document.getElementById('val-manpower').innerText = Math.floor(Math.max(0, totalManpower - usedManpower)).toLocaleString();
     document.getElementById('val-fact').innerText = state.playerResources.factories;

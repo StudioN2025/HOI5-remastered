@@ -57,10 +57,16 @@ export function areAllies(c1, c2) {
 }
 
 export function renderUnits(ctx, cellSize) {
-    state.units.forEach(u => {
+    // Оптимизация: кэшируем ссылки на функции и свойства
+    const selectedId = state.selectedUnitId;
+    const units = state.units;
+    const activeBattles = state.activeBattles;
+    const getStats = getUnitStats();
+    
+    units.forEach(u => {
         const [x, y] = u.pos.split(',').map(Number);
         
-        if (u.id === state.selectedUnitId) {
+        if (u.id === selectedId) {
             ctx.strokeStyle = "#fbbf24";
             ctx.lineWidth = 2;
             ctx.strokeRect(x * cellSize - 2, y * cellSize - 2, cellSize + 4, cellSize + 4);
@@ -75,22 +81,24 @@ export function renderUnits(ctx, cellSize) {
             ctx.fillText("🛠", x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
             ctx.globalAlpha = 1;
         } else {
-            ctx.fillText(getUnitStats()[u.type].icon, x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+            ctx.fillText(getStats[u.type].icon, x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
         }
         
         // Полоска HP
         if (u.hp !== undefined) {
-            const maxHp = getUnitStats()[u.type].hp;
+            const maxHp = getStats[u.type].hp;
             const hpWidth = cellSize * 0.6;
+            const hpX = x * cellSize + cellSize/2 - hpWidth/2;
+            const hpY = y * cellSize + cellSize - 3;
             ctx.fillStyle = 'red';
-            ctx.fillRect(x * cellSize + cellSize/2 - hpWidth/2, y * cellSize + cellSize - 3, hpWidth, 3);
+            ctx.fillRect(hpX, hpY, hpWidth, 3);
             ctx.fillStyle = 'green';
-            ctx.fillRect(x * cellSize + cellSize/2 - hpWidth/2, y * cellSize + cellSize - 3, hpWidth * (u.hp / maxHp), 3);
+            ctx.fillRect(hpX, hpY, hpWidth * (u.hp / maxHp), 3);
         }
     });
     
     // Отрисовка боев
-    state.activeBattles.forEach(battle => {
+    activeBattles.forEach(battle => {
         const [ax, ay] = battle.attacker.pos.split(',').map(Number);
         const [dx, dy] = battle.defender.pos.split(',').map(Number);
         const midX = (ax + dx) / 2 * cellSize + cellSize / 2;
@@ -102,6 +110,8 @@ export function renderUnits(ctx, cellSize) {
 }
 
 export function processCombat() {
+    const unitStats = getUnitStats();
+    
     state.activeBattles = state.activeBattles.filter(battle => {
         if (battle.attacker.hp <= 0 || battle.defender.hp <= 0) {
             if (battle.defender.hp <= 0) {
@@ -115,8 +125,8 @@ export function processCombat() {
         battle.daysCounter++;
         if (battle.daysCounter >= 2) {
             battle.daysCounter = 0;
-            const aStats = getUnitStats()[battle.attacker.type];
-            const dStats = getUnitStats()[battle.defender.type];
+            const aStats = unitStats[battle.attacker.type];
+            const dStats = unitStats[battle.defender.type];
             battle.defender.hp -= Math.max(1, aStats.attack * (Math.random() * 0.5 + 0.5));
             battle.attacker.hp -= Math.max(1, dStats.attack * 0.5);
         }
@@ -126,14 +136,14 @@ export function processCombat() {
 
 export function checkCapitulation(targetCountry, winnerCountry) {
     let cellCount = 0;
-    Object.entries(state.gridData).forEach(([pos, id]) => {
+    for (const id of Object.values(state.gridData)) {
         if (id === targetCountry) cellCount++;
-    });
+    }
     
     if (cellCount < 3) {
-        Object.keys(state.gridData).forEach(key => { 
+        for (const key of Object.keys(state.gridData)) { 
             if (state.gridData[key] === targetCountry) state.gridData[key] = winnerCountry; 
-        });
+        }
         state.wars = state.wars.filter(w => w.a !== targetCountry && w.b !== targetCountry);
         state.units = state.units.filter(u => u.owner !== targetCountry);
     }

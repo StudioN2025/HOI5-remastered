@@ -10,6 +10,26 @@ import { getCountryInfo } from './data/countries.js';
 const canvas = document.getElementById('grid-canvas');
 const ctx = canvas.getContext('2d');
 
+// Кэширование DOM элементов
+const domCache = {
+    mainMenu: document.getElementById('main-menu'),
+    gameContainer: document.getElementById('game-container'),
+    playMenu: document.getElementById('play-menu'),
+    uiWrapper: document.getElementById('ui-wrapper'),
+    gameTabs: document.getElementById('game-tabs'),
+    focusIndicator: document.getElementById('focus-indicator'),
+    researchIndicator: document.getElementById('research-indicator'),
+    buildIndicator: document.getElementById('build-indicator'),
+    notificationBox: document.getElementById('notification-box'),
+    hoiWindow: document.getElementById('hoi-window'),
+    windowBody: document.getElementById('window-body'),
+    windowTitle: document.getElementById('window-title'),
+    intelSidebar: document.getElementById('intel-sidebar'),
+    btnMapNormal: document.getElementById('btn-map-normal'),
+    recruitHint: document.getElementById('recruit-hint'),
+    buildHint: document.getElementById('build-hint')
+};
+
 // Загрузка карты
 async function loadMap() {
     try {
@@ -72,7 +92,7 @@ function onDayPassed() {
     if (state.gameDate.getDate() !== oldDate.getDate()) {
         // Фокусы
         if (state.activeFocus) {
-            document.getElementById('focus-indicator').classList.remove('hidden');
+            domCache.focusIndicator.classList.remove('hidden');
             state.activeFocus.daysLeft--;
             if (state.activeFocus.daysLeft <= 0) {
                 state.activeFocus.effect(state, {
@@ -84,8 +104,8 @@ function onDayPassed() {
                 });
                 state.completedFocuses.add(state.activeFocus.id);
                 state.activeFocus = null;
-                document.getElementById('focus-indicator').classList.add('hidden');
-                if(document.getElementById('hoi-window').style.display === 'flex') updateFocusUI();
+                domCache.focusIndicator.classList.add('hidden');
+                if (domCache.hoiWindow.style.display === 'flex') updateFocusUI();
             }
         }
         
@@ -96,13 +116,13 @@ function onDayPassed() {
                 state.tech[state.activeResearch.type] = state.activeResearch.level;
                 createAlert(`ИССЛЕДОВАНИЕ ЗАВЕРШЕНО: ${state.activeResearch.type.toUpperCase()} УР.${state.activeResearch.level}`, 10, 'diplo');
                 state.activeResearch = null;
-                document.getElementById('research-indicator').classList.add('hidden');
+                domCache.researchIndicator.classList.add('hidden');
             }
         }
         
         // Строительство
         if (state.buildingQueue.length > 0) {
-            document.getElementById('build-indicator').classList.remove('hidden');
+            domCache.buildIndicator.classList.remove('hidden');
             const activeProject = state.buildingQueue[0];
             activeProject.daysLeft--;
             if (activeProject.daysLeft <= 0) {
@@ -116,7 +136,7 @@ function onDayPassed() {
                 state.buildingQueue.shift();
             }
         } else {
-            document.getElementById('build-indicator').classList.add('hidden');
+            domCache.buildIndicator.classList.add('hidden');
         }
         
         // Производство
@@ -130,21 +150,24 @@ function onDayPassed() {
         });
         state.playerResources.equipment = Math.max(0, state.playerResources.equipment + production - maintenance);
         
-        // ИИ
-        Object.keys(state.gridData).forEach(id => {
-            const countryId = state.gridData[id];
+        // ИИ - оптимизация: собираем уникальные страны
+        const aiCountries = new Set();
+        Object.values(state.gridData).forEach(countryId => {
             if (countryId && countryId !== state.myCountryId) {
-                runCountryAI(countryId);
+                aiCountries.add(countryId);
             }
         });
+        aiCountries.forEach(countryId => runCountryAI(countryId));
         
         // Бои
         processCombat();
         
-        // Движение юнитов
+        // Движение юнитов - оптимизация
+        const unitsToRemove = [];
         state.units.forEach(u => {
-            if (u.trainingDaysLeft > 0) u.trainingDaysLeft--;
-            else if (u.path && u.path.length > 0) {
+            if (u.trainingDaysLeft > 0) {
+                u.trainingDaysLeft--;
+            } else if (u.path && u.path.length > 0) {
                 if (u.moveCooldown === undefined) u.moveCooldown = 0;
                 u.moveCooldown++;
                 if (u.moveCooldown >= 2) {
@@ -176,8 +199,8 @@ function onDayPassed() {
 
 // Старт игры
 export async function startGame() {
-    document.getElementById('main-menu').style.display = 'none';
-    document.getElementById('game-container').classList.remove('hidden');
+    domCache.mainMenu.style.display = 'none';
+    domCache.gameContainer.classList.remove('hidden');
     
     const loaded = await loadMap();
     if (!loaded) return;
@@ -207,15 +230,15 @@ function showCountrySelect() {
             state.isGameMode = true;
             setSpeed(1);
             updateTopBar();
-            document.getElementById('play-menu').style.display = 'none';
-            document.getElementById('ui-wrapper').classList.add('hidden-panel');
-            document.getElementById('game-tabs').classList.remove('hidden');
+            domCache.playMenu.style.display = 'none';
+            domCache.uiWrapper.classList.add('hidden-panel');
+            domCache.gameTabs.classList.remove('hidden');
             document.getElementById('top-country-name').innerText = getCountryInfo(id).name.toUpperCase();
         };
         list.appendChild(btn);
     });
     
-    document.getElementById('play-menu').style.display = 'flex';
+    domCache.playMenu.style.display = 'flex';
 }
 
 // Глобальные функции для HTML
@@ -231,7 +254,7 @@ window.startFocus = (id) => {
 };
 window.startResearch = (type, level) => {
     state.activeResearch = { type, level, daysLeft: CONFIG.RESEARCH_DURATION };
-    document.getElementById('research-indicator').classList.remove('hidden');
+    domCache.researchIndicator.classList.remove('hidden');
 };
 window.selectBuildType = (type) => {
     const b = getBuildingStats().factory;
@@ -241,18 +264,18 @@ window.selectBuildType = (type) => {
     }
     state.buildModeType = type;
     closeWindow();
-    document.getElementById('build-hint').classList.remove('hidden');
+    domCache.buildHint.classList.remove('hidden');
 };
 window.startRecruitment = (type) => {
     state.recruitMode = type;
     closeWindow();
-    document.getElementById('recruit-hint').classList.remove('hidden');
+    domCache.recruitHint.classList.remove('hidden');
 };
 window.setSpeed = setSpeed;
 window.openWindow = openWindow;
 window.closeWindow = closeWindow;
 window.resetMapMode = resetMapMode;
-window.closePlayMenu = () => { document.getElementById('play-menu').style.display = 'none'; };
+window.closePlayMenu = () => { domCache.playMenu.style.display = 'none'; };
 
 // Обработчики событий
 window.addEventListener('keydown', e => {
@@ -282,7 +305,7 @@ canvas.addEventListener('mousedown', e => {
             // Строительство
         } else if (e.button === 2 && clickedId) {
             state.diplomaticModeTarget = clickedId;
-            document.getElementById('btn-map-normal').classList.remove('hidden');
+            domCache.btnMapNormal.classList.remove('hidden');
             showIntel(clickedId, key, true);
         } else if (clickedId) {
             showIntel(clickedId, key, false);
