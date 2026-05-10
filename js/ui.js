@@ -36,10 +36,12 @@ window.openTab = function(tab) {
     }
 };
 
-window.closeWindow = function() {
+export function closeWindow() {
     const windowDiv = document.getElementById('info-window');
     if (windowDiv) windowDiv.classList.add('hidden');
-};
+}
+
+window.closeWindow = closeWindow;
 
 function renderArmy(container) {
     const units = getUnits();
@@ -318,7 +320,7 @@ function renderFocus(container) {
 }
 
 window.recruitUnit = (type) => {
-    window.closeWindow();
+    closeWindow();
     const hint = document.getElementById('hint');
     const hintText = document.getElementById('hint-text');
     if (hint && hintText) {
@@ -333,7 +335,7 @@ window.recruitUnit = (type) => {
 };
 
 window.selectUnitForMove = (unitId) => {
-    window.closeWindow();
+    closeWindow();
     window.selectedUnitId = unitId;
     const hint = document.getElementById('hint');
     const hintText = document.getElementById('hint-text');
@@ -348,14 +350,14 @@ window.selectUnitForMove = (unitId) => {
 };
 
 window.buildFactory = () => {
-    window.closeWindow();
+    closeWindow();
     addNotification('Выберите провинцию для строительства завода (ЛКМ по клетке)', 'info');
     window.pendingBuild = 'factory';
     setTimeout(() => { window.pendingBuild = null; }, 15000);
 };
 
 window.buildPort = () => {
-    window.closeWindow();
+    closeWindow();
     addNotification('Выберите провинцию для строительства порта (ЛКМ по клетке)', 'info');
     window.pendingBuild = 'port';
     setTimeout(() => { window.pendingBuild = null; }, 15000);
@@ -404,3 +406,6 @@ document.addEventListener('click', (e) => {
 window.getTechLevel = (type) => {
     return 1; // временно, пока нет системы технологий
 };
+
+// Экспортируем всё необходимое
+export { renderArmy, renderBuild, renderDiplomacy };
