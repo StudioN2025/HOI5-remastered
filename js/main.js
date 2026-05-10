@@ -3,7 +3,8 @@ import { getCountryInfo, addNotification } from './utils.js';
 import { 
     setGridData, setCellStats, setMyCountryId, setGameActive, 
     setGameSpeed, setGameDate, setUnits, updateTopBar,
-    getGridData, getMyCountryId, setResources, getResources
+    getGridData, getMyCountryId, setResources, getResources,
+    getGameActive
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
 import { openTab, closeWindow, showCountryInfo } from './ui.js';
@@ -15,7 +16,7 @@ window.openTab = openTab;
 window.closeWindow = closeWindow;
 window.showCountryInfo = showCountryInfo;
 
-// Рекрутинг через глобальное окно
+// Рекрутинг
 window.recruitUnit = (type) => {
     closeWindow();
     pendingRecruit = type;
@@ -32,7 +33,6 @@ window.recruitUnit = (type) => {
     setTimeout(() => hint.remove(), 15000);
 };
 
-// Строительство
 window.buildFactory = () => {
     addNotification('Выберите провинцию для строительства завода (ПКМ по клетке)', 'info');
     window.pendingBuild = 'factory';
@@ -48,31 +48,26 @@ window.buildPort = () => {
 async function init() {
     console.log('🚀 HOI V Remastered загружается...');
     
-    // Показываем экран загрузки
     showLoadingScreen('Загрузка игры...');
     
-    // Инициализация canvas и событий
     resizeCanvas();
     setupMapEvents();
-    
-    // Настройка кнопок меню
     setupMenuButtons();
-    
-    // Кнопки скорости
     setupSpeedButtons();
     
-    // Загрузка списка карт
     await loadMapsList();
-    
-    // Настройка кликов по canvas
     setupCanvasClick();
     
-    // Запуск игрового цикла
-    requestAnimationFrame(gameLoop);
+    // Запускаем рендер цикла
+    function animate() {
+        if (getGameActive()) {
+            renderMap();
+        }
+        requestAnimationFrame(animate);
+    }
+    animate();
     
-    // Скрываем загрузку
     hideLoadingScreen();
-    
     console.log('✅ Готово! Выберите карту для начала игры');
 }
 
@@ -111,13 +106,11 @@ function setupMenuButtons() {
     const cancelBtn = document.getElementById('btn-cancel');
     const closeWindowBtn = document.getElementById('close-window');
     const mapFileInput = document.getElementById('map-file-input');
-    const refreshMapsBtn = document.getElementById('btn-refresh-maps');
     
     if (startBtn) startBtn.onclick = () => showMapsList();
     if (loadBtn) loadBtn.onclick = () => mapFileInput?.click();
     if (cancelBtn) cancelBtn.onclick = () => document.getElementById('country-select')?.classList.add('hidden');
     if (closeWindowBtn) closeWindowBtn.onclick = () => document.getElementById('info-window')?.classList.add('hidden');
-    if (refreshMapsBtn) refreshMapsBtn.onclick = () => loadMapsList();
     
     if (mapFileInput) {
         mapFileInput.onchange = (e) => {
@@ -140,44 +133,35 @@ function setupSpeedButtons() {
 async function loadMapsList() {
     showLoadingScreen('Загрузка списка карт...');
     
-    // Список доступных карт в папке maps
-    const mapFiles = [
-        'europe.json',
-        'world.json',
-        'custom.json'
-    ];
-    
     availableMaps = [];
     
-    for (const mapFile of mapFiles) {
-        try {
-            const response = await fetch(`maps/${mapFile}`);
-            if (response.ok) {
-                const data = await response.json();
-                availableMaps.push({
-                    name: mapFile,
-                    data: data,
-                    preview: null
-                });
-                console.log(`✅ Карта загружена: ${mapFile}`);
-            }
-        } catch (e) {
-            console.log(`⚠️ Карта не найдена: ${mapFile}`);
+    // Пробуем загрузить europe.json
+    try {
+        const response = await fetch(`maps/europe.json`);
+        if (response.ok) {
+            const data = await response.json();
+            availableMaps.push({
+                name: 'europe.json',
+                data: data
+            });
+            console.log(`✅ Карта загружена: europe.json`);
+        } else {
+            console.log(`⚠️ Карта не найдена: europe.json`);
         }
+    } catch (e) {
+        console.log(`⚠️ Ошибка загрузки europe.json:`, e.message);
     }
     
-    // Если нет карт в папке, создаем дефолтную
+    // Если нет карт, создаем дефолтную
     if (availableMaps.length === 0) {
         console.log('📦 Создаю дефолтную карту...');
         availableMaps.push({
-            name: 'default.json',
-            data: createDefaultMap(),
-            preview: null
+            name: 'default',
+            data: createDefaultMap()
         });
     }
     
     hideLoadingScreen();
-    showMapsList();
 }
 
 function createDefaultMap() {
@@ -227,13 +211,11 @@ function showMapsList() {
     
     container.innerHTML = '';
     
-    // Заголовок
     const title = document.createElement('div');
     title.className = 'text-center font-bold text-lg mb-4 border-b pb-2';
     title.innerText = 'ВЫБЕРИТЕ КАРТУ';
     container.appendChild(title);
     
-    // Список карт
     availableMaps.forEach(map => {
         const btn = document.createElement('button');
         btn.className = 'w-full text-left p-3 border border-gray-300 rounded bg-white/50 hover:bg-white font-bold text-sm transition mb-2';
@@ -245,30 +227,20 @@ function showMapsList() {
         container.appendChild(btn);
     });
     
-    // Разделитель
     const divider = document.createElement('div');
     divider.className = 'border-t border-gray-300 my-3';
     container.appendChild(divider);
     
-    // Кнопка загрузки своей карты
     const loadBtn = document.createElement('button');
     loadBtn.className = 'w-full bg-gray-700 text-white py-2 rounded text-sm mb-2';
     loadBtn.innerHTML = '📁 ЗАГРУЗИТЬ СВОЮ КАРТУ';
     loadBtn.onclick = () => document.getElementById('map-file-input')?.click();
     container.appendChild(loadBtn);
     
-    // Кнопка обновления
-    const refreshBtn = document.createElement('button');
-    refreshBtn.className = 'w-full bg-gray-600 text-white py-2 rounded text-sm';
-    refreshBtn.innerHTML = '🔄 ОБНОВИТЬ СПИСОК';
-    refreshBtn.onclick = () => loadMapsList();
-    container.appendChild(refreshBtn);
-    
     const countrySelect = document.getElementById('country-select');
     const mainMenu = document.getElementById('main-menu');
     
     if (countrySelect) {
-        // Меняем заголовок окна
         const titleEl = countrySelect.querySelector('h2');
         if (titleEl) titleEl.innerText = 'ВЫБЕРИТЕ КАРТУ';
         countrySelect.classList.remove('hidden');
@@ -280,11 +252,9 @@ function selectMap(map) {
     console.log('Загрузка карты:', map.name);
     showLoadingScreen(`Загрузка карты ${map.name}...`);
     
-    // Загружаем данные карты
     setGridData(map.data.gridData);
     setCellStats(map.data.cellStats || {});
     
-    // Получаем список стран на карте
     const countriesOnMap = [...new Set(Object.values(map.data.gridData))];
     
     if (countriesOnMap.length === 0) {
@@ -331,7 +301,6 @@ function showCountrySelection(countries) {
     
     container.innerHTML = '';
     
-    // Заголовок
     const title = document.createElement('div');
     title.className = 'text-center font-bold text-lg mb-4 border-b pb-2';
     title.innerText = 'ВЫБЕРИТЕ СТРАНУ';
@@ -351,7 +320,6 @@ function showCountrySelection(countries) {
         container.appendChild(btn);
     });
     
-    // Кнопка назад к картам
     const backBtn = document.createElement('button');
     backBtn.className = 'w-full bg-gray-600 text-white py-2 rounded text-sm mt-2';
     backBtn.innerHTML = '◀ НАЗАД К КАРТАМ';
@@ -371,7 +339,6 @@ function showCountrySelection(countries) {
 
 function startGame(countryId) {
     console.log('Старт игры за', countryId);
-    showLoadingScreen(`Запуск игры за ${getCountryInfo(countryId).name}...`);
     
     // Инициализация игрового состояния
     setMyCountryId(countryId);
@@ -381,24 +348,28 @@ function startGame(countryId) {
     setUnits([]);
     setResources({ equipment: 1000, factories: 0, manpower: 0 });
     
-    // Убираем await - updateTopBar синхронная функция
     updateTopBar();
     
-    // Показываем игровой интерфейс
-    const gameContainer = document.getElementById('game-container');
+    // Скрываем меню выбора
     const countrySelect = document.getElementById('country-select');
+    const mainMenu = document.getElementById('main-menu');
+    const gameContainer = document.getElementById('game-container');
     const gameTabs = document.getElementById('game-tabs');
     
-    if (gameContainer) gameContainer.classList.remove('hidden');
     if (countrySelect) countrySelect.classList.add('hidden');
+    if (mainMenu) mainMenu.classList.add('hidden');
+    if (gameContainer) gameContainer.classList.remove('hidden');
     if (gameTabs) gameTabs.classList.remove('hidden');
     
-    // Рендерим карту
-    renderMap();
+    // Принудительно рендерим карту
+    setTimeout(() => {
+        resizeCanvas();
+        renderMap();
+        console.log('Карта отрендерена, активна:', getGameActive());
+    }, 100);
     
-    hideLoadingScreen();
     addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
-    addNotification(`Ваши ресурсы: ${Math.floor(getResources().equipment)} снаряжения`, 'info');
+    addNotification(`Ваши ресурсы: ${Math.floor(getResources().equipment)} снаряжения, ${Math.floor(getResources().manpower)} людей`, 'info');
 }
 
 function setupCanvasClick() {
@@ -412,12 +383,13 @@ function setupCanvasClick() {
         const myId = getMyCountryId();
         const resources = getResources();
         
+        if (!getGameActive()) return;
+        
         // Рекрутинг
         if (pendingRecruit) {
             const unitStats = UNIT_STATS[pendingRecruit];
             if (gridData[key] === myId) {
                 if (resources.equipment >= unitStats.cost && resources.manpower >= unitStats.manpower) {
-                    // Убираем async/await, используем import().then()
                     import('./game.js').then(({ addUnit, getResources, setResources }) => {
                         const res = getResources();
                         res.equipment -= unitStats.cost;
@@ -486,7 +458,6 @@ function setupCanvasClick() {
         }
     });
     
-    // ПКМ для отмены
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (pendingRecruit) {
@@ -501,12 +472,8 @@ function setupCanvasClick() {
         }
     });
 }
-function gameLoop(timestamp) {
-    renderMap();
-    requestAnimationFrame(gameLoop);
-}
 
-// Запуск после загрузки DOM
+// Запуск
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
