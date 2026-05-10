@@ -8,28 +8,41 @@ const CELL_SIZE = 20;
 let camera = { x: 0, y: 0, zoom: 1 };
 let hoverCell = null;
 
-// КЭШ для отрисованных клеток (для статичной карты)
-let cachedMapImage = null;
-let lastGridHash = null;
-
-// Функция для хеширования карты (чтобы понять, изменилась ли она)
-function getGridHash() {
-    const gridData = getGridData();
-    let hash = '';
-    const keys = Object.keys(gridData).slice(0, 100);
-    for (const key of keys) {
-        hash += key + gridData[key];
-    }
-    return hash;
-}
-
 export function getCamera() { return camera; }
 export function setCamera(newCamera) { camera = newCamera; }
+
+// Вычисление центра карты
+export function calculateMapCenter() {
+    const gridData = getGridData();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    Object.keys(gridData).forEach(pos => {
+        const [x, y] = pos.split(',').map(Number);
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+    });
+    
+    if (minX === Infinity) return { x: 0, y: 0 };
+    
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    return { x: centerX * CELL_SIZE, y: centerY * CELL_SIZE };
+}
+
+// Установка камеры в центр карты
+export function centerCameraOnMap() {
+    const center = calculateMapCenter();
+    camera.x = center.x;
+    camera.y = center.y;
+    renderMap();
+}
 
 export function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    cachedMapImage = null; // Сбрасываем кэш при изменении размера
     renderMap();
 }
 
@@ -42,7 +55,6 @@ export function screenToWorld(sx, sy) {
     return { x, y };
 }
 
-// Рендер ТОЛЬКО видимой области (без кэша, но быстро)
 export function renderMap() {
     if (!ctx) return;
     
@@ -51,7 +63,6 @@ export function renderMap() {
     const myCountryId = getMyCountryId();
     const buildingQueue = getBuildingQueue();
     
-    // Оптимизация: не рисуем если окно маленькое или зум слишком большой
     if (canvas.width === 0 || canvas.height === 0) return;
     
     ctx.fillStyle = '#1b3a4b';
@@ -67,15 +78,9 @@ export function renderMap() {
     const startY = Math.floor((camera.y - canvas.height/2/camera.zoom) / CELL_SIZE) - 2;
     const endY = Math.floor((camera.y + canvas.height/2/camera.zoom) / CELL_SIZE) + 2;
     
-    // Ограничиваем диапазон, чтобы не рисовать лишнее
-    const minX = Math.max(startX, -100);
-    const maxX = Math.min(endX, 200);
-    const minY = Math.max(startY, -100);
-    const maxY = Math.min(endY, 300);
-    
     // Рисуем клетки
-    for (let x = minX; x <= maxX; x++) {
-        for (let y = minY; y <= maxY; y++) {
+    for (let x = startX; x <= endX; x++) {
+        for (let y = startY; y <= endY; y++) {
             const key = `${x},${y}`;
             const id = gridData[key];
             if (id) {
@@ -83,16 +88,8 @@ export function renderMap() {
                 ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                 ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            }
-        }
-    }
-    
-    // Рисуем здания (только на видимых)
-    for (let x = minX; x <= maxX; x++) {
-        for (let y = minY; y <= maxY; y++) {
-            const key = `${x},${y}`;
-            const id = gridData[key];
-            if (id) {
+                
+                // Здания
                 const cell = getCellData(key, {});
                 if (cell.factories > 0) {
                     ctx.font = `${CELL_SIZE * 0.6}px sans-serif`;
@@ -107,25 +104,23 @@ export function renderMap() {
         }
     }
     
-    // Стройка (только активная)
+    // Стройка
     if (buildingQueue.length > 0 && buildingQueue[0]) {
         const [x, y] = buildingQueue[0].pos.split(',').map(Number);
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
-            const stats = BUILDING_STATS[buildingQueue[0].type];
-            if (stats) {
-                ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE, 4);
-                const progress = (stats.buildTime - buildingQueue[0].daysLeft) / stats.buildTime;
-                ctx.fillStyle = '#3b82f6';
-                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE * progress, 4);
-            }
+        const stats = BUILDING_STATS[buildingQueue[0].type];
+        if (stats && x >= startX && x <= endX && y >= startY && y <= endY) {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE, 4);
+            const progress = (stats.buildTime - buildingQueue[0].daysLeft) / stats.buildTime;
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE * progress, 4);
         }
     }
     
-    // Рисуем юниты
+    // Юниты
     units.forEach(u => {
         const [x, y] = u.pos.split(',').map(Number);
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+        if (x >= startX && x <= endX && y >= startY && y <= endY) {
             ctx.font = `${CELL_SIZE * 0.8}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -134,7 +129,6 @@ export function renderMap() {
             ctx.fillText(UNIT_STATS[u.type]?.icon || "❓", x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
             ctx.globalAlpha = 1;
             
-            // Полоска здоровья (только если HP меньше максимума)
             const stats = UNIT_STATS[u.type];
             if (stats && u.hp && u.hp < stats.hp) {
                 const hpPercent = u.hp / stats.hp;
@@ -149,7 +143,7 @@ export function renderMap() {
     // Ховер
     if (hoverCell && gridData[hoverCell]) {
         const [hx, hy] = hoverCell.split(',').map(Number);
-        if (hx >= minX && hx <= maxX && hy >= minY && hy <= maxY) {
+        if (hx >= startX && hx <= endX && hy >= startY && hy <= endY) {
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
             ctx.fillRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             ctx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -160,10 +154,7 @@ export function renderMap() {
     ctx.restore();
 }
 
-// Оптимизированное обновление камеры с throttling
-let lastCameraUpdate = 0;
 let pendingRender = false;
-
 function throttledRender() {
     if (pendingRender) return;
     pendingRender = true;
@@ -174,12 +165,9 @@ function throttledRender() {
 }
 
 export function setupMapEvents() {
-    let wheelTimeout;
-    
     canvas.addEventListener('wheel', e => {
         e.preventDefault();
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        camera.zoom = Math.min(Math.max(camera.zoom * zoomFactor, 0.3), 3);
+        camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.3), 3);
         throttledRender();
     });
     
@@ -198,11 +186,10 @@ export function setupMapEvents() {
     window.addEventListener('keydown', e => { keys[e.code] = true; });
     window.addEventListener('keyup', e => { keys[e.code] = false; });
     
-    // Оптимизированное движение камеры - не каждый кадр, а с интервалом
     let lastMoveTime = 0;
     function updateCameraMove() {
         const now = Date.now();
-        if (now - lastMoveTime < 16) { // ~60fps
+        if (now - lastMoveTime < 16) {
             requestAnimationFrame(updateCameraMove);
             return;
         }
@@ -215,9 +202,7 @@ export function setupMapEvents() {
         if (keys['KeyA']) { camera.x -= speed; moved = true; }
         if (keys['KeyD']) { camera.x += speed; moved = true; }
         
-        if (moved) {
-            throttledRender();
-        }
+        if (moved) throttledRender();
         requestAnimationFrame(updateCameraMove);
     }
     updateCameraMove();
