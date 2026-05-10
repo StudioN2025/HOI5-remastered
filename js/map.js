@@ -1,17 +1,15 @@
 import { getCountryInfo, getCellData } from './utils.js';
-import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId } from './game.js';
+import { getGridData, getUnits, getMyCountryId, getBuildingQueue } from './game.js';
 import { UNIT_STATS, BUILDING_STATS } from './data.js';
 
 const canvas = document.getElementById('map-canvas');
 let ctx = canvas.getContext('2d');
 const CELL_SIZE = 20;
-let hoverCell = null;
 let camera = { x: 0, y: 0, zoom: 1 };
+let hoverCell = null;
 
 export function getCamera() { return camera; }
 export function setCamera(newCamera) { camera = newCamera; }
-export function getHoverCell() { return hoverCell; }
-export function setHoverCell(cell) { hoverCell = cell; }
 
 export function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -28,23 +26,15 @@ export function screenToWorld(sx, sy) {
     return { x, y };
 }
 
-export function worldToScreen(x, y) {
-    const screenX = (x * CELL_SIZE - camera.x) * camera.zoom + canvas.width/2;
-    const screenY = (y * CELL_SIZE - camera.y) * camera.zoom + canvas.height/2;
-    return { x: screenX, y: screenY };
-}
-
 export function renderMap() {
     if (!ctx) return;
     const gridData = getGridData();
     const units = getUnits();
-    const buildingQueue = getBuildingQueue();
     const myCountryId = getMyCountryId();
-    const selectedUnitId = getSelectedUnitId?.() || null;
+    const buildingQueue = getBuildingQueue();
     
     ctx.fillStyle = '#1b3a4b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     ctx.save();
     ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
     ctx.scale(camera.zoom, camera.zoom);
@@ -78,25 +68,22 @@ export function renderMap() {
     });
     
     // Стройка
-    if (buildingQueue.length > 0) {
+    if (buildingQueue.length > 0 && buildingQueue[0]) {
         const [x, y] = buildingQueue[0].pos.split(',').map(Number);
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE, 4);
-        const progress = (BUILDING_STATS[buildingQueue[0].type]?.buildTime - buildingQueue[0].daysLeft) / BUILDING_STATS[buildingQueue[0].type]?.buildTime;
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE * progress, 4);
+        const stats = BUILDING_STATS[buildingQueue[0].type];
+        if (stats) {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE, 4);
+            const progress = (stats.buildTime - buildingQueue[0].daysLeft) / stats.buildTime;
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE * progress, 4);
+        }
     }
     
     // Юниты
     units.forEach(u => {
         const [x, y] = u.pos.split(',').map(Number);
         if (x < startX || x > endX || y < startY || y > endY) return;
-        
-        if (u.id === selectedUnitId) {
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x * CELL_SIZE - 2, y * CELL_SIZE - 2, CELL_SIZE + 4, CELL_SIZE + 4);
-        }
         
         ctx.font = `${CELL_SIZE * 0.8}px sans-serif`;
         ctx.textAlign = "center";
@@ -105,6 +92,15 @@ export function renderMap() {
         ctx.globalAlpha = u.trainingDaysLeft > 0 ? 0.5 : 1;
         ctx.fillText(UNIT_STATS[u.type]?.icon || "❓", x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
         ctx.globalAlpha = 1;
+        
+        // Полоска здоровья
+        if (u.hp && u.hp < UNIT_STATS[u.type]?.hp) {
+            const hpPercent = u.hp / UNIT_STATS[u.type].hp;
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 6, CELL_SIZE - 4, 3);
+            ctx.fillStyle = '#44ff44';
+            ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 6, (CELL_SIZE - 4) * hpPercent, 3);
+        }
     });
     
     // Ховер
@@ -119,23 +115,10 @@ export function renderMap() {
     ctx.restore();
 }
 
-export function updateCamera() {
-    const keys = window._keys || {};
-    const speed = 15 / camera.zoom;
-    let moved = false;
-    if (keys['KeyW']) { camera.y -= speed; moved = true; }
-    if (keys['KeyS']) { camera.y += speed; moved = true; }
-    if (keys['KeyA']) { camera.x -= speed; moved = true; }
-    if (keys['KeyD']) { camera.x += speed; moved = true; }
-    if (moved) renderMap();
-}
-
 export function setupMapEvents() {
     canvas.addEventListener('wheel', e => {
         e.preventDefault();
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        camera.zoom = Math.min(Math.max(camera.zoom * zoomFactor, 0.2), 4);
-        document.getElementById('zoom-value').innerText = Math.round(camera.zoom * 100) + '%';
+        camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.2), 4);
         renderMap();
     });
     
@@ -150,9 +133,17 @@ export function setupMapEvents() {
         renderMap();
     });
     
-    window._keys = {};
-    window.addEventListener('keydown', e => { window._keys[e.code] = true; });
-    window.addEventListener('keyup', e => { window._keys[e.code] = false; });
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.code] = true; });
+    window.addEventListener('keyup', e => { keys[e.code] = false; });
     
-    setInterval(() => updateCamera(), 16);
+    setInterval(() => {
+        let moved = false;
+        const speed = 15 / camera.zoom;
+        if (keys['KeyW']) { camera.y -= speed; moved = true; }
+        if (keys['KeyS']) { camera.y += speed; moved = true; }
+        if (keys['KeyA']) { camera.x -= speed; moved = true; }
+        if (keys['KeyD']) { camera.x += speed; moved = true; }
+        if (moved) renderMap();
+    }, 16);
 }
