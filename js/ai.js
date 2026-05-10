@@ -25,27 +25,35 @@ export function runCountryAI(countryId) {
         }
     }
     
-    // 3. Строительство
+    // 3. Строительство - оптимизация
     if (state.buildingQueue.length < 2) {
-        const myCells = Object.keys(state.gridData).filter(pos => state.gridData[pos] === countryId);
+        const myCells = [];
+        for (const [pos, id] of Object.entries(state.gridData)) {
+            if (id === countryId) myCells.push(pos);
+        }
         if (myCells.length > 0) {
             const randomPos = myCells[Math.floor(Math.random() * myCells.length)];
             state.buildingQueue.push({ type: 'factory', pos: randomPos, daysLeft: CONFIG.CONSTRUCTION_TIME });
         }
     }
     
-    // 4. Создание армии
+    // 4. Создание армии - оптимизация
     if (stats.totalFactories > 0 && Math.random() < 0.05) {
-        const myCells = Object.keys(state.gridData).filter(pos => state.gridData[pos] === countryId);
-        const spawnPos = myCells[Math.floor(Math.random() * myCells.length)];
-        state.units.push({
-            id: Math.random().toString(36).substr(2, 9),
-            pos: spawnPos,
-            owner: countryId,
-            type: Math.random() > 0.3 ? 'infantry' : 'tank',
-            hp: 100,
-            trainingDaysLeft: 10,
-            path: []
-        });
+        const myCells = [];
+        for (const [pos, id] of Object.entries(state.gridData)) {
+            if (id === countryId) myCells.push(pos);
+        }
+        if (myCells.length > 0) {
+            const spawnPos = myCells[Math.floor(Math.random() * myCells.length)];
+            state.units.push({
+                id: Math.random().toString(36).substr(2, 9),
+                pos: spawnPos,
+                owner: countryId,
+                type: Math.random() > 0.3 ? 'infantry' : 'tank',
+                hp: 100,
+                trainingDaysLeft: 10,
+                path: []
+            });
+        }
     }
 }

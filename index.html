@@ -13,7 +13,7 @@
             <h1 class="text-5xl font-black text-center mb-12 border-b-4 border-black/30 pb-6 tracking-[0.2em] uppercase">
                 HEARTS OF IRON V
             </h1>
-            <button onclick="startGame()" class="hq-button text-2xl px-12 py-6 w-full max-w-sm">В БОЙ</button>
+            <button id="btn-start-game" class="hq-button text-2xl px-12 py-6 w-full max-w-sm">В БОЙ</button>
             <p class="text-[10px] mt-12 text-center opacity-60 italic uppercase">Oberkommando — Simulation Module</p>
         </div>
     </div>
@@ -23,7 +23,7 @@
         <div class="bg-[#e3d1b5] p-8 border-4 border-[#8b4513] w-96 text-black">
             <h2 class="text-2xl font-bold mb-6 text-center border-b-2 border-black/20 pb-2 uppercase">Выберите Державу</h2>
             <div id="play-country-list" class="space-y-2 max-h-64 overflow-y-auto pr-2"></div>
-            <button onclick="closePlayMenu()" class="hq-button w-full mt-8 bg-red-900 text-sm">Назад</button>
+            <button id="btn-close-play" class="hq-button w-full mt-8 bg-red-900 text-sm">Назад</button>
         </div>
     </div>
 
@@ -40,7 +40,7 @@
                 <span title="Людские ресурсы">👥 <span id="val-manpower">0</span></span>
                 <span title="Заводы">🏭 <span id="val-fact">0</span></span>
                 <span title="Снаряжение">🔫 <span id="val-equip">0</span></span>
-                <button id="btn-map-normal" class="mode-status-btn hidden ml-4" onclick="resetMapMode()">
+                <button id="btn-map-normal" class="mode-status-btn hidden ml-4">
                     ОБЫЧНЫЙ РЕЖИМ КАРТЫ
                 </button>
             </div>
@@ -52,10 +52,10 @@
                 <div id="order-hint" class="hidden text-emerald-400 animate-pulse mr-4">ВЫБЕРИТЕ ЦЕЛЬ ДЛЯ ПЕРЕДВИЖЕНИЯ</div>
                 <div id="build-hint" class="hidden text-blue-400 animate-pulse mr-4">ВЫБЕРИТЕ МЕСТО ДЛЯ СТРОИТЕЛЬСТВА</div>
                 <div class="time-controls">
-                    <button id="btn-pause" class="speed-btn active" onclick="setSpeed(0)">⏸️</button>
-                    <button id="btn-speed-1" class="speed-btn" onclick="setSpeed(1)">1x</button>
-                    <button id="btn-speed-3" class="speed-btn" onclick="setSpeed(3)">3x</button>
-                    <button id="btn-speed-5" class="speed-btn" onclick="setSpeed(5)">5x</button>
+                    <button id="btn-pause" class="speed-btn active">⏸️</button>
+                    <button id="btn-speed-1" class="speed-btn">1x</button>
+                    <button id="btn-speed-3" class="speed-btn">3x</button>
+                    <button id="btn-speed-5" class="speed-btn">5x</button>
                 </div>
                 <span id="game-date" class="bg-black/50 px-3 py-1 rounded min-w-[120px] text-center border border-white/10">1 ЯНВ, 1936</span>
             </div>
@@ -63,18 +63,18 @@
 
         <!-- Вкладки -->
         <div class="hoi-tab-container hidden" id="game-tabs">
-            <button class="hoi-tab-btn" onclick="openWindow('politics')">ПОЛИТИКА</button>
-            <button class="hoi-tab-btn" onclick="openWindow('research')">ИССЛЕДОВАНИЯ</button>
-            <button class="hoi-tab-btn" onclick="openWindow('build')">СТРОИТЕЛЬСТВО</button>
-            <button class="hoi-tab-btn" onclick="openWindow('diplomacy')">ДИПЛОМАТИЯ</button>
-            <button class="hoi-tab-btn" onclick="openWindow('army')">АРМИЯ</button>
+            <button class="hoi-tab-btn" data-tab="politics">ПОЛИТИКА</button>
+            <button class="hoi-tab-btn" data-tab="research">ИССЛЕДОВАНИЯ</button>
+            <button class="hoi-tab-btn" data-tab="build">СТРОИТЕЛЬСТВО</button>
+            <button class="hoi-tab-btn" data-tab="diplomacy">ДИПЛОМАТИЯ</button>
+            <button class="hoi-tab-btn" data-tab="army">АРМИЯ</button>
         </div>
 
         <!-- Окно -->
         <div id="hoi-window">
             <div class="window-header">
                 <span id="window-title">---</span>
-                <button onclick="closeWindow()" class="text-red-500 hover:text-red-300">✖️</button>
+                <button id="btn-close-window" class="text-red-500 hover:text-red-300">✖️</button>
             </div>
             <div id="window-body" class="window-content"></div>
         </div>

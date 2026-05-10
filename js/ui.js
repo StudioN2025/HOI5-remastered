@@ -11,7 +11,10 @@ export function updateTopBar() {
     const stats = calculateCountryStats(state.myCountryId);
     state.playerResources.factories = stats.totalFactories;
     const totalManpower = stats.totalPop * CONFIG.MANPOWER_USAGE_PERCENT;
-    const usedManpower = state.units.reduce((acc, u) => acc + (getUnitStats()[u.type].costManpower), 0);
+    
+    // Оптимизация: кэшируем getUnitStats
+    const unitStats = getUnitStats();
+    const usedManpower = state.units.reduce((acc, u) => acc + unitStats[u.type].costManpower, 0);
     
     document.getElementById('val-manpower').innerText = Math.floor(Math.max(0, totalManpower - usedManpower)).toLocaleString();
     document.getElementById('val-fact').innerText = state.playerResources.factories;
@@ -76,8 +79,10 @@ function updatePoliticsUI(body) {
                 <p class="text-xl font-bold">${info.leader}</p>
             </div>
         </div>
-        <button onclick="window.openFocusTree()" class="hq-button w-full bg-yellow-800 border-yellow-600 text-sm">НАЦИОНАЛЬНЫЕ ФОКУСЫ</button>
+        <button id="btn-open-focus-tree" class="hq-button w-full bg-yellow-800 border-yellow-600 text-sm">НАЦИОНАЛЬНЫЕ ФОКУСЫ</button>
     </div>`;
+    
+    document.getElementById('btn-open-focus-tree').addEventListener('click', openFocusTree);
 }
 
 export function openFocusTree() {
@@ -100,7 +105,7 @@ export function updateFocusUI() {
         </div>`;
     }
     
-    html += `<div class="space-y-3">`;
+    html += `<div class="space-y-3" id="focus-list-container">`;
     countryFocuses.forEach(f => {
         const isDone = state.completedFocuses.has(f.id);
         const isCurrent = state.activeFocus && state.activeFocus.id === f.id;
@@ -112,7 +117,7 @@ export function updateFocusUI() {
                     <p class="text-[9px] text-gray-400 uppercase mt-1 leading-tight">${f.description}</p>
                 </div>
                 <div class="flex items-center">
-                    ${!isDone && !state.activeFocus ? `<button onclick="window.startFocus('${f.id}')" class="bg-yellow-700 hover:bg-yellow-600 px-4 py-1 text-[10px] font-bold border border-yellow-400">ВЫБРАТЬ</button>` : ''}
+                    ${!isDone && !state.activeFocus ? `<button class="btn-start-focus bg-yellow-700 hover:bg-yellow-600 px-4 py-1 text-[10px] font-bold border border-yellow-400" data-focus-id="${f.id}">ВЫБРАТЬ</button>` : ''}
                     ${isCurrent ? `<span class="text-yellow-500 text-[10px] animate-pulse font-bold tracking-tighter">В ПРОЦЕССЕ...</span>` : ''}
                     ${isDone ? `<span class="text-emerald-500 text-[10px] font-bold">ЗАВЕРШЕНО ✅</span>` : ''}
                 </div>
@@ -125,6 +130,16 @@ export function updateFocusUI() {
         html = '<div class="text-center py-12 opacity-40 italic text-xs uppercase">Для этой державы нет уникальных фокусов</div>';
     }
     body.innerHTML = html;
+    
+    // Добавляем обработчики для кнопок фокусов
+    setTimeout(() => {
+        document.querySelectorAll('.btn-start-focus').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const focusId = btn.getAttribute('data-focus-id');
+                if (focusId) window.startFocus(focusId);
+            });
+        });
+    }, 0);
 }
 
 function updateDiplomacyUI(body) {
@@ -182,11 +197,21 @@ function updateBuildUI(body) {
         </div>` : '';
     
     body.innerHTML = activeHtml + 
-        `<div class="grid grid-cols-1 gap-2">${Object.entries(getBuildingStats()).map(([key, b]) => 
+        `<div class="grid grid-cols-1 gap-2" id="build-list-container">${Object.entries(getBuildingStats()).map(([key, b]) => 
         `<div class="unit-card flex justify-between items-center">
             <span>${b.icon} ${b.name}</span>
-            <button onclick="window.selectBuildType('${key}')" class="bg-blue-800 px-3 py-1 text-[10px]">ВЫБРАТЬ КЛЕТКУ</button>
+            <button class="btn-select-build bg-blue-800 px-3 py-1 text-[10px]" data-build-type="${key}">ВЫБРАТЬ КЛЕТКУ</button>
         </div>`).join('')}</div>`;
+    
+    // Добавляем обработчики для кнопок строительства
+    setTimeout(() => {
+        document.querySelectorAll('.btn-select-build').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const buildType = btn.getAttribute('data-build-type');
+                if (buildType) window.selectBuildType(buildType);
+            });
+        });
+    }, 0);
 }
 
 function updateResearchUI(body) {
@@ -220,7 +245,7 @@ function renderTechTier(type, currentLevel, name) {
         } else if (isProcessing) {
             buttonHtml = `<span class="text-blue-400 text-[9px] animate-pulse">ИЗУЧАЕТСЯ (${state.activeResearch.daysLeft}д)</span>`;
         } else if (isAvailable) {
-            buttonHtml = `<button onclick="window.startResearch('${type}', ${i})" class="bg-blue-800 hover:bg-blue-700 px-3 py-1 text-[9px] border border-blue-400">ИЗУЧИТЬ</button>`;
+            buttonHtml = `<button class="btn-start-research bg-blue-800 hover:bg-blue-700 px-3 py-1 text-[9px] border border-blue-400" data-tech-type="${type}" data-tech-level="${i}">ИЗУЧИТЬ</button>`;
         } else {
             buttonHtml = '<span class="text-gray-600 text-[9px]">ЗАБЛОКИРОВАНО</span>';
         }
@@ -231,6 +256,18 @@ function renderTechTier(type, currentLevel, name) {
             ${buttonHtml}
         </div>`;
     }
+    
+    // Добавляем обработчики для кнопок исследований после рендера
+    setTimeout(() => {
+        document.querySelectorAll('.btn-start-research').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const techType = btn.getAttribute('data-tech-type');
+                const techLevel = parseInt(btn.getAttribute('data-tech-level'));
+                if (techType && techLevel) window.startResearch(techType, techLevel);
+            });
+        });
+    }, 0);
+    
     return html;
 }
 
@@ -239,7 +276,7 @@ function updateArmyUI(body) {
     <div class="unit-card">
         <div class="flex justify-between items-start mb-2">
             <span class="text-lg font-bold">${u.icon} ${u.name}</span>
-            <button onclick="window.startRecruitment('${key}')" class="bg-emerald-800 hover:bg-emerald-700 px-4 py-1 text-[10px] font-bold border border-emerald-400">РАЗВЕРНУТЬ</button>
+            <button class="btn-start-recruitment bg-emerald-800 hover:bg-emerald-700 px-4 py-1 text-[10px] font-bold border border-emerald-400" data-unit-type="${key}">РАЗВЕРНУТЬ</button>
         </div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] uppercase">
             <div class="flex justify-between border-b border-white/5">
@@ -256,6 +293,16 @@ function updateArmyUI(body) {
             </div>
         </div>
     </div>`).join('');
+    
+    // Добавляем обработчики для кнопок развертывания
+    setTimeout(() => {
+        document.querySelectorAll('.btn-start-recruitment').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const unitType = btn.getAttribute('data-unit-type');
+                if (unitType) window.startRecruitment(unitType);
+            });
+        });
+    }, 0);
 }
 
 export function showIntel(id, key, withDiplo) {

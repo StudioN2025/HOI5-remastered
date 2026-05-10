@@ -205,7 +205,7 @@ export const nationalFocuses = {
             name: "Королевский флот",
             description: "Усиление военно-морских сил",
             effect: (state, utils) => {
-                utils.createAlert="ФЛОТ ЕГО ВЕЛИЧЕСТВА: УСИЛЕН", 10, 'diplo');
+                utils.createAlert("ФЛОТ ЕГО ВЕЛИЧЕСТВА: УСИЛЕН", 10, 'diplo');
             }
         }
     ]

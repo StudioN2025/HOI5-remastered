@@ -6,9 +6,30 @@ import { updateTopBar, updateDate, createAlert, openWindow, closeWindow, showInt
 import { runCountryAI } from './ai.js';
 import { nationalFocuses } from './data/focuses.js';
 import { getCountryInfo } from './data/countries.js';
+import { showLoader, updateLoaderStatus, updateLoaderProgress, hideLoader } from './core/loader.js';
 
 const canvas = document.getElementById('grid-canvas');
 const ctx = canvas.getContext('2d');
+
+// Кэширование DOM элементов
+const domCache = {
+    mainMenu: document.getElementById('main-menu'),
+    gameContainer: document.getElementById('game-container'),
+    playMenu: document.getElementById('play-menu'),
+    uiWrapper: document.getElementById('ui-wrapper'),
+    gameTabs: document.getElementById('game-tabs'),
+    focusIndicator: document.getElementById('focus-indicator'),
+    researchIndicator: document.getElementById('research-indicator'),
+    buildIndicator: document.getElementById('build-indicator'),
+    notificationBox: document.getElementById('notification-box'),
+    hoiWindow: document.getElementById('hoi-window'),
+    windowBody: document.getElementById('window-body'),
+    windowTitle: document.getElementById('window-title'),
+    intelSidebar: document.getElementById('intel-sidebar'),
+    btnMapNormal: document.getElementById('btn-map-normal'),
+    recruitHint: document.getElementById('recruit-hint'),
+    buildHint: document.getElementById('build-hint')
+};
 
 // Загрузка карты
 async function loadMap() {
@@ -72,7 +93,7 @@ function onDayPassed() {
     if (state.gameDate.getDate() !== oldDate.getDate()) {
         // Фокусы
         if (state.activeFocus) {
-            document.getElementById('focus-indicator').classList.remove('hidden');
+            domCache.focusIndicator.classList.remove('hidden');
             state.activeFocus.daysLeft--;
             if (state.activeFocus.daysLeft <= 0) {
                 state.activeFocus.effect(state, {
@@ -84,8 +105,8 @@ function onDayPassed() {
                 });
                 state.completedFocuses.add(state.activeFocus.id);
                 state.activeFocus = null;
-                document.getElementById('focus-indicator').classList.add('hidden');
-                if(document.getElementById('hoi-window').style.display === 'flex') updateFocusUI();
+                domCache.focusIndicator.classList.add('hidden');
+                if (domCache.hoiWindow.style.display === 'flex') updateFocusUI();
             }
         }
         
@@ -96,13 +117,13 @@ function onDayPassed() {
                 state.tech[state.activeResearch.type] = state.activeResearch.level;
                 createAlert(`ИССЛЕДОВАНИЕ ЗАВЕРШЕНО: ${state.activeResearch.type.toUpperCase()} УР.${state.activeResearch.level}`, 10, 'diplo');
                 state.activeResearch = null;
-                document.getElementById('research-indicator').classList.add('hidden');
+                domCache.researchIndicator.classList.add('hidden');
             }
         }
         
         // Строительство
         if (state.buildingQueue.length > 0) {
-            document.getElementById('build-indicator').classList.remove('hidden');
+            domCache.buildIndicator.classList.remove('hidden');
             const activeProject = state.buildingQueue[0];
             activeProject.daysLeft--;
             if (activeProject.daysLeft <= 0) {
@@ -116,7 +137,7 @@ function onDayPassed() {
                 state.buildingQueue.shift();
             }
         } else {
-            document.getElementById('build-indicator').classList.add('hidden');
+            domCache.buildIndicator.classList.add('hidden');
         }
         
         // Производство
@@ -130,21 +151,24 @@ function onDayPassed() {
         });
         state.playerResources.equipment = Math.max(0, state.playerResources.equipment + production - maintenance);
         
-        // ИИ
-        Object.keys(state.gridData).forEach(id => {
-            const countryId = state.gridData[id];
+        // ИИ - оптимизация: собираем уникальные страны
+        const aiCountries = new Set();
+        Object.values(state.gridData).forEach(countryId => {
             if (countryId && countryId !== state.myCountryId) {
-                runCountryAI(countryId);
+                aiCountries.add(countryId);
             }
         });
+        aiCountries.forEach(countryId => runCountryAI(countryId));
         
         // Бои
         processCombat();
         
-        // Движение юнитов
+        // Движение юнитов - оптимизация
+        const unitsToRemove = [];
         state.units.forEach(u => {
-            if (u.trainingDaysLeft > 0) u.trainingDaysLeft--;
-            else if (u.path && u.path.length > 0) {
+            if (u.trainingDaysLeft > 0) {
+                u.trainingDaysLeft--;
+            } else if (u.path && u.path.length > 0) {
                 if (u.moveCooldown === undefined) u.moveCooldown = 0;
                 u.moveCooldown++;
                 if (u.moveCooldown >= 2) {
@@ -176,15 +200,25 @@ function onDayPassed() {
 
 // Старт игры
 export async function startGame() {
-    document.getElementById('main-menu').style.display = 'none';
-    document.getElementById('game-container').classList.remove('hidden');
-    
-    const loaded = await loadMap();
-    if (!loaded) return;
-    
-    initMap();
+    domCache.mainMenu.style.display = 'none';
     showCountrySelect();
-    gameLoop(0);
+}
+
+async function initGameAfterCountrySelect() {
+    domCache.gameContainer.classList.remove('hidden');
+    
+    // Карта уже загружена в initGame(), просто центрируем камеру еще раз для надежности
+    centerCameraOnMap();
+    
+    // Инициализируем карту (рассчитываем границы, если нужно)
+    initMap();
+    
+    domCache.uiWrapper.classList.add('hidden-panel');
+    domCache.gameTabs.classList.remove('hidden');
+    
+    // Запускаем игровой цикл с корректным временем
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
 }
 
 function showCountrySelect() {
@@ -200,59 +234,142 @@ function showCountrySelect() {
     
     ids.forEach(id => {
         const btn = document.createElement('button');
-        btn.className = "w-full text-left p-3 border-b border-black/10 font-bold uppercase text-xs";
+        btn.className = "w-full text-left p-3 border-b border-black/10 font-bold uppercase text-xs hover:bg-black/10 transition-colors cursor-pointer";
         btn.innerText = getCountryInfo(id).name;
-        btn.onclick = () => {
+        btn.style.cursor = 'pointer';
+        btn.addEventListener('click', async () => {
             state.myCountryId = id;
             state.isGameMode = true;
-            setSpeed(1);
-            updateTopBar();
-            document.getElementById('play-menu').style.display = 'none';
-            document.getElementById('ui-wrapper').classList.add('hidden-panel');
-            document.getElementById('game-tabs').classList.remove('hidden');
+            
+            // Инициализируем ресурсы игрока на основе выбранной страны
+            const stats = calculateCountryStats(id);
+            state.playerResources.factories = stats.totalFactories;
+            state.playerResources.equipment = stats.totalFactories * 50;
+            state.playerResources.manpower = stats.totalPop;
+            
+            domCache.playMenu.style.display = 'none';
             document.getElementById('top-country-name').innerText = getCountryInfo(id).name.toUpperCase();
-        };
+            
+            // Инициализируем игру после выбора страны
+            await initGameAfterCountrySelect();
+        });
         list.appendChild(btn);
     });
     
-    document.getElementById('play-menu').style.display = 'flex';
+    domCache.playMenu.style.display = 'flex';
 }
 
-// Глобальные функции для HTML
-window.startGame = startGame;
-window.openFocusTree = openFocusTree;
-window.startFocus = (id) => {
-    const countryFocuses = nationalFocuses[state.myCountryId] || [];
-    const f = countryFocuses.find(x => x.id === id);
-    if (f) {
-        state.activeFocus = { ...f, daysLeft: CONFIG.FOCUS_DURATION };
-        updateFocusUI();
-    }
+// Глобальные функции для HTML (должны быть доступны до загрузки модуля)
+const exposeFunctions = () => {
+    window.startGame = startGame;
+    window.openFocusTree = openFocusTree;
+    window.startFocus = (id) => {
+        const countryFocuses = nationalFocuses[state.myCountryId] || [];
+        const f = countryFocuses.find(x => x.id === id);
+        if (f) {
+            state.activeFocus = { ...f, daysLeft: CONFIG.FOCUS_DURATION };
+            updateFocusUI();
+        }
+    };
+    window.startResearch = (type, level) => {
+        state.activeResearch = { type, level, daysLeft: CONFIG.RESEARCH_DURATION };
+        domCache.researchIndicator.classList.remove('hidden');
+    };
+    window.selectBuildType = (type) => {
+        const b = getBuildingStats().factory;
+        if (state.playerResources.equipment < b.costEquipment) {
+            createAlert("НЕДОСТАТОЧНО СНАРЯЖЕНИЯ", 3, 'war');
+            return;
+        }
+        state.buildModeType = type;
+        closeWindow();
+        domCache.buildHint.classList.remove('hidden');
+    };
+    window.startRecruitment = (type) => {
+        state.recruitMode = type;
+        closeWindow();
+        domCache.recruitHint.classList.remove('hidden');
+    };
+    window.setSpeed = setSpeed;
+    window.openWindow = openWindow;
+    window.closeWindow = closeWindow;
+    window.resetMapMode = resetMapMode;
+    window.closePlayMenu = () => { domCache.playMenu.style.display = 'none'; };
 };
-window.startResearch = (type, level) => {
-    state.activeResearch = { type, level, daysLeft: CONFIG.RESEARCH_DURATION };
-    document.getElementById('research-indicator').classList.remove('hidden');
-};
-window.selectBuildType = (type) => {
-    const b = getBuildingStats().factory;
-    if (state.playerResources.equipment < b.costEquipment) {
-        createAlert("НЕДОСТАТОЧНО СНАРЯЖЕНИЯ", 3, 'war');
+
+// Экспортируем функции сразу при загрузке модуля
+exposeFunctions();
+
+// Инициализация игры с экраном загрузки
+async function initGame() {
+    // Показываем экран загрузки
+    showLoader();
+    
+    let progress = 0;
+    
+    // Шаг 1: Загрузка данных стран
+    updateLoaderStatus('ЗАГРУЗКА ДАННЫХ СТРАН...');
+    updateLoaderProgress(progress += 10);
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 2: Загрузка карты
+    updateLoaderStatus('ЗАГРУЗКА КАРТЫ ЕВРОПЫ...');
+    updateLoaderProgress(progress += 20);
+    const mapLoaded = await loadMap();
+    if (!mapLoaded) {
+        updateLoaderStatus('ОШИБКА ЗАГРУЗКИ КАРТЫ!');
         return;
     }
-    state.buildModeType = type;
-    closeWindow();
-    document.getElementById('build-hint').classList.remove('hidden');
-};
-window.startRecruitment = (type) => {
-    state.recruitMode = type;
-    closeWindow();
-    document.getElementById('recruit-hint').classList.remove('hidden');
-};
-window.setSpeed = setSpeed;
-window.openWindow = openWindow;
-window.closeWindow = closeWindow;
-window.resetMapMode = resetMapMode;
-window.closePlayMenu = () => { document.getElementById('play-menu').style.display = 'none'; };
+    updateLoaderProgress(progress += 20);
+    
+    // Шаг 3: Инициализация карты
+    updateLoaderStatus('ИНИЦИАЛИЗАЦИЯ КАРТЫ...');
+    initMap();
+    updateLoaderProgress(progress += 15);
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 4: Подготовка интерфейса
+    updateLoaderStatus('ПОДГОТОВКА ИНТЕРФЕЙСА...');
+    updateLoaderProgress(progress += 15);
+    setSpeed(1);
+    updateTopBar();
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Шаг 5: Финализация
+    updateLoaderStatus('ГОТОВО К БОЮ...');
+    updateLoaderProgress(100);
+    await new Promise(r => setTimeout(r, 500));
+    
+    // Скрываем загрузчик и показываем меню
+    hideLoader();
+}
+
+// Запускаем инициализацию при загрузке страницы
+initGame();
+
+// Обработчики событий для кнопок меню
+document.getElementById('btn-start-game').addEventListener('click', startGame);
+document.getElementById('btn-close-play').addEventListener('click', () => { domCache.playMenu.style.display = 'none'; });
+
+// Обработчики для кнопок скорости
+document.getElementById('btn-pause').addEventListener('click', () => setSpeed(0));
+document.getElementById('btn-speed-1').addEventListener('click', () => setSpeed(1));
+document.getElementById('btn-speed-3').addEventListener('click', () => setSpeed(3));
+document.getElementById('btn-speed-5').addEventListener('click', () => setSpeed(5));
+
+// Обработчик для кнопки закрытия окна
+document.getElementById('btn-close-window').addEventListener('click', closeWindow);
+
+// Обработчик для кнопки обычного режима карты
+document.getElementById('btn-map-normal').addEventListener('click', resetMapMode);
+
+// Обработчики для вкладок
+document.querySelectorAll('.hoi-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab');
+        if (tab) openWindow(tab);
+    });
+});
 
 // Обработчики событий
 window.addEventListener('keydown', e => {
@@ -282,7 +399,7 @@ canvas.addEventListener('mousedown', e => {
             // Строительство
         } else if (e.button === 2 && clickedId) {
             state.diplomaticModeTarget = clickedId;
-            document.getElementById('btn-map-normal').classList.remove('hidden');
+            domCache.btnMapNormal.classList.remove('hidden');
             showIntel(clickedId, key, true);
         } else if (clickedId) {
             showIntel(clickedId, key, false);
