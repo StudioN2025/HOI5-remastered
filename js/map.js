@@ -7,13 +7,6 @@ let ctx = canvas.getContext('2d');
 const CELL_SIZE = 20;
 let camera = { x: 0, y: 0, zoom: 1 };
 let hoverCell = null;
-export function renderMap() {
-    // ТЕСТ: закрасить весь canvas красным
-    if (!ctx) return;
-    ctx.fillStyle = '#ff0000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    console.log('renderMap, canvas size:', canvas.width, canvas.height);
-}
 
 export function getCamera() { return camera; }
 export function setCamera(newCamera) { camera = newCamera; }
@@ -25,23 +18,22 @@ export function calculateMapCenter() {
     
     Object.keys(gridData).forEach(pos => {
         const [x, y] = pos.split(',').map(Number);
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
     });
     
     if (minX === Infinity) return { x: 0, y: 0 };
     
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-    
     return { x: centerX * CELL_SIZE, y: centerY * CELL_SIZE };
 }
 
-// Установка камеры в центр карты
 export function centerCameraOnMap() {
     const center = calculateMapCenter();
+    console.log('Центр карты:', center);
     camera.x = center.x;
     camera.y = center.y;
     renderMap();
@@ -50,6 +42,7 @@ export function centerCameraOnMap() {
 export function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    console.log('resizeCanvas:', canvas.width, canvas.height);
     renderMap();
 }
 
@@ -62,8 +55,14 @@ export function screenToWorld(sx, sy) {
     return { x, y };
 }
 
+// ГЛАВНАЯ ФУНКЦИЯ РЕНДЕРА (только одна!)
 export function renderMap() {
     if (!ctx) return;
+    
+    // ТЕСТ: закрасить красным
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    console.log('renderMap вызван, canvas size:', canvas.width, canvas.height);
     
     const gridData = getGridData();
     const units = getUnits();
@@ -72,14 +71,10 @@ export function renderMap() {
     
     if (canvas.width === 0 || canvas.height === 0) return;
     
-    ctx.fillStyle = '#1b3a4b';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     ctx.save();
     ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
     ctx.scale(camera.zoom, camera.zoom);
     
-    // Рисуем ТОЛЬКО видимые клетки
     const startX = Math.floor((camera.x - canvas.width/2/camera.zoom) / CELL_SIZE) - 2;
     const endX = Math.floor((camera.x + canvas.width/2/camera.zoom) / CELL_SIZE) + 2;
     const startY = Math.floor((camera.y - canvas.height/2/camera.zoom) / CELL_SIZE) - 2;
@@ -95,32 +90,7 @@ export function renderMap() {
                 ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                 ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                
-                // Здания
-                const cell = getCellData(key, {});
-                if (cell.factories > 0) {
-                    ctx.font = `${CELL_SIZE * 0.6}px sans-serif`;
-                    ctx.fillStyle = 'white';
-                    ctx.fillText("🏭", x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 4);
-                }
-                if (cell.buildings?.includes('port')) {
-                    ctx.fillStyle = '#3b82f6';
-                    ctx.fillText("⚓", x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 4);
-                }
             }
-        }
-    }
-    
-    // Стройка
-    if (buildingQueue.length > 0 && buildingQueue[0]) {
-        const [x, y] = buildingQueue[0].pos.split(',').map(Number);
-        const stats = BUILDING_STATS[buildingQueue[0].type];
-        if (stats && x >= startX && x <= endX && y >= startY && y <= endY) {
-            ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE, 4);
-            const progress = (stats.buildTime - buildingQueue[0].daysLeft) / stats.buildTime;
-            ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 4, CELL_SIZE * progress, 4);
         }
     }
     
@@ -132,31 +102,9 @@ export function renderMap() {
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillStyle = u.owner === myCountryId ? '#ffffff' : '#ff9999';
-            ctx.globalAlpha = u.trainingDaysLeft > 0 ? 0.5 : 1;
-            ctx.fillText(UNIT_STATS[u.type]?.icon || "❓", x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
-            ctx.globalAlpha = 1;
-            
-            const stats = UNIT_STATS[u.type];
-            if (stats && u.hp && u.hp < stats.hp) {
-                const hpPercent = u.hp / stats.hp;
-                ctx.fillStyle = '#ff4444';
-                ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 6, CELL_SIZE - 4, 3);
-                ctx.fillStyle = '#44ff44';
-                ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + CELL_SIZE - 6, (CELL_SIZE - 4) * hpPercent, 3);
-            }
+            ctx.fillText(UNIT_STATS[u.type]?.icon || "?", x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
         }
     });
-    
-    // Ховер
-    if (hoverCell && gridData[hoverCell]) {
-        const [hx, hy] = hoverCell.split(',').map(Number);
-        if (hx >= startX && hx <= endX && hy >= startY && hy <= endY) {
-            ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.fillRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.strokeRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        }
-    }
     
     ctx.restore();
 }
