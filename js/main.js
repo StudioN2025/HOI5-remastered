@@ -200,13 +200,20 @@ function onDayPassed() {
 // Старт игры
 export async function startGame() {
     domCache.mainMenu.style.display = 'none';
+    showCountrySelect();
+}
+
+async function initGameAfterCountrySelect() {
     domCache.gameContainer.classList.remove('hidden');
     
     const loaded = await loadMap();
     if (!loaded) return;
     
     initMap();
-    showCountrySelect();
+    setSpeed(1);
+    updateTopBar();
+    domCache.uiWrapper.classList.add('hidden-panel');
+    domCache.gameTabs.classList.remove('hidden');
     gameLoop(0);
 }
 
@@ -226,7 +233,7 @@ function showCountrySelect() {
         btn.className = "w-full text-left p-3 border-b border-black/10 font-bold uppercase text-xs hover:bg-black/10 transition-colors cursor-pointer";
         btn.innerText = getCountryInfo(id).name;
         btn.style.cursor = 'pointer';
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             state.myCountryId = id;
             state.isGameMode = true;
             
@@ -236,12 +243,11 @@ function showCountrySelect() {
             state.playerResources.equipment = stats.totalFactories * 50;
             state.playerResources.manpower = stats.totalPop;
             
-            setSpeed(1);
-            updateTopBar();
             domCache.playMenu.style.display = 'none';
-            domCache.uiWrapper.classList.add('hidden-panel');
-            domCache.gameTabs.classList.remove('hidden');
             document.getElementById('top-country-name').innerText = getCountryInfo(id).name.toUpperCase();
+            
+            // Инициализируем игру после выбора страны
+            await initGameAfterCountrySelect();
         });
         list.appendChild(btn);
     });
