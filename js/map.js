@@ -24,9 +24,18 @@ export function renderMap() {
     ctx.translate(canvas.width/2 - state.camera.x * state.camera.zoom, canvas.height/2 - state.camera.y * state.camera.zoom);
     ctx.scale(state.camera.zoom, state.camera.zoom);
     
-    // Отрисовка клеток
+    // Оптимизация: рисуем только видимые клетки
+    const startCol = Math.floor((state.camera.x - canvas.width/2/state.camera.zoom) / CONFIG.CELL_SIZE) - 1;
+    const endCol = Math.floor((state.camera.x + canvas.width/2/state.camera.zoom) / CONFIG.CELL_SIZE) + 1;
+    const startRow = Math.floor((state.camera.y - canvas.height/2/state.camera.zoom) / CONFIG.CELL_SIZE) - 1;
+    const endRow = Math.floor((state.camera.y + canvas.height/2/state.camera.zoom) / CONFIG.CELL_SIZE) + 1;
+    
     Object.entries(state.gridData).forEach(([pos, id]) => {
         const [x, y] = pos.split(',').map(Number);
+        
+        // Пропускаем невидимые клетки
+        if (x < startCol || x > endCol || y < startRow || y > endRow) return;
+        
         let color = getCountryInfo(id).color;
         
         if (state.isGameMode && state.diplomaticModeTarget) {
@@ -87,8 +96,12 @@ export function getCellData(key) {
 }
 
 export function screenToWorld(sx, sy) {
-    const x = Math.floor(((sx - canvas.width/2) / state.camera.zoom + state.camera.x) / CONFIG.CELL_SIZE);
-    const y = Math.floor(((sy - canvas.height/2) / state.camera.zoom + state.camera.y) / CONFIG.CELL_SIZE);
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = sx - rect.left;
+    const canvasY = sy - rect.top;
+    
+    const x = Math.floor(((canvasX - canvas.width/2) / state.camera.zoom + state.camera.x) / CONFIG.CELL_SIZE);
+    const y = Math.floor(((canvasY - canvas.height/2) / state.camera.zoom + state.camera.y) / CONFIG.CELL_SIZE);
     return { x, y };
 }
 
@@ -111,4 +124,33 @@ export function calculateCountryStats(countryId) {
         }
     });
     return stats;
+}
+
+// ✅ Функция центрирования камеры на карте
+export function centerCameraOnMap() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    Object.keys(state.gridData).forEach(pos => {
+        const [x, y] = pos.split(',').map(Number);
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+    });
+    
+    if (minX === Infinity) {
+        state.camera.x = 0;
+        state.camera.y = 0;
+        console.log('⚠️ Карта пуста!');
+        return;
+    }
+    
+    const centerX = (minX + maxX) / 2 * CONFIG.CELL_SIZE;
+    const centerY = (minY + maxY) / 2 * CONFIG.CELL_SIZE;
+    
+    state.camera.x = centerX;
+    state.camera.y = centerY;
+    
+    console.log(`🗺 Карта: ${minX},${minY} до ${maxX},${maxY}`);
+    console.log(`📍 Камера центрирована на: ${centerX}, ${centerY}`);
 }
