@@ -125,26 +125,16 @@ export function processCombat() {
 }
 
 export function checkCapitulation(targetCountry, winnerCountry) {
-    const stats = calculateCountryStats(targetCountry);
-    if (stats.cellCount < 3) {
-        // Капитуляция
+    let cellCount = 0;
+    Object.entries(state.gridData).forEach(([pos, id]) => {
+        if (id === targetCountry) cellCount++;
+    });
+    
+    if (cellCount < 3) {
         Object.keys(state.gridData).forEach(key => { 
             if (state.gridData[key] === targetCountry) state.gridData[key] = winnerCountry; 
         });
         state.wars = state.wars.filter(w => w.a !== targetCountry && w.b !== targetCountry);
         state.units = state.units.filter(u => u.owner !== targetCountry);
     }
-}
-
-function calculateCountryStats(countryId) {
-    let stats = { totalPop: 0, totalFactories: 0, cellCount: 0 };
-    Object.entries(state.gridData).forEach(([pos, id]) => {
-        if (id === countryId) {
-            const data = getCellData(pos);
-            stats.totalPop += data.population;
-            stats.totalFactories += data.factories;
-            stats.cellCount++;
-        }
-    });
-    return stats;
 }
