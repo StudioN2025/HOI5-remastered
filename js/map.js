@@ -33,7 +33,6 @@ export function calculateMapCenter() {
 
 export function centerCameraOnMap() {
     const center = calculateMapCenter();
-    console.log('Центр карты:', center);
     camera.x = center.x;
     camera.y = center.y;
     renderMap();
@@ -55,9 +54,12 @@ export function screenToWorld(sx, sy) {
     return { x, y };
 }
 
-// ГЛАВНАЯ ФУНКЦИЯ РЕНДЕРА (только одна!)
+// ГЛАВНАЯ ФУНКЦИЯ РЕНДЕРА
 export function renderMap() {
-    if (!ctx) return;
+    if (!ctx) {
+        console.error('ctx is null');
+        return;
+    }
     
     // ТЕСТ: закрасить красным
     ctx.fillStyle = '#ff0000';
@@ -69,7 +71,10 @@ export function renderMap() {
     const myCountryId = getMyCountryId();
     const buildingQueue = getBuildingQueue();
     
-    if (canvas.width === 0 || canvas.height === 0) return;
+    if (canvas.width === 0 || canvas.height === 0) {
+        console.warn('Canvas size is 0');
+        return;
+    }
     
     ctx.save();
     ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
@@ -79,6 +84,8 @@ export function renderMap() {
     const endX = Math.floor((camera.x + canvas.width/2/camera.zoom) / CELL_SIZE) + 2;
     const startY = Math.floor((camera.y - canvas.height/2/camera.zoom) / CELL_SIZE) - 2;
     const endY = Math.floor((camera.y + canvas.height/2/camera.zoom) / CELL_SIZE) + 2;
+    
+    let cellsDrawn = 0;
     
     // Рисуем клетки
     for (let x = startX; x <= endX; x++) {
@@ -90,9 +97,12 @@ export function renderMap() {
                 ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                 ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                cellsDrawn++;
             }
         }
     }
+    
+    console.log('Cells drawn:', cellsDrawn, 'Range X:', startX, endX, 'Y:', startY, endY);
     
     // Юниты
     units.forEach(u => {
@@ -101,7 +111,7 @@ export function renderMap() {
             ctx.font = `${CELL_SIZE * 0.8}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillStyle = u.owner === myCountryId ? '#ffffff' : '#ff9999';
+            ctx.fillStyle = '#ffffff';
             ctx.fillText(UNIT_STATS[u.type]?.icon || "?", x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
         }
     });
