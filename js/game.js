@@ -1,86 +1,75 @@
 import { calculateCountryStats } from './utils.js';
 import { UNIT_STATS } from './data.js';
 
-// СОСТОЯНИЕ
+// СОСТОЯНИЕ ИГРЫ
 let gridData = {};
 let cellStats = {};
 let units = [];
+let buildingQueue = [];
 let wars = [];
 let alliances = [];
 let myCountryId = null;
-let gameActive = false;
+let isGameActive = false;
 let gameSpeed = 1;
 let gameDate = new Date(1936, 0, 1);
-let resources = { equipment: 1000, factories: 0, manpower: 0 };
-let buildingQueue = [];
+let tech = { industry: 1, infantry: 1, tank: 1 };
 let activeResearch = null;
 let activeFocus = null;
 let completedFocuses = new Set();
-let selectedUnitId = null;
+let playerResources = { equipment: 1000, factories: 0, manpower: 0 };
 
-// GETTERS / SETTERS
+// GETTERS
 export function getGridData() { return gridData; }
-export function setGridData(data) { gridData = data; window._gridData = data; }
-
 export function getCellStats() { return cellStats; }
-export function setCellStats(data) { cellStats = data; }
-
 export function getUnits() { return units; }
-export function setUnits(data) { units = data; }
-export function addUnit(u) { units.push(u); }
-export function removeUnit(id) { units = units.filter(u => u.id !== id); }
-
-export function getWars() { return wars; }
-export function setWars(data) { wars = data; }
-
-export function getAlliances() { return alliances; }
-export function setAlliances(data) { alliances = data; }
-
-export function getMyCountryId() { return myCountryId; }
-export function setMyCountryId(id) { myCountryId = id; window._myCountryId = id; }
-
-export function isGameActive() { return gameActive; }
-export function getGameActive() { return gameActive; }  // <-- ДОБАВЛЕНО
-export function setGameActive(active) { gameActive = active; }
-
-export function getGameSpeed() { return gameSpeed; }
-export function setGameSpeed(speed) { gameSpeed = speed; }
-
-export function getGameDate() { return gameDate; }
-export function setGameDate(date) { gameDate = date; }
-
-export function getResources() { return resources; }
-export function setResources(r) { resources = r; }
-
 export function getBuildingQueue() { return buildingQueue; }
-export function setBuildingQueue(q) { buildingQueue = q; }
-export function addToBuildingQueue(item) { buildingQueue.push(item); }
-
+export function getWars() { return wars; }
+export function getAlliances() { return alliances; }
+export function getMyCountryId() { return myCountryId; }
+export function isGameActive() { return isGameActive; }
+export function getGameSpeed() { return gameSpeed; }
+export function getGameDate() { return gameDate; }
+export function getTech() { return tech; }
 export function getActiveResearch() { return activeResearch; }
-export function setActiveResearch(r) { activeResearch = r; }
-
 export function getActiveFocus() { return activeFocus; }
-export function setActiveFocus(f) { activeFocus = f; }
-
 export function getCompletedFocuses() { return completedFocuses; }
-export function addCompletedFocus(id) { completedFocuses.add(id); }
+export function getPlayerResources() { return playerResources; }
 
-export function getSelectedUnitId() { return selectedUnitId; }
-export function setSelectedUnitId(id) { selectedUnitId = id; }
+// SETTERS
+export function setGridData(data) { gridData = data; }
+export function setCellStats(data) { cellStats = data; }
+export function setUnits(data) { units = data; }
+export function setBuildingQueue(data) { buildingQueue = data; }
+export function setWars(data) { wars = data; }
+export function setAlliances(data) { alliances = data; }
+export function setMyCountryId(id) { myCountryId = id; }
+export function setGameActive(active) { isGameActive = active; }
+export function setGameSpeed(speed) { gameSpeed = speed; }
+export function setGameDate(date) { gameDate = date; }
+export function setTech(newTech) { tech = newTech; }
+export function setActiveResearch(research) { activeResearch = research; }
+export function setActiveFocus(focus) { activeFocus = focus; }
+export function addCompletedFocus(id) { completedFocuses.add(id); }
+export function setPlayerResources(res) { playerResources = res; }
+
+// Добавление/удаление юнитов
+export function addUnit(unit) { units.push(unit); }
+export function removeUnit(id) { units = units.filter(u => u.id !== id); setUnits(units); }
 
 export function updateTopBar() {
     if (!myCountryId) return;
+    const { calculateCountryStats, getCountryInfo } = await import('./utils.js');
     const stats = calculateCountryStats(myCountryId, gridData, cellStats);
-    resources.factories = stats.totalFactories;
+    playerResources.factories = stats.totalFactories;
     const totalManpower = stats.totalPop * 0.05;
-    const usedManpower = units.reduce((acc, u) => acc + (UNIT_STATS[u.type]?.manpower || 0), 0);
-    resources.manpower = Math.max(0, totalManpower - usedManpower);
+    const usedManpower = units.reduce((acc, u) => acc + (UNIT_STATS?.[u.type]?.costManpower || 0), 0);
+    playerResources.manpower = Math.max(0, totalManpower - usedManpower);
     
-    const manpowerEl = document.getElementById('val-manpower');
-    const factoriesEl = document.getElementById('val-factories');
-    const equipmentEl = document.getElementById('val-equipment');
-    const countryNameEl = document.getElementById('country-name');
-    
+    document.getElementById('val-manpower').innerText = Math.floor(playerResources.manpower).toLocaleString();
+    document.getElementById('val-factories').innerText = playerResources.factories;
+    document.getElementById('val-equipment').innerText = Math.floor(playerResources.equipment).toLocaleString();
+    document.getElementById('country-name').innerText = getCountryInfo(myCountryId).name;
+}    
     if (manpowerEl) manpowerEl.innerText = Math.floor(resources.manpower).toLocaleString();
     if (factoriesEl) factoriesEl.innerText = resources.factories;
     if (equipmentEl) equipmentEl.innerText = Math.floor(resources.equipment).toLocaleString();
