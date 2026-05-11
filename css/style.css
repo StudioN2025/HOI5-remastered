@@ -655,3 +655,22 @@ button {
         padding: 8px !important;
     }
 }
+/* Убираем скролл у body когда игра активна */
+body {
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+#main-menu, #country-select, #game-container {
+    transition: all 0.3s ease;
+}
+
+/* Для canvas - чтобы был поверх всего но под UI */
+#map-canvas {
+    z-index: 1;
+}
+
+#top-bar, #game-tabs, #info-window, #info-sidebar, #hint, #notifications {
+    z-index: 10;
+}
