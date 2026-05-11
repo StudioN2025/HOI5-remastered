@@ -442,7 +442,7 @@ button {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('../assets/hoi5-backend.jpg') !important;
+    background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('../assets/hoi5-backend.png') !important;
     background-size: cover !important;
     background-position: center !important;
 }
