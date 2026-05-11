@@ -2,103 +2,115 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hearts of Iron V: Remastered</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- МЕНЮ -->
+<!-- СТАРТОВОЕ МЕНЮ -->
 <div id="main-menu" class="fixed inset-0 z-50 flex items-center justify-center bg-cover bg-center"
-     style="background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('assets/hoi5-backend.jpg')">
-    <div class="bg-[#e3d1b5] text-black p-8 rounded-lg border-4 border-amber-800 w-[550px] shadow-2xl" style="max-width: 90vw;">
-        <h1 class="text-6xl font-black text-center mb-6 border-b-4 border-black/30 pb-4" style="font-size: clamp(32px, 10vw, 60px);">HOI V</h1>
+     style="background: radial-gradient(circle, rgba(0,0,0,0.6), rgba(0,0,0,0.95)), url('assets/hoi5-backend.png'); background-size: cover;">
+    <div class="bg-[#e3d1b5] text-black p-8 rounded-lg border-4 border-amber-800 w-[550px] shadow-2xl">
+        <h1 class="text-6xl font-black text-center mb-6 border-b-4 border-black/30 pb-4 tracking-widest">HOI V</h1>
         <p class="text-center text-sm mb-8 italic text-gray-700">Hearts of Iron V: Remastered</p>
-        <button id="btn-start" class="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-xl font-bold border-2 border-black mb-4 shadow-md transition-all">СТАРТ</button>
-        <button id="btn-load-map" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 text-lg font-bold border-2 border-black mb-3 transition-all">ЗАГРУЗИТЬ КАРТУ</button>
+        
+        <button id="btn-start" class="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-xl font-bold border-2 border-black mb-4 shadow-md transition-all">
+            🗺️ ДЕМО-КАРТА
+        </button>
+        
+        <button id="btn-load-map" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 text-lg font-bold border-2 border-black mb-3 transition-all">
+            📂 ЗАГРУЗИТЬ СВОЮ КАРТУ
+        </button>
+        
         <input type="file" id="map-file-input" class="hidden" accept=".json">
-        <p class="text-center text-[10px] text-gray-500 mt-6">GitHub Pages Ready</p>
+        
+        <div id="map-info" class="text-center text-xs text-gray-600 mt-4 hidden">
+            <span id="map-name"></span>
+        </div>
+        
+        <button id="btn-editor" class="w-full bg-amber-800 hover:bg-amber-700 text-white py-2 text-sm font-bold border-2 border-black mt-4 transition-all">
+            ✏️ ОТКРЫТЬ РЕДАКТОР КАРТ
+        </button>
+        
+        <p class="text-center text-[10px] text-gray-500 mt-6">Oberkommando — Simulation Module</p>
     </div>
 </div>
 
-<!-- ВЫБОР СТРАНЫ/КАРТЫ -->
+<!-- ВЫБОР СТРАНЫ -->
 <div id="country-select" class="fixed inset-0 z-40 bg-black/90 hidden items-center justify-center">
-    <div class="bg-[#e3d1b5] p-6 rounded-lg border-4 border-amber-800 w-[450px] max-h-[80vh] overflow-auto" style="max-width: 90vw;">
-        <h2 class="text-2xl font-bold text-center mb-4 border-b border-black/20 pb-2">ВЫБЕРИТЕ</h2>
-        <div id="country-list" class="space-y-2"></div>
-        <button id="btn-cancel" class="w-full mt-4 bg-red-800 hover:bg-red-700 text-white py-2 text-sm font-bold rounded">НАЗАД</button>
+    <div class="bg-[#e3d1b5] p-6 rounded-lg border-4 border-amber-800 w-[450px] max-h-[80vh]">
+        <h2 class="text-2xl font-bold text-center mb-4 border-b border-black/20 pb-2">ВЫБЕРИТЕ ДЕРЖАВУ</h2>
+        <div id="country-list" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+            <div class="text-center text-gray-500 py-4">Загрузка...</div>
+        </div>
+        <button id="btn-cancel-country" class="w-full mt-4 bg-red-800 hover:bg-red-700 text-white py-2 text-sm font-bold">НАЗАД</button>
     </div>
 </div>
 
-<!-- ИГРА -->
-<div id="game-container">
-    <!-- Верхняя панель -->
-    <div id="top-bar">
-        <span id="country-name" class="font-bold text-yellow-500">—</span>
-        <span class="separator">|</span>
-        <div class="stat-item">👥 <span id="val-manpower">0</span></div>
-        <div class="stat-item">🏭 <span id="val-factories">0</span></div>
-        <div class="stat-item">🔫 <span id="val-equipment">0</span></div>
-        
+<!-- ИГРОВОЙ КОНТЕЙНЕР -->
+<div id="game-container" class="hidden relative w-full h-full overflow-hidden bg-gray-900">
+    <div id="top-bar" class="absolute top-0 left-0 right-0 h-12 bg-gray-900/95 border-b border-gray-700 flex items-center px-4 gap-4 z-20 text-sm backdrop-blur-sm">
+        <span id="country-name" class="font-bold text-yellow-500 text-lg min-w-[150px]">—</span>
+        <span class="text-gray-400">|</span>
+        <div class="flex items-center gap-2"><span>👥</span><span id="val-manpower" class="font-mono">0</span></div>
+        <div class="flex items-center gap-2"><span>🏭</span><span id="val-factories" class="font-mono">0</span></div>
+        <div class="flex items-center gap-2"><span>🔫</span><span id="val-equipment" class="font-mono">0</span></div>
         <div class="flex-1"></div>
-        
         <div id="research-indicator" class="hidden text-blue-400 text-xs animate-pulse">🔬 ИССЛЕДОВАНИЕ...</div>
         <div id="focus-indicator" class="hidden text-yellow-500 text-xs animate-pulse">⭐ ФОКУС...</div>
         <div id="build-indicator" class="hidden text-emerald-400 text-xs animate-pulse">🏗️ СТРОЙКА...</div>
-        
-        <div class="speed-buttons">
+        <div class="flex gap-1 bg-black/50 px-3 py-1 rounded">
             <button class="speed-btn" data-speed="0">⏸</button>
             <button class="speed-btn" data-speed="1">1x</button>
             <button class="speed-btn" data-speed="3">3x</button>
             <button class="speed-btn" data-speed="5">5x</button>
         </div>
-        
-        <span id="game-date" class="date-display">1 ЯНВ 1936</span>
+        <span id="game-date" class="bg-black/50 px-3 py-1 rounded font-mono min-w-[130px] text-center border border-gray-600">1 ЯНВ 1936</span>
     </div>
     
-    <!-- Вкладки -->
-    <div id="game-tabs">
-        <button class="tab-btn" data-icon="🎖️" onclick="window.openTab('army')">🎖️ АРМИЯ</button>
-        <button class="tab-btn" data-icon="🏗️" onclick="window.openTab('build')">🏗️ СТРОЙКА</button>
-        <button class="tab-btn" data-icon="🤝" onclick="window.openTab('diplomacy')">🤝 ДИПЛОМАТИЯ</button>
-        <button class="tab-btn" data-icon="🔬" onclick="window.openTab('research')">🔬 ТЕХНОЛОГИИ</button>
-        <button class="tab-btn" data-icon="⭐" onclick="window.openTab('focus')">⭐ ФОКУСЫ</button>
+    <div id="game-tabs" class="absolute top-12 left-4 flex gap-1 z-20">
+        <button class="tab-btn" data-tab="army">🎖️ АРМИЯ</button>
+        <button class="tab-btn" data-tab="research">🔬 ТЕХНОЛОГИИ</button>
+        <button class="tab-btn" data-tab="focus">⭐ ФОКУСЫ</button>
+        <button class="tab-btn" data-tab="diplomacy">🤝 ДИПЛОМАТИЯ</button>
+        <button class="tab-btn" data-tab="build">🏗️ СТРОЙКА</button>
+        <button class="tab-btn" data-tab="economy">📊 ЭКОНОМИКА</button>
     </div>
     
-    <!-- Окно с контентом -->
-    <div id="info-window" class="hidden">
-        <div>
-            <span id="window-title">ОКНО</span>
-            <button id="close-window" onclick="window.closeWindow()">✖</button>
+    <div id="info-window" class="absolute top-24 left-4 w-[580px] bg-gray-800 border-2 border-gray-600 rounded-lg hidden z-30 flex flex-col shadow-2xl">
+        <div class="flex justify-between items-center p-3 bg-gray-900 border-b border-gray-700 rounded-t-lg">
+            <span id="window-title" class="font-bold text-yellow-500">ОКНО</span>
+            <button id="close-window" class="text-red-500 hover:text-red-400 text-xl leading-none">✖</button>
         </div>
-        <div id="window-content"></div>
+        <div id="window-content" class="p-4 max-h-[70vh] overflow-y-auto"></div>
     </div>
     
-    <!-- Canvas карты -->
-    <canvas id="map-canvas"></canvas>
+    <canvas id="map-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
     
-    <!-- Боковая панель информации -->
-    <div id="sidebar" class="hidden">
-        <div>
-            <h3 id="sidebar-title">—</h3>
-            <button id="close-sidebar" onclick="document.getElementById('sidebar').classList.add('hidden')">✖</button>
+    <div id="info-sidebar" class="absolute right-4 top-24 w-80 bg-gray-900/95 border-2 border-gray-600 rounded-lg p-3 hidden z-20 backdrop-blur-sm">
+        <div class="flex justify-between items-start mb-2">
+            <h3 id="sidebar-title" class="font-bold text-yellow-500 text-xl">—</h3>
+            <button id="close-sidebar" class="text-gray-400 hover:text-white">✖</button>
         </div>
-        <div id="sidebar-actions"></div>
+        <div class="space-y-1 text-sm border-t border-gray-700 pt-2">
+            <p>👑 Лидер: <span id="sidebar-leader" class="text-gray-300">—</span></p>
+            <p>⚡ Идеология: <span id="sidebar-ideology" class="text-gray-300">—</span></p>
+            <p>👥 Население: <span id="sidebar-pop" class="text-emerald-400">—</span></p>
+            <p>🏭 Фабрики: <span id="sidebar-factories" class="text-blue-400">—</span></p>
+        </div>
+        <div id="sidebar-actions" class="mt-4 pt-3 border-t border-gray-700 hidden"></div>
     </div>
     
-    <!-- Подсказки -->
-    <div id="hint" class="hidden">
+    <div id="hint" class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 px-5 py-2 rounded-full text-yellow-400 text-xs hidden z-30 whitespace-nowrap border border-yellow-500/50">
         💡 <span id="hint-text"></span>
     </div>
     
-    <!-- Нотификации -->
-    <div id="notifications"></div>
+    <div id="notifications" class="absolute bottom-4 left-4 w-80 z-40 space-y-2 pointer-events-none"></div>
 </div>
 
-<script type="module" src="./js/main.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
