@@ -1,7 +1,12 @@
-import { getUnits, setUnits, getMyCountryId, getWars, getSelectedUnitId, setSelectedUnitId } from './game.js';
+// military.js (исправленная версия)
+import { getUnits, setUnits, getMyCountryId, getWars } from './game.js';
 import { UNIT_STATS } from './data.js';
 import { isAtWar, addNotification } from './utils.js';
 import { renderMap } from './map.js';
+
+export function setSelectedUnitId(id) {
+    window.selectedUnitId = id;
+}
 
 export function moveUnit(unitId, targetPos) {
     const units = getUnits();
@@ -28,6 +33,43 @@ export function moveUnit(unitId, targetPos) {
     unit.path = path;
     setUnits(units);
     renderMap();
+    return true;
+}
+
+export function startRecruitment(unitType, posKey) {
+    const myCountryId = getMyCountryId();
+    const units = getUnits();
+    const stats = UNIT_STATS[unitType];
+    
+    if (!stats) return false;
+    
+    // Проверка ресурсов
+    const resources = window.getPlayerResources?.() || { equipment: 0, manpower: 0 };
+    if (resources.equipment < stats.costEquipment || resources.manpower < stats.costManpower) {
+        addNotification('Недостаточно ресурсов для найма!', 'war');
+        return false;
+    }
+    
+    // Списание ресурсов
+    resources.equipment -= stats.costEquipment;
+    resources.manpower -= stats.costManpower;
+    if (window.setPlayerResources) window.setPlayerResources(resources);
+    
+    // Создание юнита
+    const newUnit = {
+        id: `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: unitType,
+        owner: myCountryId,
+        pos: posKey,
+        hp: stats.hp,
+        trainingDaysLeft: 30,
+        path: []
+    };
+    
+    units.push(newUnit);
+    setUnits(units);
+    
+    addNotification(`${stats.icon} ${stats.name} начал тренировку!`, 'info');
     return true;
 }
 
