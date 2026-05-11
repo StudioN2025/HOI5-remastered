@@ -1,5 +1,6 @@
+// map.js (исправленная версия)
 import { getCountryInfo, getCellData } from './utils.js';
-import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId } from './game.js';
+import { getGridData, getUnits, getMyCountryId, getBuildingQueue } from './game.js';
 import { UNIT_STATS, BUILDING_STATS } from './data.js';
 
 const canvas = document.getElementById('map-canvas');
@@ -36,9 +37,7 @@ export function worldToScreen(x, y) {
 
 export function clearCanvas() {
     if (!ctx) return;
-    // Очищаем весь канвас
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Заливаем фоном
     ctx.fillStyle = '#1b3a4b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -46,14 +45,15 @@ export function clearCanvas() {
 export function renderMap() {
     if (!ctx) return;
     
-    // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: очищаем канвас перед отрисовкой
     clearCanvas();
     
     const gridData = getGridData();
     const units = getUnits();
     const buildingQueue = getBuildingQueue();
     const myCountryId = getMyCountryId();
-    const selectedUnitId = getSelectedUnitId?.() || null;
+    
+    // ✅ ИСПРАВЛЕНИЕ: получаем ID выбранного юнита через глобальный объект window
+    const selectedUnitId = window.selectedUnitId || null;
     
     ctx.save();
     ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
@@ -169,5 +169,4 @@ export function setupMapEvents() {
     setInterval(() => updateCamera(), 16);
 }
 
-// Экспортируем canvas для внешнего доступа
 export { canvas, ctx };
