@@ -1,8 +1,9 @@
-import { COUNTRIES, UNIT_STATS, BUILDING_STATS, TECH_TREE, DEMO_MAP } from './data.js';
+// main.js (исправленная версия)
+import { COUNTRIES, UNIT_STATS, BUILDING_STATS, TECH_TREE, DEFAULT_MAP } from './data.js';
 import { 
     getGridData, setGridData, setCellStats, setMyCountryId, setGameActive, 
     setGameSpeed, setGameDate, setUnits, setBuildingQueue, getMyCountryId,
-    getPlayerResources, getBuildingQueue as getBuildQueue, setBuildingQueue as setBuildQueue,
+    getPlayerResources, getBuildingQueue, setBuildingQueue,
     getUnits, setPlayerResources, updateTopBar
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, setCamera } from './map.js';
@@ -34,7 +35,7 @@ window.openBuildMode = (buildType) => {
     document.getElementById('info-window').classList.add('hidden');
     const hint = document.getElementById('hint');
     const hintText = document.getElementById('hint-text');
-    hintText.innerText = `Выберите провинцию для строительства ${BUILDING_STATS[buildType].name}`;
+    hintText.innerText = `Выберите провинцию для строительства ${BUILDING_STATS[buildType]?.name || buildType}`;
     hint.classList.remove('hidden');
     window._pendingBuild = buildType;
     setTimeout(() => {
@@ -71,6 +72,8 @@ async function openWindow(tab) {
     const windowDiv = document.getElementById('info-window');
     const content = document.getElementById('window-content');
     const title = document.getElementById('window-title');
+    
+    if (!windowDiv || !content || !title) return;
     
     windowDiv.classList.remove('hidden');
     
@@ -181,7 +184,7 @@ async function openWindow(tab) {
     }
     else if (tab === 'build') {
         title.innerText = 'СТРОИТЕЛЬСТВО';
-        const queue = getBuildQueue();
+        const queue = getBuildingQueue();
         
         let html = '';
         if (queue.length > 0 && queue[0]) {
@@ -225,14 +228,14 @@ async function openWindow(tab) {
             <div class="space-y-4">
                 <div class="bg-gray-700 p-4 rounded">
                     <div class="text-sm text-gray-400">РЕСУРСЫ</div>
-                    <div class="text-2xl font-bold text-yellow-500">🔫 ${Math.floor(resources.equipment).toLocaleString()}</div>
-                    <div class="text-lg">👥 ${Math.floor(resources.manpower).toLocaleString()}</div>
-                    <div class="text-lg">🏭 ${resources.factories}</div>
+                    <div class="text-2xl font-bold text-yellow-500">🔫 ${Math.floor(resources.equipment || 0).toLocaleString()}</div>
+                    <div class="text-lg">👥 ${Math.floor(resources.manpower || 0).toLocaleString()}</div>
+                    <div class="text-lg">🏭 ${resources.factories || 0}</div>
                 </div>
                 <div class="bg-gray-700 p-4 rounded">
                     <div class="text-sm text-gray-400">ТЕРРИТОРИЯ</div>
-                    <div class="text-lg">📊 Провинций: ${stats.cellCount}</div>
-                    <div class="text-lg">👨‍👩‍👧‍👦 Население: ${Math.floor(stats.totalPop).toLocaleString()}</div>
+                    <div class="text-lg">📊 Провинций: ${stats.cellCount || 0}</div>
+                    <div class="text-lg">👨‍👩‍👧‍👦 Население: ${Math.floor(stats.totalPop || 0).toLocaleString()}</div>
                 </div>
             </div>
         `;
@@ -240,7 +243,10 @@ async function openWindow(tab) {
 }
 
 window.openWindow = openWindow;
-window.closeWindow = () => document.getElementById('info-window').classList.add('hidden');
+window.closeWindow = () => {
+    const win = document.getElementById('info-window');
+    if (win) win.classList.add('hidden');
+};
 
 window.showCountryInfo = (countryId, posKey) => {
     const info = getCountryInfo(countryId);
@@ -249,8 +255,8 @@ window.showCountryInfo = (countryId, posKey) => {
     document.getElementById('sidebar-title').innerText = info.name;
     document.getElementById('sidebar-leader').innerText = info.leader;
     document.getElementById('sidebar-ideology').innerText = info.ideology;
-    document.getElementById('sidebar-pop').innerText = cell.population.toLocaleString();
-    document.getElementById('sidebar-factories').innerText = cell.factories;
+    document.getElementById('sidebar-pop').innerText = (cell.population || 0).toLocaleString();
+    document.getElementById('sidebar-factories').innerText = cell.factories || 0;
     
     const actionsDiv = document.getElementById('sidebar-actions');
     const myCountryId = getMyCountryId();
@@ -280,6 +286,14 @@ window.showCountryInfo = (countryId, posKey) => {
     document.getElementById('info-sidebar').classList.remove('hidden');
 };
 
+// ========== ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ФУНКЦИИ ==========
+window.getPlayerResources = () => {
+    return getPlayerResources();
+};
+window.setPlayerResources = (res) => {
+    setPlayerResources(res);
+};
+
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 async function init() {
     console.log('🚀 HOI V Remastered');
@@ -290,9 +304,9 @@ async function init() {
     
     // Кнопка демо-карты
     document.getElementById('btn-start').onclick = () => {
-        setGridData(DEMO_MAP.gridData);
-        setCellStats(DEMO_MAP.cellStats);
-        const countries = [...new Set(Object.values(DEMO_MAP.gridData))];
+        setGridData(DEFAULT_MAP.gridData);
+        setCellStats(DEFAULT_MAP.cellStats);
+        const countries = [...new Set(Object.values(DEFAULT_MAP.gridData))];
         showCountrySelection(countries);
     };
     
@@ -336,8 +350,16 @@ async function init() {
         btn.onclick = () => {
             const speed = parseInt(btn.dataset.speed);
             setGameSpeed(speed);
-            document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active', 'bg-yellow-600'));
-            if (speed > 0) btn.classList.add('active', 'bg-yellow-600');
+            document.querySelectorAll('.speed-btn').forEach(b => {
+                b.classList.remove('active', 'bg-yellow-600');
+                b.style.background = '';
+                b.style.color = '';
+            });
+            if (speed > 0) {
+                btn.classList.add('active', 'bg-yellow-600');
+                btn.style.background = '#ca8a04';
+                btn.style.color = 'black';
+            }
         };
     });
     
@@ -372,12 +394,15 @@ async function init() {
             if (gridData[key] === myCountryId) {
                 const stats = BUILDING_STATS[window._pendingBuild];
                 const resources = getPlayerResources();
+                if (!resources.equipment) resources.equipment = 0;
+                if (!resources.manpower) resources.manpower = 0;
+                
                 if (resources.equipment >= stats.costEquipment) {
                     resources.equipment -= stats.costEquipment;
                     setPlayerResources(resources);
-                    const queue = getBuildQueue();
+                    const queue = getBuildingQueue();
                     queue.push({ pos: key, type: window._pendingBuild, daysLeft: stats.buildTime });
-                    setBuildQueue(queue);
+                    setBuildingQueue(queue);
                     addNotification(`Строительство ${stats.name} начато!`, 'info');
                     updateTopBar();
                 } else {
@@ -407,6 +432,8 @@ async function init() {
 
 function showCountrySelection(countriesList) {
     const container = document.getElementById('country-list');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     countriesList.forEach(countryId => {
