@@ -1,9 +1,8 @@
-// main.js (исправленная версия)
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS, TECH_TREE, DEFAULT_MAP } from './data.js';
 import { 
     getGridData, setGridData, setCellStats, setMyCountryId, setGameActive, 
     setGameSpeed, setGameDate, setUnits, setBuildingQueue, getMyCountryId,
-    getPlayerResources, getBuildingQueue, setBuildingQueue,
+    getPlayerResources, getBuildingQueue,
     getUnits, setPlayerResources, updateTopBar
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, setCamera } from './map.js';
