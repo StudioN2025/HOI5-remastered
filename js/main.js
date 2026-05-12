@@ -2,44 +2,60 @@
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
-    getGridData, setGridData, getCellStats, setCellStats, setMyCountryId, setGameActive,
-    setGameSpeed, setGameDate, setUnits, setBuildingQueue, setPlayerResources,
-    getMyCountryId, getPlayerResources, getBuildingQueue, getUnits, getGameSpeed,
-    getActiveResearch, getActiveFocus, getSelectedUnitId, setSelectedUnitId,
-    advanceDay, getDateString, getTech
+    getGridData, setGridData, getCellStats, setCellStats, 
+    setMyCountryId, setGameActive, setGameSpeed, setGameDate, 
+    setUnits, setBuildingQueue, setPlayerResources,
+    getMyCountryId, getPlayerResources, getBuildingQueue, 
+    getUnits, getGameSpeed, getActiveResearch, getActiveFocus, 
+    getSelectedUnitId, setSelectedUnitId, advanceDay, getDateString, 
+    getTech, setWars, setAlliances, getWars, getAlliances,
+    getActiveBattles, setActiveBattles
 } from './game.js';
-import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
-import { deployUnit, giveOrder, processMovement, processCombat } from './military.js';
-import { updateEconomy } from './economy.js';
+import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty } from './map.js';
+import { deployUnit, giveOrder, processMovement, processCombat, clearRecruitMode, setRecruitMode } from './military.js';
+import { processConstruction } from './economy.js';
 import { updateResearch } from './tech.js';
 import { updateFocus } from './focuses.js';
 import { runAllAI } from './ai.js';
 import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint } from './ui.js';
 import { getCountryInfo, addNotification } from './utils.js';
 
-// Глобальные данные
+// ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 window._gridData = {};
 window._cellStats = {};
 window._units = [];
 window._wars = [];
 window._alliances = [];
 window._countries = COUNTRIES;
+window._buildingQueue = [];
+window._activeBattles = [];
+window._myCountryId = null;
+window._isGameActive = false;
+window._gameSpeed = 0;
+window._gameDate = new Date(1936, 0, 1, 12, 0);
+window._tech = { industry: 1, infantry: 1, tank: 1 };
+window._activeResearch = null;
+window._activeFocus = null;
+window._completedFocuses = new Set();
+window._playerResources = { equipment: 1000, factories: 0, manpower: 500000 };
+window._selectedUnitId = null;
 
-// Глобальные функции для onclick
+// ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ==========
 window.getPlayerResources = getPlayerResources;
 window.setPlayerResources = setPlayerResources;
+window.updateTopBar = updateTopBar;
 
 let gameLoopId = null;
 
-// ========== ЗАГРУЗКА КАРТЫ ИЗ ПАПКИ MAPS ==========
+// ========== ЗАГРУЗКА КАРТЫ ==========
 async function loadMapFromFile(filename) {
     try {
         const response = await fetch(`maps/${filename}`);
         if (!response.ok) {
-            throw new Error(`Не удалось загрузить карту: ${response.status}`);
+            throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
-        console.log(`✅ Карта "${filename}" загружена`);
+        console.log(`✅ Карта "${filename}" загружена (${Object.keys(data.gridData || {}).length} клеток)`);
         return data;
     } catch (error) {
         console.error('❌ Ошибка загрузки карты:', error);
@@ -56,28 +72,25 @@ async function init() {
     setupMapEvents();
     renderMap();
     
-    // Кнопка "Начать игру" в меню
+    // Кнопка "Начать игру"
     document.getElementById('btn-play').onclick = async () => {
-        // Загружаем карту из папки maps
         const mapData = await loadMapFromFile('europe.json');
         
         if (!mapData) {
-            addNotification('Не удалось загрузить карту. Проверьте наличие файла maps/europe.json', 'war');
+            addNotification('Не удалось загрузить карту. Проверьте maps/europe.json', 'war');
             return;
         }
         
-        // Устанавливаем данные карты
         setGridData(mapData.gridData || {});
         setCellStats(mapData.cellStats || {});
         
-        // Получаем список стран
         const countries = [...new Set(Object.values(getGridData()))];
         showCountrySelection(countries);
         
-        addNotification('Карта Европы (1936) загружена!', 'info');
+        addNotification(`Карта Европы (1936) загружена! ${countries.length} стран`, 'info');
     };
     
-    // Кнопка отмены выбора страны
+    // Кнопка отмены
     document.getElementById('btn-cancel').onclick = () => {
         document.getElementById('country-select').classList.add('hidden');
         document.getElementById('main-menu').classList.remove('hidden');
@@ -103,8 +116,9 @@ async function init() {
         document.getElementById('info-sidebar').classList.add('hidden');
     };
     
-    // Обработчик кликов по карте
+    // ========== ОБРАБОТЧИК КЛИКОВ ПО КАРТЕ ==========
     const canvas = document.getElementById('map-canvas');
+    
     canvas.addEventListener('click', async (e) => {
         const world = screenToWorld(e.clientX, e.clientY);
         const key = `${world.x},${world.y}`;
@@ -112,10 +126,9 @@ async function init() {
         const myCountryId = getMyCountryId();
         
         // Режим найма
-        const recruitMode = window._recruitMode;
-        if (recruitMode) {
+        if (window._recruitMode) {
             if (gridData[key] === myCountryId) {
-                deployUnit(key, recruitMode);
+                deployUnit(key, window._recruitMode);
             } else {
                 addNotification('Можно развертывать только на своей территории!', 'war');
             }
@@ -128,8 +141,12 @@ async function init() {
         if (window._pendingBuild) {
             if (gridData[key] === myCountryId) {
                 const { startBuilding } = await import('./economy.js');
-                startBuilding(window._pendingBuild, key);
-                updateTopBar();
+                const success = startBuilding(window._pendingBuild, key);
+                if (success) {
+                    markDirty();
+                    renderMap();
+                    updateTopBar();
+                }
             } else {
                 addNotification('Строить можно только на своей территории!', 'war');
             }
@@ -138,7 +155,7 @@ async function init() {
             return;
         }
         
-        // Выбран юнит
+        // Выбран юнит — приказ на движение
         const selectedUnitId = getSelectedUnitId();
         if (selectedUnitId) {
             giveOrder(key, selectedUnitId);
@@ -153,7 +170,7 @@ async function init() {
         }
     });
     
-    // Обработчик ПКМ для выбора юнита
+    // Обработчик ПКМ — выбор юнита или дипломатия
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (!getMyCountryId()) return;
@@ -162,15 +179,24 @@ async function init() {
         const key = `${world.x},${world.y}`;
         const units = getUnits();
         const myId = getMyCountryId();
+        const gridData = getGridData();
         
+        // Ищем своего юнита на клетке
         const unit = units.find(u => u.pos === key && u.owner === myId);
         if (unit) {
             setSelectedUnitId(unit.id);
             document.getElementById('order-hint')?.classList.remove('hidden');
+            showHint('Выберите цель для движения');
+            return;
+        }
+        
+        // Если нет юнита — показываем дипломатию для страны
+        if (gridData[key] && gridData[key] !== myId) {
+            showCountryInfo(gridData[key], key);
         }
     });
     
-    // Анимация
+    // Анимация карты
     function animate() {
         renderMap();
         requestAnimationFrame(animate);
@@ -178,20 +204,33 @@ async function init() {
     animate();
 }
 
+// ========== ВЫБОР СТРАНЫ ==========
 function showCountrySelection(countriesList) {
     const container = document.getElementById('country-list');
     if (!container) return;
     
     container.innerHTML = '';
     
+    // Сортируем: крупные страны первыми
+    const gridData = getGridData();
+    const countrySizes = {};
+    Object.values(gridData).forEach(id => {
+        countrySizes[id] = (countrySizes[id] || 0) + 1;
+    });
+    
+    countriesList.sort((a, b) => (countrySizes[b] || 0) - (countrySizes[a] || 0));
+    
     countriesList.forEach(countryId => {
         const info = getCountryInfo(countryId);
+        const size = countrySizes[countryId] || 0;
+        
         const btn = document.createElement('button');
         btn.style.borderLeftColor = info.color;
         btn.style.borderLeftWidth = '4px';
         btn.innerHTML = `
             <div class="font-bold">${info.name}</div>
             <div class="text-xs opacity-70">${info.ideology} • ${info.leader}</div>
+            <div class="text-xs opacity-50 mt-1">📊 Провинций: ${size}</div>
         `;
         
         btn.onclick = () => startGame(countryId);
@@ -202,6 +241,7 @@ function showCountrySelection(countriesList) {
     document.getElementById('country-select').classList.remove('hidden');
 }
 
+// ========== ЗАПУСК ИГРЫ ==========
 function startGame(countryId) {
     setMyCountryId(countryId);
     setGameActive(true);
@@ -209,6 +249,9 @@ function startGame(countryId) {
     setGameDate(new Date(1936, 0, 1, 12, 0));
     setUnits([]);
     setBuildingQueue([]);
+    setWars([]);
+    setAlliances([]);
+    setActiveBattles([]);
     setPlayerResources({ equipment: 1000, factories: 0, manpower: 500000 });
     setSelectedUnitId(null);
     
@@ -221,15 +264,18 @@ function startGame(countryId) {
     renderMap();
     
     addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
+    addNotification('ПКМ по вражеской стране — объявить войну', 'info');
+    addNotification('WASD — движение камеры, колёсико — зум', 'info');
     
     // Запуск игрового цикла
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     startGameLoop();
 }
 
+// ========== ИГРОВОЙ ЦИКЛ ==========
 function startGameLoop() {
     let lastTick = performance.now();
-    const TICK_INTERVAL = 1000; // 1 секунда = 1 игровой день на скорости 1x
+    const TICK_INTERVAL = 1000; // 1 секунда = 1 день на скорости 1x
     
     function loop(timestamp) {
         const elapsed = timestamp - lastTick;
@@ -241,20 +287,35 @@ function startGameLoop() {
             // Игровой день
             advanceDay();
             
-            // Обновление даты в интерфейсе
-            document.getElementById('game-date').innerText = getDateString();
+            // Обновление даты в UI
+            const dateElem = document.getElementById('game-date');
+            if (dateElem) dateElem.innerText = getDateString();
             
             // Обработка всех систем
             updateResearch();
             updateFocus();
+            processConstruction();
             processMovement();
             processCombat();
-            updateEconomy(getTech(), {});
-            runAllAI();
-            updateTopBar();
             
-            // Обновление UI если окна открыты
+            // Обновление экономики
+            import('./economy.js').then(m => {
+                const { getUnitStatsWithTech } = require('./tech.js');
+                const unitStats = getUnitStatsWithTech();
+                m.updateEconomy(getTech().industry, unitStats);
+            }).catch(() => {
+                // Fallback если модуль не загрузился
+            });
+            
+            // ИИ
+            runAllAI();
+            
+            // Обновление UI
+            updateTopBar();
             updateOpenWindows();
+            
+            // Перерисовка карты
+            markDirty();
         }
         
         gameLoopId = requestAnimationFrame(loop);
@@ -276,15 +337,17 @@ function updateOpenWindows() {
     const title = document.getElementById('window-title');
     if (!title) return;
     
-    // Обновляем содержимое в зависимости от открытой вкладки
     if (title.innerText.includes('ТЕХНОЛОГИИ')) {
         import('./tech.js').then(m => m.updateResearchUI());
     } else if (title.innerText.includes('ФОКУСЫ')) {
         import('./focuses.js').then(m => m.updateFocusUI());
+    } else if (title.innerText.includes('СТРОИТЕЛЬСТВО')) {
+        // Обновляем окно стройки
+        openWindow('build');
     }
 }
 
-// Экспортируем для использования в HTML
+// ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ HTML ==========
 window.recruitUnit = (type) => {
     document.getElementById('info-window')?.classList.add('hidden');
     window._recruitMode = type;
@@ -292,5 +355,5 @@ window.recruitUnit = (type) => {
     document.getElementById('recruit-hint')?.classList.remove('hidden');
 };
 
-// Запуск
+// ========== ЗАПУСК ==========
 init();
