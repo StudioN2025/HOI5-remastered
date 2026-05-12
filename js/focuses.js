@@ -1,19 +1,8 @@
-import { getMyCountryId, getActiveFocus, setActiveFocus, getCompletedFocuses, addCompletedFocus } from './game.js';
-import { getCountryInfo, addNotification } from './utils.js';
-import { declareWar } from './diplomacy.js';
-import { addUnit } from './military.js';
+// focuses.js — национальные фокусы
 
-const NATIONAL_FOCUSES = {
-    germany: [
-        { id: 'rearmament', name: 'Перевооружение', description: '+1000 снаряжения', effect: (ctx) => { ctx.resources.equipment += 1000; } },
-        { id: 'danzig', name: 'Данциг или война', description: 'Война с Польшей', effect: (ctx) => { declareWar('poland'); } },
-        { id: 'axis', name: 'Ось', description: 'Альянс с Италией', effect: (ctx) => { /* альянс с Италией */ } }
-    ],
-    ussr: [
-        { id: 'five_year', name: 'Пятилетка', description: '+3 фабрики', effect: (ctx) => { /* добавление фабрик */ } },
-        { id: 'great_patriotic', name: 'Великая Отечественная', description: 'Мобилизация', effect: (ctx) => { /* мобилизация */ } }
-    ]
-};
+import { getMyCountryId, getActiveFocus, setActiveFocus, getCompletedFocuses, addCompletedFocus, getPlayerResources, setPlayerResources, getGridData, setGridData, addUnit, addWar } from './game.js';
+import { NATIONAL_FOCUSES } from './data.js';
+import { addNotification } from './utils.js';
 
 export function getAvailableFocuses() {
     const myCountryId = getMyCountryId();
@@ -30,7 +19,10 @@ export function startFocus(focusId) {
     const completed = getCompletedFocuses();
     
     if (!focus || completed.has(focus.id)) return false;
-    if (getActiveFocus()) return false;
+    if (getActiveFocus()) {
+        addNotification('Фокус уже выполняется!', 'info');
+        return false;
+    }
     
     setActiveFocus({
         ...focus,
@@ -38,6 +30,10 @@ export function startFocus(focusId) {
     });
     
     addNotification(`Национальный фокус "${focus.name}" начат!`, 'info');
+    
+    const indicator = document.getElementById('focus-indicator');
+    if (indicator) indicator.classList.remove('hidden');
+    
     return true;
 }
 
@@ -48,12 +44,61 @@ export function updateFocus() {
     activeFocus.daysLeft--;
     
     if (activeFocus.daysLeft <= 0) {
-        const ctx = { resources: window.getPlayerResources?.() || {} };
-        activeFocus.effect(ctx);
+        // Выполняем эффект фокуса
+        const ctx = createFocusContext();
+        if (activeFocus.effect) {
+            activeFocus.effect(ctx);
+        }
+        
         addCompletedFocus(activeFocus.id);
         setActiveFocus(null);
         addNotification(`Фокус "${activeFocus.name}" завершён!`, 'info');
+        
+        const indicator = document.getElementById('focus-indicator');
+        if (indicator) indicator.classList.add('hidden');
     }
+}
+
+function createFocusContext() {
+    const resources = getPlayerResources();
+    
+    return {
+        resources,
+        declareWar: (targetId) => addWar(getMyCountryId(), targetId),
+        proposeAlliance: (targetId) => {
+            import('./diplomacy.js').then(m => m.proposeAlliance(targetId));
+        },
+        addEquipment: (amount) => {
+            resources.equipment += amount;
+            setPlayerResources(resources);
+        },
+        addFactories: (amount) => {
+            let count = 0;
+            const gridData = getGridData();
+            const myId = getMyCountryId();
+            
+            Object.entries(gridData).forEach(([pos, id]) => {
+                if (id === myId && count < amount) {
+                    const cellStats = window._cellStats || {};
+                    if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
+                    cellStats[pos].factories += 1;
+                    count++;
+                }
+            });
+        },
+        addUnits: (type, count) => {
+            const gridData = getGridData();
+            const myId = getMyCountryId();
+            const myCells = Object.keys(gridData).filter(k => gridData[k] === myId);
+            
+            for (let i = 0; i < count; i++) {
+                const pos = myCells[Math.floor(Math.random() * myCells.length)];
+                if (pos) {
+                    addUnit({ pos, owner: myId, type, trainingDaysLeft: 0, path: [] });
+                }
+            }
+        }
+    };
 }
 
 export function updateFocusUI() {
@@ -63,35 +108,41 @@ export function updateFocusUI() {
     const activeFocus = getActiveFocus();
     const availableFocuses = getAvailableFocuses();
     const myCountryId = getMyCountryId();
-    
-    if (!NATIONAL_FOCUSES[myCountryId]) {
-        container.innerHTML = '<div class="text-center text-gray-400 py-8">Нет доступных фокусов для этой страны</div>';
-        return;
-    }
+    const allFocuses = NATIONAL_FOCUSES[myCountryId] || [];
+    const completed = getCompletedFocuses();
     
     let html = '';
     
     if (activeFocus) {
+        const progress = ((70 - activeFocus.daysLeft) / 70) * 100;
         html += `
-            <div class="bg-yellow-900/30 border border-yellow-500 p-3 rounded mb-4">
+            <div class="bg-yellow-900/30 border border-yellow-500 p-4 rounded mb-4">
                 <div class="font-bold text-yellow-500">Выполняется: ${activeFocus.name}</div>
                 <div class="progress-bar mt-2">
-                    <div class="progress-fill" style="width: ${((70 - activeFocus.daysLeft) / 70) * 100}%"></div>
+                    <div class="progress-fill" style="width: ${progress}%"></div>
                 </div>
                 <div class="text-right text-xs text-gray-400 mt-1">${activeFocus.daysLeft} дней</div>
             </div>
         `;
     }
     
-    html += '<div class="space-y-2">';
-    availableFocuses.forEach(focus => {
+    html += '<div class="space-y-3">';
+    allFocuses.forEach(focus => {
+        const isDone = completed.has(focus.id);
+        const isAvailable = !isDone && !activeFocus;
+        
         html += `
-            <div class="unit-card flex justify-between items-center">
-                <div>
-                    <div class="font-bold">${focus.name}</div>
-                    <div class="text-xs text-gray-400">${focus.description}</div>
+            <div class="unit-card ${isDone ? 'opacity-50' : ''}">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <div class="font-bold ${isDone ? 'text-emerald-500' : 'text-yellow-500'}">${focus.name}</div>
+                        <div class="text-xs text-gray-400 mt-1">${focus.description}</div>
+                    </div>
+                    <div>
+                        ${isAvailable ? `<button onclick="window.startFocus('${focus.id}')" class="bg-yellow-700 hover:bg-yellow-600 px-3 py-1 text-xs rounded">ВЫБРАТЬ</button>` : ''}
+                        ${isDone ? '<span class="text-emerald-500 text-xs">✅ ЗАВЕРШЕНО</span>' : ''}
+                    </div>
                 </div>
-                ${!activeFocus ? `<button onclick="window.startFocus('${focus.id}')" class="bg-yellow-700 hover:bg-yellow-600 px-3 py-1 text-xs rounded">ВЫБРАТЬ</button>` : ''}
             </div>
         `;
     });
