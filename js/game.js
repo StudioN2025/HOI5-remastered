@@ -121,6 +121,7 @@ export function addUnit(unit) {
     unit.hp = unit.hp ?? 100;
     unit.trainingDaysLeft = unit.trainingDaysLeft ?? 10;
     unit.path = unit.path || [];
+    unit.moveCooldown = unit.moveCooldown || 0;
     _units.push(unit);
     window._units = _units;
 }
@@ -159,11 +160,80 @@ export function addToBuildingQueue(item) {
 
 // ========== ВРЕМЯ ==========
 export function getDateString() {
+    if (!_gameDate) return "1 ЯНВ 1936";
     return `${_gameDate.getDate()} ${MONTHS[_gameDate.getMonth()]} ${_gameDate.getFullYear()}`;
 }
 
 export function advanceDay() {
+    if (!_gameDate) _gameDate = new Date(1936, 0, 1, 12, 0);
     _gameDate.setDate(_gameDate.getDate() + 1);
+}
+
+// ========== ИНИЦИАЛИЗАЦИЯ ЗАВОДОВ ==========
+export function initializeFactories() {
+    const gridData = getGridData();
+    const cellStats = getCellStats();
+    
+    // Считаем размеры стран
+    const countrySizes = {};
+    Object.values(gridData).forEach(id => {
+        countrySizes[id] = (countrySizes[id] || 0) + 1;
+    });
+    
+    // Очищаем заводы
+    Object.keys(cellStats).forEach(pos => {
+        if (cellStats[pos]) {
+            cellStats[pos].factories = 0;
+        }
+    });
+    
+    // Создаём cellStats для клеток где его нет
+    Object.keys(gridData).forEach(pos => {
+        if (!cellStats[pos]) {
+            cellStats[pos] = {
+                population: Math.floor(Math.random() * 80000) + 5000,
+                factories: 0,
+                buildings: []
+            };
+        }
+    });
+    
+    // Распределяем заводы по странам
+    Object.entries(countrySizes).forEach(([countryId, size]) => {
+        let totalFactories = 0;
+        
+        if (size >= 100) totalFactories = Math.floor(size * 0.3);
+        else if (size >= 50) totalFactories = Math.floor(size * 0.25);
+        else if (size >= 20) totalFactories = Math.floor(size * 0.2);
+        else if (size >= 10) totalFactories = Math.floor(size * 0.15);
+        else totalFactories = Math.max(1, Math.floor(size * 0.1));
+        
+        const countryCells = Object.entries(gridData)
+            .filter(([pos, id]) => id === countryId)
+            .map(([pos]) => pos);
+        
+        const shuffled = countryCells.sort(() => Math.random() - 0.5);
+        
+        for (let i = 0; i < Math.min(totalFactories, shuffled.length); i++) {
+            const pos = shuffled[i];
+            if (cellStats[pos]) {
+                cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
+                // Шанс порта для прибрежных клеток
+                const [x, y] = pos.split(',').map(Number);
+                const neighbors = [[0,1],[0,-1],[1,0],[-1,0]];
+                const isCoastal = neighbors.some(([dx, dy]) => !gridData[`${x+dx},${y+dy}`]);
+                if (isCoastal && Math.random() < 0.1) {
+                    if (!cellStats[pos].buildings) cellStats[pos].buildings = [];
+                    if (!cellStats[pos].buildings.includes('port')) {
+                        cellStats[pos].buildings.push('port');
+                    }
+                }
+            }
+        }
+    });
+    
+    setCellStats(cellStats);
+    console.log('✅ Заводы и порты распределены по всем странам');
 }
 
 // ========== СБРОС ==========
@@ -187,7 +257,6 @@ export function resetGameState() {
     _selectedUnitId = null;
     _activeBattles = [];
     
-    // Синхронизация с window
     window._gridData = _gridData;
     window._cellStats = _cellStats;
     window._units = _units;
