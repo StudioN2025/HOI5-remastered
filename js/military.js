@@ -1,4 +1,4 @@
-// military.js — ПОЛНЫЙ С БАЛАНСОМ И ФИКСАЦИЕЙ В БОЮ
+// military.js — ПОЛНЫЙ С МУЛЬТИ-БОЕМ И ФИКСАЦИЕЙ ТАНКОВ
 
 import { 
     getUnits, setUnits, getMyCountryId, getWars, 
@@ -52,7 +52,7 @@ export function deployUnit(posKey, unitType) {
         trainingDaysLeft: 10,
         path: [],
         moveCooldown: 0,
-        inCombat: false  // ✅ Флаг блокировки движения в бою
+        inCombat: false
     };
     
     addUnit(unit);
@@ -71,7 +71,7 @@ export function giveOrder(posKey, selectedUnitId) {
     const unit = units.find(u => u.id === selectedUnitId);
     if (!unit) return;
 
-    // ✅ Нельзя двигаться если в бою
+    // ✅ Нельзя двигаться если в бою (для всех типов юнитов)
     if (unit.inCombat) {
         addNotification('Юнит ведёт бой и не может двигаться!', 'war');
         return;
@@ -212,9 +212,9 @@ export function processMovement() {
     let changed = false;
 
     units.forEach(u => {
-        // ✅ Пропускаем движение если юнит в бою
+        // ✅ ВСЕ юниты в бою не двигаются (включая танки)
         if (u.inCombat) {
-            u.path = []; // Очищаем путь
+            u.path = [];
             return;
         }
         
@@ -231,18 +231,14 @@ export function processMovement() {
                 );
                 
                 if (enemyOnTarget) {
+                    // ✅ Не проверяем существующий бой — добавляем всегда
                     const battles = getActiveBattles();
-                    if (!battles.some(b => 
-                        (b.attacker?.id === u.id && b.defender?.id === enemyOnTarget.id) ||
-                        (b.attacker?.id === enemyOnTarget.id && b.defender?.id === u.id)
-                    )) {
-                        battles.push({ attacker: u, defender: enemyOnTarget, daysCounter: 0 });
-                        setActiveBattles(battles);
-                        u.inCombat = true;
-                        enemyOnTarget.inCombat = true;
-                        if (u.owner === myId) {
-                            addNotification('⚔️ Десант вступил в бой при высадке!', 'war');
-                        }
+                    battles.push({ attacker: u, defender: enemyOnTarget, daysCounter: 0 });
+                    setActiveBattles(battles);
+                    u.inCombat = true;
+                    enemyOnTarget.inCombat = true;
+                    if (u.owner === myId) {
+                        addNotification('⚔️ Десант вступил в бой при высадке!', 'war');
                     }
                 } else {
                     const previousOwner = gridData[targetPos];
@@ -285,19 +281,14 @@ export function processMovement() {
 
                 if (enemyOnNext) {
                     const battles = getActiveBattles();
-                    if (!battles.some(b => 
-                        (b.attacker?.id === u.id && b.defender?.id === enemyOnNext.id) ||
-                        (b.attacker?.id === enemyOnNext.id && b.defender?.id === u.id)
-                    )) {
-                        battles.push({ attacker: u, defender: enemyOnNext, daysCounter: 0 });
-                        setActiveBattles(battles);
-                        u.inCombat = true;
-                        enemyOnNext.inCombat = true;
-                        if (u.owner === myId) {
-                            addNotification('⚔️ Столкновение с врагом!', 'war');
-                        }
-                    }
+                    battles.push({ attacker: u, defender: enemyOnNext, daysCounter: 0 });
+                    setActiveBattles(battles);
+                    u.inCombat = true;
+                    enemyOnNext.inCombat = true;
                     u.path = [];
+                    if (u.owner === myId) {
+                        addNotification('⚔️ Столкновение с врагом!', 'war');
+                    }
                     return;
                 }
 
@@ -335,7 +326,7 @@ export function processMovement() {
     }
 }
 
-// ========== БОЕВАЯ СИСТЕМА С БАЛАНСОМ ==========
+// ========== БОЕВАЯ СИСТЕМА С МУЛЬТИ-БОЕМ ==========
 
 function getUnitName(type) {
     return UNIT_STATS[type]?.name || type;
@@ -348,10 +339,16 @@ export function processCombat() {
     const myId = getMyCountryId();
     let battles = getActiveBattles() || [];
 
-    // Находим коллизии (юниты на одной клетке)
+    // ========== НАХОДИМ ВСЕ КОЛЛИЗИИ ==========
     for (let i = 0; i < units.length; i++) {
         for (let j = i + 1; j < units.length; j++) {
-            if (units[i].pos === units[j].pos && 
+            // ✅ Проверяем и ту же клетку И соседние клетки
+            const [ix, iy] = units[i].pos.split(',').map(Number);
+            const [jx, jy] = units[j].pos.split(',').map(Number);
+            const dist = Math.sqrt(Math.pow(jx - ix, 2) + Math.pow(jy - iy, 2));
+            
+            // Бой на расстоянии до 1.5 клеток
+            if (dist <= 1.5 && 
                 units[i].owner !== units[j].owner && 
                 isAtWar(units[i].owner, units[j].owner, wars)) {
                 
@@ -364,6 +361,7 @@ export function processCombat() {
                     const aStats = UNIT_STATS[units[i].type] || { attack: 10 };
                     const dStats = UNIT_STATS[units[j].type] || { attack: 10 };
                     
+                    // Более сильный — атакующий
                     const attacker = aStats.attack >= dStats.attack ? units[i] : units[j];
                     const defender = attacker.id === units[i].id ? units[j] : units[i];
                     
@@ -379,7 +377,7 @@ export function processCombat() {
         }
     }
 
-    // Обрабатываем все бои
+    // ========== ОБРАБАТЫВАЕМ ВСЕ БОИ ==========
     battles = battles.filter(battle => {
         if (!battle.attacker || !battle.defender) return false;
         
@@ -387,7 +385,6 @@ export function processCombat() {
         const defender = units.find(u => u.id === battle.defender.id);
         
         if (!attacker || !defender) {
-            // Один из юнитов погиб — снимаем флаг с другого
             if (attacker) attacker.inCombat = false;
             if (defender) defender.inCombat = false;
             return false;
@@ -397,7 +394,6 @@ export function processCombat() {
         const [dx, dy] = defender.pos.split(',').map(Number);
         const distance = Math.sqrt(Math.pow(dx - ax, 2) + Math.pow(dy - ay, 2));
         
-        // Если разошлись далеко — бой окончен
         if (distance > 1.5 && attacker.pos !== defender.pos) {
             attacker.inCombat = false;
             defender.inCombat = false;
@@ -407,7 +403,13 @@ export function processCombat() {
         // Смерть атакующего
         if ((attacker.hp || 0) <= 0) {
             removeUnit(attacker.id);
-            defender.inCombat = false;
+            // ✅ Проверяем, есть ли ещё враги для защитника
+            const stillInCombat = battles.some(b => 
+                b !== battle && 
+                (b.defender?.id === defender.id || b.attacker?.id === defender.id)
+            );
+            if (!stillInCombat) defender.inCombat = false;
+            
             if (attacker.owner === myId || defender.owner === myId) {
                 addNotification(`${getUnitName(attacker.type)} уничтожен в бою!`, 'war');
             }
@@ -420,7 +422,13 @@ export function processCombat() {
             const defenderOwner = gridData[defenderPos];
             
             removeUnit(defender.id);
-            attacker.inCombat = false;
+            
+            // ✅ Проверяем, есть ли ещё враги для атакующего
+            const stillInCombat = battles.some(b => 
+                b !== battle && 
+                (b.defender?.id === attacker.id || b.attacker?.id === attacker.id)
+            );
+            if (!stillInCombat) attacker.inCombat = false;
             
             if (attacker.owner === myId || defender.owner === myId) {
                 addNotification(`${getUnitName(defender.type)} уничтожен! Победа!`, 'war');
@@ -437,7 +445,7 @@ export function processCombat() {
             return false;
         }
 
-        // Нанесение урона
+        // ========== НАНЕСЕНИЕ УРОНА ==========
         battle.daysCounter = (battle.daysCounter || 0) + 1;
         
         if (battle.daysCounter >= 2) {
@@ -446,39 +454,38 @@ export function processCombat() {
             const aStats = UNIT_STATS[attacker.type] || { attack: 10, defense: 25, armor: 0 };
             const dStats = UNIT_STATS[defender.type] || { attack: 10, defense: 25, armor: 0 };
 
-            // ========== НОВАЯ ФОРМУЛА УРОНА ==========
+            // ✅ МУЛЬТИ-БОЙ: считаем сколько врагов атакуют каждого
+            const attackersOnDefender = battles.filter(b => 
+                b.defender?.id === defender.id || b.attacker?.id === defender.id
+            ).length;
             
-            // Базовый урон атакующего
-            let aBaseDamage = aStats.attack;
-            let dBaseDamage = dStats.attack;
+            const attackersOnAttacker = battles.filter(b => 
+                b.defender?.id === attacker.id || b.attacker?.id === attacker.id
+            ).length;
+
+            // Урон увеличивается если врагов больше
+            const aMultiplier = Math.min(2.0, 1.0 + (attackersOnDefender - 1) * 0.3);
+            const dMultiplier = Math.min(2.0, 1.0 + (attackersOnAttacker - 1) * 0.3);
             
-            // ✅ Защитник получает БОНУС к защите (окопался)
-            const defenderDefenseBonus = 1.5;
+            const defenderDefenseBonus = 1.4;
             
-            // ✅ Урон с учётом контратаки защитника
+            const aRawDamage = aStats.attack * aMultiplier * (0.8 + Math.random() * 0.4);
+            const dRawDamage = dStats.attack * dMultiplier * 0.5 * (0.8 + Math.random() * 0.4);
+            
             const aDamage = Math.max(3, Math.floor(
-                aBaseDamage * (0.8 + Math.random() * 0.4) - 
-                dStats.defense * defenderDefenseBonus * 0.3
+                aRawDamage - dStats.defense * defenderDefenseBonus * 0.3
             ));
+            const dDamage = Math.max(2, Math.floor(dRawDamage));
             
-            const dDamage = Math.max(2, Math.floor(
-                dBaseDamage * 0.6 * (0.8 + Math.random() * 0.4)
-            ));
+            // Броня
+            const defenderArmor = 1 - (dStats.armor || 0) / 150;
+            const attackerArmor = 1 - (aStats.armor || 0) / 150;
             
-            // Броня уменьшает урон
-            const defenderArmorReduction = 1 - (dStats.armor || 0) / 150;
-            const attackerArmorReduction = 1 - (aStats.armor || 0) / 150;
-            
-            const finalADamage = Math.max(1, Math.floor(aDamage * defenderArmorReduction));
-            const finalDDamage = Math.max(1, Math.floor(dDamage * attackerArmorReduction));
+            const finalADamage = Math.max(1, Math.floor(aDamage * defenderArmor));
+            const finalDDamage = Math.max(1, Math.floor(dDamage * attackerArmor));
 
             defender.hp = Math.max(0, (defender.hp || 0) - finalADamage);
             attacker.hp = Math.max(0, (attacker.hp || 0) - finalDDamage);
-            
-            // Лог боёв для игрока
-            if (attacker.owner === myId || defender.owner === myId) {
-                console.log(`⚔️ Бой: ${getUnitName(attacker.type)} нанёс ${finalADamage} урона, получил ${finalDDamage}`);
-            }
         }
         
         return true;
