@@ -1,54 +1,183 @@
-/* style.css */
 @import url('https://fonts.googleapis.com/css2?family=Special+Elite&display=swap');
 
-/* === СБРОС И БАЗА === */
-*,
-*::before,
-*::after {
+:root {
+    --bg-dark: #0a0a0a;
+    --panel-bg: #1f2937;
+    --gold: #eab308;
+    --war-red: #ef4444;
+    --ally-green: #15803d;
+    --army-green: #4b5320;
+    --sea-blue: #1b3a4b;
+    --paper: #e3d1b5;
+    --border-color: #4b5563;
+}
+
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-html, body {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #0a0a0a;
-}
-
 body {
     font-family: 'Special Elite', 'Courier New', monospace;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg-dark);
+    color: white;
+    overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
 }
 
-/* === КАНВАС КАРТЫ === */
-#map-canvas {
+/* === ГЛАВНОЕ МЕНЮ === */
+#main-menu {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #1b3a4b;
-    cursor: crosshair;
-    z-index: 1;
+    inset: 0;
+    z-index: 1000;
+    background: radial-gradient(circle, rgba(0,0,0,0.2), rgba(0,0,0,0.95)),
+                url('../assets/hoi5-backend.png') center/cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hq-folder {
+    background: rgba(227, 209, 181, 0.95);
+    color: #1a1a1a;
+    padding: 3rem;
+    border-radius: 4px;
+    box-shadow: 0 0 50px rgba(0,0,0,0.9);
+    width: 550px;
+    max-width: 90vw;
+    text-align: center;
+    border: 2px solid #8b4513;
+}
+
+.hq-folder h1 {
+    font-size: clamp(28px, 8vw, 48px);
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 4px solid rgba(0,0,0,0.3);
+}
+
+.subtitle {
+    font-size: 14px;
+    opacity: 0.7;
+    margin-bottom: 2rem;
+    font-style: italic;
+}
+
+.hq-button {
     display: block;
-    touch-action: none;
+    width: 100%;
+    background: #2e2e2e;
+    color: #eee;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: bold;
+    border: 2px solid #111;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+    font-family: inherit;
+    box-shadow: 4px 4px 0px #000;
+}
+
+.hq-button:hover {
+    background: var(--army-green);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px #000;
+}
+
+.hq-button.secondary {
+    background: #374151;
+}
+
+.version-text {
+    font-size: 10px;
+    opacity: 0.5;
+    margin-top: 2rem;
+    text-transform: uppercase;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* === ВЫБОР СТРАНЫ === */
+#country-select {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.select-card {
+    background: var(--paper);
+    color: #1a1a1a;
+    padding: 2rem;
+    border-radius: 8px;
+    border: 4px solid #854d0e;
+    width: 450px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.select-card h2 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid rgba(0,0,0,0.2);
+}
+
+#country-list button {
+    width: 100%;
+    text-align: left;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid #9ca3af;
+    border-radius: 6px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    background: rgba(255,255,255,0.5);
+    transition: all 0.2s;
+}
+
+#country-list button:hover {
+    background: white;
+    transform: scale(1.02);
+}
+
+.cancel-btn {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 10px;
+    background: #991b1b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+}
+
+.cancel-btn:hover {
+    background: #7f1d1d;
 }
 
 /* === ИГРОВОЙ КОНТЕЙНЕР === */
 #game-container {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-    background: transparent;
+    inset: 0;
+    background: #1a1c1e;
 }
 
 /* === ВЕРХНЯЯ ПАНЕЛЬ === */
@@ -57,46 +186,50 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 48px;
+    height: 44px;
     background: rgba(17, 24, 39, 0.95);
     backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     padding: 0 16px;
     gap: 16px;
     z-index: 100;
     font-size: 13px;
-    color: white;
 }
 
-#top-bar .separator {
+.separator {
     color: #6b7280;
 }
 
-#top-bar .stat-item {
-    white-space: nowrap;
+.indicator {
+    font-size: 10px;
+    animation: pulse 1.5s infinite;
 }
 
-.speed-buttons {
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.speed-controls {
     display: flex;
     gap: 4px;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0,0,0,0.3);
     padding: 4px 8px;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
 .speed-btn {
     background: #374151;
-    padding: 4px 12px;
-    border-radius: 6px;
-    cursor: pointer;
     color: white;
-    transition: all 0.2s;
-    font-size: 11px;
     border: none;
-    touch-action: manipulation;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    transition: all 0.2s;
 }
 
 .speed-btn:hover {
@@ -104,42 +237,46 @@ body {
 }
 
 .speed-btn.active {
-    background: #ca8a04;
+    background: var(--gold);
     color: black;
+}
+
+#game-date {
+    background: rgba(0,0,0,0.5);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    min-width: 120px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    font-size: 12px;
 }
 
 /* === ВКЛАДКИ === */
 #game-tabs {
     position: fixed;
-    top: 52px;
+    top: 48px;
     left: 16px;
     display: flex;
-    gap: 4px;
+    gap: 2px;
     z-index: 100;
-    flex-wrap: wrap;
 }
 
 .tab-btn {
     background: #1f2937;
-    padding: 6px 14px;
-    border-radius: 6px 6px 0 0;
-    cursor: pointer;
     color: #d1d5db;
-    border: 1px solid #4b5563;
-    font-size: 11px;
+    border: 1px solid var(--border-color);
+    padding: 6px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
     font-weight: bold;
+    border-radius: 6px 6px 0 0;
     transition: all 0.2s;
-    touch-action: manipulation;
 }
 
 .tab-btn:hover {
     background: #374151;
-    color: white;
-}
-
-.tab-btn.active {
-    background: #854d0e;
-    border-color: #ca8a04;
     color: white;
 }
 
@@ -150,18 +287,18 @@ body {
     left: 16px;
     width: 560px;
     max-width: calc(100vw - 32px);
-    background: #1f2937;
-    border: 1px solid #4b5563;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     z-index: 200;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
-#info-window .window-header {
+.window-header {
     background: #111827;
     padding: 12px 16px;
     border-bottom: 1px solid #374151;
+    border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -169,28 +306,32 @@ body {
 
 #window-title {
     font-weight: bold;
-    color: #eab308;
+    color: var(--gold);
 }
 
 #close-window {
-    color: #ef4444;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
     background: none;
     border: none;
+    color: var(--war-red);
+    font-size: 18px;
+    cursor: pointer;
     padding: 4px 8px;
-}
-
-#close-window:hover {
-    color: #dc2626;
 }
 
 #window-content {
     padding: 16px;
     max-height: 70vh;
     overflow-y: auto;
-    color: #e5e5e5;
+}
+
+/* === КАНВАС === */
+#map-canvas {
+    position: fixed;
+    inset: 0;
+    background: var(--sea-blue);
+    cursor: crosshair;
+    z-index: 1;
+    touch-action: none;
 }
 
 /* === БОКОВАЯ ПАНЕЛЬ === */
@@ -198,18 +339,16 @@ body {
     position: fixed;
     top: 100px;
     right: 16px;
-    width: 320px;
-    max-width: calc(100vw - 32px);
-    background: #1f2937;
-    border: 1px solid #4b5563;
+    width: 300px;
+    background: rgba(31, 41, 55, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 16px;
     z-index: 150;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 
-#info-sidebar .sidebar-header {
+.sidebar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -219,30 +358,40 @@ body {
 #sidebar-title {
     font-size: 20px;
     font-weight: bold;
-    color: #eab308;
+    color: var(--gold);
 }
 
 #close-sidebar {
-    color: #9ca3af;
-    cursor: pointer;
     background: none;
     border: none;
+    color: #9ca3af;
     font-size: 18px;
-    padding: 4px 8px;
+    cursor: pointer;
 }
 
-#close-sidebar:hover {
-    color: #f3f4f6;
+/* === ПОДСКАЗКА === */
+#hint {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.9);
+    padding: 8px 16px;
+    border-radius: 999px;
+    color: var(--gold);
+    font-size: 12px;
+    z-index: 300;
+    border: 1px solid rgba(234, 179, 8, 0.5);
+    white-space: nowrap;
 }
 
-/* === НОТИФИКАЦИИ === */
+/* === УВЕДОМЛЕНИЯ === */
 #notifications {
     position: fixed;
     bottom: 16px;
     left: 16px;
     width: 320px;
-    max-width: calc(100vw - 32px);
-    z-index: 200;
+    z-index: 400;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -251,11 +400,20 @@ body {
 
 #notifications > div {
     pointer-events: auto;
-    background: #1f2937;
-    border-left: 4px solid #eab308;
     padding: 12px;
     border-radius: 8px;
+    border-left: 4px solid;
     animation: slideIn 0.3s ease-out;
+}
+
+.notif-war {
+    background: rgba(185, 28, 28, 0.9);
+    border-color: white;
+}
+
+.notif-info {
+    background: rgba(27, 58, 75, 0.9);
+    border-color: var(--gold);
 }
 
 @keyframes slideIn {
@@ -269,29 +427,12 @@ body {
     }
 }
 
-/* === ПОДСКАЗКИ === */
-#hint {
-    position: fixed;
-    bottom: 96px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.9);
-    padding: 8px 16px;
-    border-radius: 999px;
-    color: #eab308;
-    font-size: 12px;
-    z-index: 300;
-    white-space: nowrap;
-    border: 1px solid rgba(234, 179, 8, 0.5);
-    pointer-events: none;
-}
-
-/* === КАРТОЧКИ ЮНИТОВ === */
+/* === КАРТОЧКИ === */
 .unit-card {
     background: #374151;
     padding: 12px;
     border-radius: 8px;
-    border-left: 4px solid #ca8a04;
+    border-left: 4px solid var(--gold);
     margin-bottom: 8px;
 }
 
@@ -301,159 +442,24 @@ body {
     border-radius: 999px;
     overflow: hidden;
     height: 4px;
+    margin-top: 4px;
 }
 
 .progress-fill {
-    background: #ca8a04;
+    background: var(--gold);
     height: 100%;
     transition: width 0.3s;
 }
 
-/* === КНОПКИ === */
-button {
-    cursor: pointer;
-    touch-action: manipulation;
-    font-family: inherit;
-}
-
-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* === МЕНЮ === */
-#main-menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-size: cover;
-    background-position: center;
-}
-
-#main-menu .menu-card {
-    background: #e3d1b5;
-    color: black;
-    padding: 32px;
-    border-radius: 12px;
-    border: 4px solid #854d0e;
-    width: 550px;
-    max-width: 90vw;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-}
-
-#main-menu h1 {
-    font-size: clamp(32px, 10vw, 60px);
-    font-weight: 900;
-    text-align: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 4px solid rgba(0, 0, 0, 0.3);
-    letter-spacing: 0.2em;
-}
-
-#btn-start,
-#btn-load-map {
-    width: 100%;
-    background: #1f2937;
-    color: white;
-    padding: 16px;
-    font-size: 20px;
-    font-weight: bold;
-    border: 2px solid black;
-    margin-bottom: 16px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-#btn-start:hover,
-#btn-load-map:hover {
-    background: #374151;
-    transform: translateY(-2px);
-}
-
-#btn-load-map {
-    background: #374151;
-}
-
-/* === ВЫБОР СТРАНЫ === */
-#country-select {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.9);
-}
-
-#country-select .select-card {
-    background: #e3d1b5;
-    padding: 24px;
-    border-radius: 12px;
-    border: 4px solid #854d0e;
-    width: 450px;
-    max-width: 90vw;
-    max-height: 80vh;
-    overflow: auto;
-}
-
-#country-select h2 {
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-}
-
-#country-list button {
-    width: 100%;
-    text-align: left;
-    padding: 12px;
-    border: 1px solid #9ca3af;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    font-weight: bold;
-    font-size: 14px;
-    transition: all 0.2s;
-    background: rgba(255, 255, 255, 0.5);
-    color: black;
-}
-
-#country-list button:hover {
-    background: white;
-    transform: scale(1.02);
-}
-
-#btn-cancel-country {
-    width: 100%;
-    margin-top: 16px;
-    background: #991b1b;
-    color: white;
-    padding: 8px;
-    border-radius: 8px;
-    cursor: pointer;
-    border: none;
-    font-weight: bold;
-}
-
-#btn-cancel-country:hover {
-    background: #7f1d1d;
+.progress-fill-blue {
+    background: #3b82f6;
+    height: 100%;
+    transition: width 0.3s;
 }
 
 /* === СКРОЛЛ === */
 ::-webkit-scrollbar {
     width: 6px;
-    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -465,117 +471,41 @@ button:disabled {
     border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-}
-
 /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
 @media (max-width: 768px) {
     #top-bar {
-        height: auto;
-        min-height: 44px;
-        padding: 4px 8px;
-        gap: 6px;
         font-size: 10px;
-        flex-wrap: wrap;
-    }
-    
-    #top-bar .separator {
-        display: none;
-    }
-    
-    .speed-btn {
-        padding: 2px 8px;
-        font-size: 10px;
+        padding: 0 8px;
+        gap: 8px;
     }
     
     #game-tabs {
-        top: 48px;
         left: 8px;
         right: 8px;
-        gap: 4px;
     }
     
     .tab-btn {
-        padding: 6px 10px;
-        font-size: 10px;
         flex: 1;
         text-align: center;
+        padding: 6px 8px;
+        font-size: 8px;
     }
     
     #info-window,
     #info-sidebar {
-        top: 90px;
         left: 8px;
         right: 8px;
         width: auto;
-        max-width: none;
+        top: 90px;
     }
     
-    #info-sidebar {
-        right: 8px;
-        left: 8px;
-    }
-    
-    #window-content {
-        padding: 12px;
-        font-size: 11px;
-    }
-    
-    .unit-card {
-        padding: 8px;
+    .hq-folder {
+        padding: 1.5rem;
     }
 }
 
 @media (max-width: 480px) {
-    .tab-btn {
-        font-size: 9px;
-        padding: 6px;
-    }
-    
-    #country-list button {
-        font-size: 10px;
-        padding: 8px;
-    }
-
-    #main-menu h1 {
-        font-size: 28px;
-        margin-bottom: 16px;
-        padding-bottom: 12px;
-    }
-}
-
-/* === ТАЧ-УСТРОЙСТВА === */
-@media (hover: none) and (pointer: coarse) {
-    .tab-btn,
-    .speed-btn,
-    button {
-        min-height: 44px;
-    }
-    
-    #map-canvas {
-        cursor: default;
-    }
-}
-
-/* === ЛАНДШАФТНАЯ ОРИЕНТАЦИЯ === */
-@media (max-width: 900px) and (orientation: landscape) {
-    #top-bar {
-        height: 40px;
-    }
-    
-    #game-tabs {
-        top: 44px;
-    }
-    
-    #info-window,
-    #info-sidebar {
-        max-height: 60vh;
-        top: 80px;
-    }
-    
-    .tab-btn {
-        padding: 4px 8px;
-        font-size: 9px;
+    .separator {
+        display: none;
     }
 }
