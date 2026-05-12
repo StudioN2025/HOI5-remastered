@@ -1,4 +1,4 @@
-// military.js — ЮНИТЫ С ФРОНТОМ И СТРЕЛОЧКАМИ
+// military.js — ПОЛНЫЙ С ДИСТАНЦИОННЫМ БОЕМ
 
 import { 
     getUnits, setUnits, getMyCountryId, getWars, 
@@ -121,7 +121,7 @@ export function giveOrder(posKey, selectedUnitId) {
         return;
     }
 
-    // Поиск пути в обход вражеских юнитов
+    // Поиск пути
     const path = findPathAvoidingEnemies(unit.pos, posKey, unit.owner);
     
     if (!path) {
@@ -135,7 +135,7 @@ export function giveOrder(posKey, selectedUnitId) {
     markDirty();
 }
 
-// ========== ПОИСК ПУТИ С ОБХОДОМ ВРАГОВ ==========
+// ========== ПОИСК ПУТИ ==========
 
 function findPathAvoidingEnemies(startPos, endPos, owner) {
     const gridData = getGridData();
@@ -145,7 +145,6 @@ function findPathAvoidingEnemies(startPos, endPos, owner) {
     const [sx, sy] = startPos.split(',').map(Number);
     const [tx, ty] = endPos.split(',').map(Number);
     
-    // BFS с учётом вражеских юнитов
     const queue = [{ x: sx, y: sy, path: [] }];
     const visited = new Set();
     visited.add(`${sx},${sy}`);
@@ -154,13 +153,11 @@ function findPathAvoidingEnemies(startPos, endPos, owner) {
         const { x, y, path } = queue.shift();
         
         if (x === tx && y === ty) {
-            // Возвращаем путь без начальной точки
             return path.length > 0 ? path : [`${tx},${ty}`];
         }
         
-        if (path.length > 60) continue; // Максимальная длина пути
+        if (path.length > 60) continue;
         
-        // Проверяем соседей
         const neighbors = [[1,0], [-1,0], [0,1], [0,-1]];
         for (const [dx, dy] of neighbors) {
             const nx = x + dx;
@@ -168,23 +165,20 @@ function findPathAvoidingEnemies(startPos, endPos, owner) {
             const key = `${nx},${ny}`;
             
             if (visited.has(key)) continue;
-            if (!gridData[key]) continue; // Вода — нельзя
+            if (!gridData[key]) continue;
             
-            // Проверяем, нет ли вражеского юнита на клетке
             const enemyUnit = units.find(u => 
                 u.pos === key && 
                 u.owner !== owner && 
                 isAtWar(owner, u.owner, wars)
             );
             
-            if (enemyUnit) continue; // Враг на клетке — обходим
+            if (enemyUnit) continue;
             
-            // Нельзя ходить через нейтральные страны
             const cellOwner = gridData[key];
             const isEnemyCountry = cellOwner && isAtWar(owner, cellOwner, wars);
+            const isAlly = areAlliesCheck(owner, cellOwner);
             
-            // Можно: своя территория, союзная, или вражеская (будет захват)
-            const isAlly = areAllies(owner, cellOwner);
             if (cellOwner !== owner && !isAlly && !isEnemyCountry) continue;
             
             visited.add(key);
@@ -192,11 +186,10 @@ function findPathAvoidingEnemies(startPos, endPos, owner) {
         }
     }
     
-    // Путь не найден — возвращаем null
     return null;
 }
 
-function areAllies(c1, c2) {
+function areAlliesCheck(c1, c2) {
     if (c1 === c2) return true;
     const alliances = window._alliances || [];
     return alliances.some(a => a.has && a.has(c1) && a.has(c2));
@@ -218,7 +211,6 @@ export function processMovement() {
             const targetOwner = gridData[targetPos];
             
             if (targetOwner && isAtWar(u.owner, targetOwner, wars)) {
-                // Проверка: есть ли враг на клетке высадки
                 const enemyOnTarget = getUnits().find(unit => 
                     unit.pos === targetPos && 
                     unit.owner !== u.owner && 
@@ -226,14 +218,13 @@ export function processMovement() {
                 );
                 
                 if (enemyOnTarget) {
-                    // Начинаем бой вместо высадки
                     const battles = getActiveBattles();
-                    if (!battles.some(b => b.attacker.id === u.id || b.defender.id === u.id)) {
+                    if (!battles.some(b => 
+                        (b.attacker?.id === u.id && b.defender?.id === enemyOnTarget.id) ||
+                        (b.attacker?.id === enemyOnTarget.id && b.defender?.id === u.id)
+                    )) {
                         battles.push({ attacker: u, defender: enemyOnTarget, daysCounter: 0 });
                         setActiveBattles(battles);
-                        if (u.owner === myId) {
-                            addNotification('⚔️ Десант вступил в бой при высадке!', 'war');
-                        }
                     }
                 } else {
                     const previousOwner = gridData[targetPos];
@@ -241,11 +232,6 @@ export function processMovement() {
                     setGridData(gridData);
                     u.pos = targetPos;
                     changed = true;
-                    
-                    if (u.owner === myId) {
-                        addNotification('⚓ Морская высадка успешна!', 'war');
-                    }
-                    
                     checkCapitulation(previousOwner, u.owner);
                 }
             }
@@ -259,7 +245,7 @@ export function processMovement() {
                 addNotification(`Юнит ${UNIT_STATS[u.type]?.icon || ''} готов к бою!`, 'info');
             }
         }
-        // Движение по пути
+        // Движение
         else if (u.path && u.path.length > 0) {
             if (u.moveCooldown === undefined) u.moveCooldown = 0;
             u.moveCooldown++;
@@ -274,7 +260,6 @@ export function processMovement() {
                     return;
                 }
 
-                // ✅ ПРОВЕРКА: есть ли вражеский юнит на следующей клетке
                 const enemyOnNext = getUnits().find(unit => 
                     unit.pos === nextStep && 
                     unit.owner !== u.owner && 
@@ -282,23 +267,18 @@ export function processMovement() {
                 );
 
                 if (enemyOnNext) {
-                    // Враг на пути — останавливаемся и начинаем бой
                     const battles = getActiveBattles();
                     if (!battles.some(b => 
-                        (b.attacker.id === u.id && b.defender.id === enemyOnNext.id) ||
-                        (b.attacker.id === enemyOnNext.id && b.defender.id === u.id)
+                        (b.attacker?.id === u.id && b.defender?.id === enemyOnNext.id) ||
+                        (b.attacker?.id === enemyOnNext.id && b.defender?.id === u.id)
                     )) {
                         battles.push({ attacker: u, defender: enemyOnNext, daysCounter: 0 });
                         setActiveBattles(battles);
-                        if (u.owner === myId) {
-                            addNotification(`⚔️ Столкновение с врагом на пути!`, 'war');
-                        }
                     }
-                    u.path = []; // Останавливаем движение
+                    u.path = [];
                     return;
                 }
 
-                // Двигаемся
                 if (isAtWar(u.owner, targetOwner, wars)) {
                     u.path.shift();
                     const previousOwner = gridData[nextStep];
@@ -313,7 +293,7 @@ export function processMovement() {
                             return owner === u.owner || isAtWar(u.owner, owner, wars);
                         });
                     }
-                } else if (targetOwner === u.owner || areAllies(u.owner, targetOwner)) {
+                } else if (targetOwner === u.owner || areAlliesCheck(u.owner, targetOwner)) {
                     u.path.shift();
                     u.pos = nextStep;
                     changed = true;
@@ -323,11 +303,10 @@ export function processMovement() {
             }
         }
         
-        // Регенерация (только не в бою)
+        // Регенерация
         const battles = getActiveBattles();
         const inBattle = battles.some(b => 
-            (b.attacker && b.attacker.id === u.id) || 
-            (b.defender && b.defender.id === u.id)
+            (b.attacker?.id === u.id) || (b.defender?.id === u.id)
         );
         
         if (!inBattle && u.hp !== undefined && u.hp !== null) {
@@ -358,7 +337,7 @@ export function processCombat() {
     const myId = getMyCountryId();
     let battles = getActiveBattles() || [];
 
-    // Находим новые коллизии (юниты на одной клетке)
+    // Находим коллизии (юниты на одной клетке)
     for (let i = 0; i < units.length; i++) {
         for (let j = i + 1; j < units.length; j++) {
             if (units[i].pos === units[j].pos && 
@@ -366,19 +345,15 @@ export function processCombat() {
                 isAtWar(units[i].owner, units[j].owner, wars)) {
                 
                 const alreadyFighting = battles.some(b => 
-                    (b.attacker.id === units[i].id && b.defender.id === units[j].id) ||
-                    (b.attacker.id === units[j].id && b.defender.id === units[i].id)
+                    (b.attacker?.id === units[i].id && b.defender?.id === units[j].id) ||
+                    (b.attacker?.id === units[j].id && b.defender?.id === units[i].id)
                 );
                 
                 if (!alreadyFighting) {
-                    // Атакующий — тот кто движется или с большей атакой
-                    const aStats = UNIT_STATS[units[i].type];
-                    const dStats = UNIT_STATS[units[j].type];
+                    const aStats = UNIT_STATS[units[i].type] || { attack: 10 };
+                    const dStats = UNIT_STATS[units[j].type] || { attack: 10 };
                     
-                    const iAttack = aStats ? aStats.attack : 10;
-                    const jAttack = dStats ? dStats.attack : 10;
-                    
-                    const attacker = iAttack >= jAttack ? units[i] : units[j];
+                    const attacker = aStats.attack >= dStats.attack ? units[i] : units[j];
                     const defender = attacker.id === units[i].id ? units[j] : units[i];
                     
                     battles.push({ attacker, defender, daysCounter: 0 });
@@ -391,18 +366,28 @@ export function processCombat() {
         }
     }
 
-    // Обрабатываем бои
+    // ✅ ОБРАБАТЫВАЕМ ВСЕ БОИ (включая дистанционные)
     battles = battles.filter(battle => {
-        const attacker = units.find(u => u.id === battle.attacker?.id);
-        const defender = units.find(u => u.id === battle.defender?.id);
+        if (!battle.attacker || !battle.defender) return false;
+        
+        const attacker = units.find(u => u.id === battle.attacker.id);
+        const defender = units.find(u => u.id === battle.defender.id);
         
         if (!attacker || !defender) return false;
         
-        // Проверка: юниты всё ещё на одной клетке
-        if (attacker.pos !== defender.pos) {
-            return false; // Разошлись — бой окончен
+        // ✅ ПРОВЕРКА ДИСТАНЦИИ ДЛЯ ДИСТАНЦИОННОГО БОЯ
+        const [ax, ay] = attacker.pos.split(',').map(Number);
+        const [dx, dy] = defender.pos.split(',').map(Number);
+        const distance = Math.sqrt(Math.pow(dx - ax, 2) + Math.pow(dy - ay, 2));
+        
+        // Если расстояние > 1.5 клетки и они не на одной клетке — бой прекращается
+        if (distance > 1.5 && attacker.pos !== defender.pos) {
+            return false;
         }
-
+        
+        // Если на одной клетке — продолжаем бой
+        // Если на соседних — продолжаем бой (дистанционный)
+        
         // Смерть атакующего
         if ((attacker.hp || 0) <= 0) {
             removeUnit(attacker.id);
@@ -423,8 +408,8 @@ export function processCombat() {
                 addNotification(`${getUnitName(defender.type)} уничтожен! Победа!`, 'war');
             }
             
-            // Захват клетки если защитник был владельцем
-            if (defenderOwner === defender.owner) {
+            // Захват клетки если защитник был владельцем и они на одной клетке
+            if (defenderOwner === defender.owner && attacker.pos === defender.pos) {
                 const previousOwner = gridData[defenderPos];
                 gridData[defenderPos] = attacker.owner;
                 setGridData(gridData);
@@ -434,7 +419,7 @@ export function processCombat() {
             return false;
         }
 
-        // Нанесение урона
+        // Нанесение урона (каждые 2 дня)
         battle.daysCounter = (battle.daysCounter || 0) + 1;
         
         if (battle.daysCounter >= 2) {
@@ -443,8 +428,11 @@ export function processCombat() {
             const aStats = UNIT_STATS[attacker.type] || { attack: 10, defense: 25, armor: 0 };
             const dStats = UNIT_STATS[defender.type] || { attack: 10, defense: 25, armor: 0 };
 
-            const aRawDamage = aStats.attack * (0.8 + Math.random() * 0.4);
-            const dRawDamage = dStats.attack * (0.4 + Math.random() * 0.3);
+            // Дистанционный бой — урон снижен
+            const rangeMultiplier = attacker.pos === defender.pos ? 1.0 : 0.6;
+            
+            const aRawDamage = aStats.attack * rangeMultiplier * (0.8 + Math.random() * 0.4);
+            const dRawDamage = dStats.attack * 0.3 * (0.8 + Math.random() * 0.4);
             
             const defenderArmor = dStats.armor || 0;
             const aDamage = Math.max(1, Math.floor(aRawDamage * (1 - defenderArmor / 100)));
