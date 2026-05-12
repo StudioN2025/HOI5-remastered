@@ -1,6 +1,11 @@
-// focuses.js — национальные фокусы
+// focuses.js — фокусы только для игрока
 
-import { getMyCountryId, getActiveFocus, setActiveFocus, getCompletedFocuses, addCompletedFocus, getPlayerResources, setPlayerResources, getGridData, setGridData, addUnit, addWar } from './game.js';
+import { 
+    getMyCountryId, getActiveFocus, setActiveFocus, 
+    getCompletedFocuses, addCompletedFocus, 
+    getPlayerResources, setPlayerResources, 
+    getGridData, addUnit, addWar 
+} from './game.js';
 import { NATIONAL_FOCUSES } from './data.js';
 import { addNotification } from './utils.js';
 
@@ -8,7 +13,6 @@ export function getAvailableFocuses() {
     const myCountryId = getMyCountryId();
     const completed = getCompletedFocuses();
     const focuses = NATIONAL_FOCUSES[myCountryId] || [];
-    
     return focuses.filter(f => !completed.has(f.id));
 }
 
@@ -24,16 +28,11 @@ export function startFocus(focusId) {
         return false;
     }
     
-    setActiveFocus({
-        ...focus,
-        daysLeft: 70
-    });
-    
+    setActiveFocus({ ...focus, daysLeft: 70 });
     addNotification(`Национальный фокус "${focus.name}" начат!`, 'info');
     
     const indicator = document.getElementById('focus-indicator');
     if (indicator) indicator.classList.remove('hidden');
-    
     return true;
 }
 
@@ -44,12 +43,8 @@ export function updateFocus() {
     activeFocus.daysLeft--;
     
     if (activeFocus.daysLeft <= 0) {
-        // Выполняем эффект фокуса
         const ctx = createFocusContext();
-        if (activeFocus.effect) {
-            activeFocus.effect(ctx);
-        }
-        
+        if (activeFocus.effect) activeFocus.effect(ctx);
         addCompletedFocus(activeFocus.id);
         setActiveFocus(null);
         addNotification(`Фокус "${activeFocus.name}" завершён!`, 'info');
@@ -61,10 +56,10 @@ export function updateFocus() {
 
 function createFocusContext() {
     const resources = getPlayerResources();
-    
+    const myId = getMyCountryId();
     return {
         resources,
-        declareWar: (targetId) => addWar(getMyCountryId(), targetId),
+        declareWar: (targetId) => addWar(myId, targetId),
         proposeAlliance: (targetId) => {
             import('./diplomacy.js').then(m => m.proposeAlliance(targetId));
         },
@@ -72,29 +67,26 @@ function createFocusContext() {
             resources.equipment += amount;
             setPlayerResources(resources);
         },
-        addFactories: (amount) => {
-            let count = 0;
+        addFactories: (count) => {
             const gridData = getGridData();
-            const myId = getMyCountryId();
-            
-            Object.entries(gridData).forEach(([pos, id]) => {
-                if (id === myId && count < amount) {
-                    const cellStats = window._cellStats || {};
+            const myCells = Object.keys(gridData).filter(k => gridData[k] === myId);
+            for (let i = 0; i < count && i < myCells.length; i++) {
+                import('./game.js').then(m => {
+                    const cellStats = m.getCellStats();
+                    const pos = myCells[i];
                     if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
-                    cellStats[pos].factories += 1;
-                    count++;
-                }
-            });
+                    cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
+                    m.setCellStats(cellStats);
+                });
+            }
         },
         addUnits: (type, count) => {
             const gridData = getGridData();
-            const myId = getMyCountryId();
             const myCells = Object.keys(gridData).filter(k => gridData[k] === myId);
-            
             for (let i = 0; i < count; i++) {
                 const pos = myCells[Math.floor(Math.random() * myCells.length)];
                 if (pos) {
-                    addUnit({ pos, owner: myId, type, trainingDaysLeft: 0, path: [] });
+                    addUnit({ pos, owner: myId, type, trainingDaysLeft: 0, path: [], inCombat: false });
                 }
             }
         }
@@ -150,3 +142,5 @@ export function updateFocusUI() {
     
     container.innerHTML = html;
 }
+
+window.startFocus = startFocus;
