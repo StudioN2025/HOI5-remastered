@@ -1,4 +1,4 @@
-// main.js — главный файл, точка входа
+// main.js — ПОЛНАЯ ФИНАЛЬНАЯ ВЕРСИЯ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -18,7 +18,7 @@ import { updateResearch } from './tech.js';
 import { updateFocus } from './focuses.js';
 import { runAllAI } from './ai.js';
 import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint } from './ui.js';
-import { getCountryInfo, addNotification } from './utils.js';
+import { getCountryInfo, addNotification, isAtWar } from './utils.js';
 
 // ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 window._gridData = {};
@@ -160,6 +160,13 @@ async function loadMapFromFile(filename) {
     }
 }
 
+// ========== ПРОВЕРКА АЛЬЯНСА ==========
+function areAlliesCheck(c1, c2) {
+    if (c1 === c2) return true;
+    const alliances = getAlliances();
+    return alliances.some(a => a.has && a.has(c1) && a.has(c2));
+}
+
 // ========== ВЫБОР СТРАНЫ ==========
 function showCountrySelection(countriesList) {
     const container = document.getElementById('country-list');
@@ -167,7 +174,6 @@ function showCountrySelection(countriesList) {
     
     container.innerHTML = '';
     
-    // Сортируем: крупные страны первыми
     const gridData = getGridData();
     const countrySizes = {};
     Object.values(gridData).forEach(id => {
@@ -176,7 +182,6 @@ function showCountrySelection(countriesList) {
     
     countriesList.sort((a, b) => (countrySizes[b] || 0) - (countrySizes[a] || 0));
     
-    // Крупные страны сверху с заголовком
     const majorCountries = countriesList.filter(id => (countrySizes[id] || 0) >= 30);
     const minorCountries = countriesList.filter(id => (countrySizes[id] || 0) < 30);
     
@@ -237,7 +242,6 @@ function startGame(countryId) {
     setPlayerResources({ equipment: 1000, factories: 0, manpower: 500000 });
     setSelectedUnitId(null);
     
-    // Инициализируем заводы для всех стран
     initializeFactories();
     
     document.getElementById('country-select').classList.add('hidden');
@@ -252,10 +256,9 @@ function startGame(countryId) {
     const info = getCountryInfo(countryId);
     addNotification(`🎌 Игра начата! Вы играете за ${info.name}`, 'info');
     addNotification(`👑 Лидер: ${info.leader} | ⚡ ${info.ideology}`, 'info');
-    addNotification('🖱️ ПКМ по вражеской стране — дипломатия', 'info');
+    addNotification('🖱️ Выберите юнит и кликните по врагу для атаки', 'info');
     addNotification('⌨️ WASD — камера | Колёсико — зум | Пробел — пауза', 'info');
     
-    // Запуск игрового цикла
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     startGameLoop();
 }
@@ -263,7 +266,7 @@ function startGame(countryId) {
 // ========== ИГРОВОЙ ЦИКЛ ==========
 function startGameLoop() {
     let lastTick = performance.now();
-    const TICK_INTERVAL = 1000; // 1 секунда = 1 игровой день на скорости 1x
+    const TICK_INTERVAL = 1000;
     
     function loop(timestamp) {
         const elapsed = timestamp - lastTick;
@@ -272,21 +275,17 @@ function startGameLoop() {
         if (speed > 0 && elapsed >= TICK_INTERVAL / speed) {
             lastTick = timestamp;
             
-            // Игровой день
             advanceDay();
             
-            // Обновление даты в UI
             const dateElem = document.getElementById('game-date');
             if (dateElem) dateElem.innerText = getDateString();
             
-            // Обработка всех систем
             updateResearch();
             updateFocus();
             processConstruction();
             processMovement();
             processCombat();
             
-            // Обновление экономики
             try {
                 const unitStats = {
                     infantry: { maintenance: 0.2 },
@@ -297,14 +296,11 @@ function startGameLoop() {
                 console.warn('Ошибка обновления экономики:', e);
             }
             
-            // ИИ
             runAllAI();
             
-            // Обновление UI
             updateTopBar();
             updateOpenWindows();
             
-            // Перерисовка карты
             markDirty();
         }
         
@@ -340,15 +336,12 @@ function updateOpenWindows() {
 async function init() {
     console.log('🚀 HOI V Remastered v2.0 — Запуск');
     
-    // Показываем экран загрузки
     const loadingScreen = showLoadingScreen();
     
-    // Этап 1: Загрузка изображений
     loadingScreen.setText('ЗАГРУЗКА ИЗОБРАЖЕНИЙ...');
     loadingScreen.setProgress(10);
     await preloadImages();
     
-    // Этап 2: Инициализация canvas
     loadingScreen.setText('ИНИЦИАЛИЗАЦИЯ КАРТЫ...');
     loadingScreen.setProgress(40);
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -357,12 +350,10 @@ async function init() {
     setupMapEvents();
     renderMap();
     
-    // Этап 3: Загрузка модулей
     loadingScreen.setText('ЗАГРУЗКА МОДУЛЕЙ...');
     loadingScreen.setProgress(70);
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Этап 4: Подготовка интерфейса
     loadingScreen.setText('ПОДГОТОВКА ИНТЕРФЕЙСА...');
     loadingScreen.setProgress(90);
     
@@ -420,6 +411,8 @@ async function init() {
         const key = `${world.x},${world.y}`;
         const gridData = getGridData();
         const myCountryId = getMyCountryId();
+        const units = getUnits();
+        const wars = getWars();
         
         // Режим найма
         if (window._recruitMode) {
@@ -451,22 +444,83 @@ async function init() {
             return;
         }
         
-        // Выбран юнит — приказ на движение
+        // ========== ВЫБРАН ЮНИТ — АТАКА ИЛИ ДВИЖЕНИЕ ==========
         const selectedUnitId = getSelectedUnitId();
         if (selectedUnitId) {
-            giveOrder(key, selectedUnitId);
+            const selectedUnit = units.find(u => u.id === selectedUnitId);
+            
+            if (!selectedUnit) {
+                setSelectedUnitId(null);
+                document.getElementById('order-hint')?.classList.add('hidden');
+                return;
+            }
+            
+            const targetOwner = gridData[key];
+            
+            // ✅ КЛИК ПО ВРАГУ (территория или юнит) — АТАКА
+            if (targetOwner && isAtWar(myCountryId, targetOwner, wars)) {
+                // Ищем вражеского юнита на клетке
+                const enemyUnit = units.find(u => u.pos === key && u.owner !== myCountryId && isAtWar(myCountryId, u.owner, wars));
+                
+                if (enemyUnit) {
+                    // ✅ АТАКА ВРАЖЕСКОГО ЮНИТА
+                    const activeBattles = getActiveBattles();
+                    const alreadyFighting = activeBattles.some(b =>
+                        (b.attacker && b.attacker.id === selectedUnit.id && b.defender && b.defender.id === enemyUnit.id) ||
+                        (b.attacker && b.attacker.id === enemyUnit.id && b.defender && b.defender.id === selectedUnit.id)
+                    );
+                    
+                    if (!alreadyFighting) {
+                        activeBattles.push({
+                            attacker: selectedUnit,
+                            defender: enemyUnit,
+                            daysCounter: 0
+                        });
+                        setActiveBattles(activeBattles);
+                        
+                        const enemyName = enemyUnit.type === 'tank' ? '🚜 Танки' : '💂 Пехоту';
+                        addNotification(`⚔️ Атака на вражескую ${enemyName}! Бой начат!`, 'war');
+                    }
+                    
+                    setSelectedUnitId(null);
+                    document.getElementById('order-hint')?.classList.add('hidden');
+                    markDirty();
+                    return;
+                }
+                
+                // ✅ Вражеская территория БЕЗ юнита — захват
+                giveOrder(key, selectedUnitId);
+                setSelectedUnitId(null);
+                document.getElementById('order-hint')?.classList.add('hidden');
+                return;
+            }
+            
+            // ✅ Клик по своей или союзной клетке — движение
+            if (targetOwner === myCountryId || areAlliesCheck(myCountryId, targetOwner)) {
+                giveOrder(key, selectedUnitId);
+                setSelectedUnitId(null);
+                document.getElementById('order-hint')?.classList.add('hidden');
+                return;
+            }
+            
+            // ✅ Клик по нейтральной стране
+            if (targetOwner) {
+                addNotification('⚡ Нельзя атаковать нейтральную страну! Объявите войну через ПКМ по клетке страны.', 'war');
+            } else {
+                addNotification('🌊 Юниты не могут ходить по воде! Используйте порты.', 'war');
+            }
             setSelectedUnitId(null);
             document.getElementById('order-hint')?.classList.add('hidden');
             return;
         }
         
-        // Показ информации о стране
+        // ========== ЮНИТ НЕ ВЫБРАН — ПОКАЗ ИНФОРМАЦИИ ==========
         if (gridData[key]) {
             showCountryInfo(gridData[key], key);
         }
     });
     
-    // Обработчик ПКМ — выбор юнита или дипломатия
+    // ========== ОБРАБОТЧИК ПКМ — ВЫБОР ЮНИТА ИЛИ ДИПЛОМАТИЯ ==========
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (!getMyCountryId()) return;
@@ -482,7 +536,8 @@ async function init() {
         if (unit) {
             setSelectedUnitId(unit.id);
             document.getElementById('order-hint')?.classList.remove('hidden');
-            showHint('Выберите цель для движения');
+            document.getElementById('info-sidebar')?.classList.add('hidden');
+            showHint('⚔️ Кликните по врагу для атаки или по территории для захвата');
             return;
         }
         
@@ -492,7 +547,7 @@ async function init() {
         }
     });
     
-    // Обработчик клавиатуры
+    // ========== ПРОБЕЛ — ПАУЗА ==========
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
             e.preventDefault();
@@ -528,14 +583,13 @@ async function init() {
 window.recruitUnit = (type) => {
     document.getElementById('info-window')?.classList.add('hidden');
     window._recruitMode = type;
-    showHint(`Выберите провинцию для развертывания ${UNIT_STATS[type]?.icon} ${UNIT_STATS[type]?.name}`);
+    showHint(`🎯 Выберите провинцию для развертывания ${UNIT_STATS[type]?.icon} ${UNIT_STATS[type]?.name}`);
     document.getElementById('recruit-hint')?.classList.remove('hidden');
 };
 
 // ========== ЗАПУСК ==========
 init().catch(error => {
     console.error('❌ Ошибка инициализации:', error);
-    // Убираем экран загрузки в случае ошибки
     const loadingScreen = document.getElementById('loading-screen');
     if (loadingScreen) loadingScreen.remove();
     document.getElementById('main-menu').style.display = '';
