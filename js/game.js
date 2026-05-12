@@ -43,53 +43,109 @@ export function getActiveBattles() { return _activeBattles; }
 export function getMonths() { return MONTHS; }
 
 // ========== SETTERS ==========
-export function setGridData(data) { _gridData = data || {}; }
-export function setCellStats(data) { _cellStats = data || {}; }
-export function setUnits(data) { _units = data || []; }
-export function setBuildingQueue(data) { _buildingQueue = data || []; }
-export function setWars(data) { _wars = data || []; }
-export function setAlliances(data) { _alliances = data || []; }
-export function setMyCountryId(id) { _myCountryId = id; }
-export function setGameActive(active) { _isGameActive = active; }
+export function setGridData(data) { 
+    _gridData = data || {}; 
+    window._gridData = _gridData;
+}
+export function setCellStats(data) { 
+    _cellStats = data || {}; 
+    window._cellStats = _cellStats;
+}
+export function setUnits(data) { 
+    _units = data || []; 
+    window._units = _units;
+}
+export function setBuildingQueue(data) { 
+    _buildingQueue = data || []; 
+    window._buildingQueue = _buildingQueue;
+}
+export function setWars(data) { 
+    _wars = data || []; 
+    window._wars = _wars;
+}
+export function setAlliances(data) { 
+    _alliances = data || []; 
+    window._alliances = _alliances;
+}
+export function setMyCountryId(id) { 
+    _myCountryId = id; 
+    window._myCountryId = id;
+}
+export function setGameActive(active) { 
+    _isGameActive = active; 
+    window._isGameActive = active;
+}
 export function setGameSpeed(speed) { 
     if (speed > 0) _lastSavedSpeed = speed;
     _gameSpeed = speed; 
+    window._gameSpeed = speed;
 }
-export function setGameDate(date) { _gameDate = date; }
-export function setTech(newTech) { Object.assign(_tech, newTech); }
-export function setActiveResearch(research) { _activeResearch = research; }
-export function setActiveFocus(focus) { _activeFocus = focus; }
-export function addCompletedFocus(id) { _completedFocuses.add(id); }
-export function setPlayerResources(res) { Object.assign(_playerResources, res); }
-export function setSelectedUnitId(id) { _selectedUnitId = id; }
-export function setActiveBattles(battles) { _activeBattles = battles; }
+export function setGameDate(date) { 
+    _gameDate = date; 
+    window._gameDate = date;
+}
+export function setTech(newTech) { 
+    Object.assign(_tech, newTech); 
+    window._tech = _tech;
+}
+export function setActiveResearch(research) { 
+    _activeResearch = research; 
+    window._activeResearch = research;
+}
+export function setActiveFocus(focus) { 
+    _activeFocus = focus; 
+    window._activeFocus = focus;
+}
+export function addCompletedFocus(id) { 
+    _completedFocuses.add(id); 
+    window._completedFocuses = _completedFocuses;
+}
+export function setPlayerResources(res) { 
+    Object.assign(_playerResources, res); 
+    window._playerResources = _playerResources;
+}
+export function setSelectedUnitId(id) { 
+    _selectedUnitId = id; 
+    window._selectedUnitId = id;
+}
+export function setActiveBattles(battles) { 
+    _activeBattles = battles || []; 
+    window._activeBattles = _activeBattles;
+}
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ==========
-export function addUnit(unit) { 
-    unit.id = unit.id || `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    unit.hp = unit.hp || 100;
+// ========== ДОБАВЛЕНИЕ / УДАЛЕНИЕ ==========
+export function addUnit(unit) {
+    if (!unit.id) {
+        unit.id = `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    unit.hp = unit.hp ?? 100;
     unit.trainingDaysLeft = unit.trainingDaysLeft ?? 10;
     unit.path = unit.path || [];
-    _units.push(unit); 
+    _units.push(unit);
+    window._units = _units;
 }
 
-export function removeUnit(id) { 
-    _units = _units.filter(u => u.id !== id); 
+export function removeUnit(id) {
+    _units = _units.filter(u => u.id !== id);
+    window._units = _units;
 }
 
 export function addWar(a, b) {
     if (!_wars.some(w => (w.a === a && w.b === b) || (w.b === a && w.a === b))) {
         _wars.push({ a, b });
+        window._wars = _wars;
     }
 }
 
 export function removeWar(a, b) {
     _wars = _wars.filter(w => !((w.a === a && w.b === b) || (w.b === a && w.a === b)));
+    window._wars = _wars;
 }
 
 export function addAlliance(a, b) {
     if (!_alliances.some(al => al.has(a) && al.has(b))) {
         _alliances.push(new Set([a, b]));
+        window._alliances = _alliances;
     }
 }
 
@@ -98,12 +154,55 @@ export function addToBuildingQueue(item) {
         ...item,
         daysLeft: item.daysLeft || 135
     });
+    window._buildingQueue = _buildingQueue;
 }
 
+// ========== ВРЕМЯ ==========
 export function getDateString() {
     return `${_gameDate.getDate()} ${MONTHS[_gameDate.getMonth()]} ${_gameDate.getFullYear()}`;
 }
 
 export function advanceDay() {
     _gameDate.setDate(_gameDate.getDate() + 1);
+}
+
+// ========== СБРОС ==========
+export function resetGameState() {
+    _gridData = {};
+    _cellStats = {};
+    _units = [];
+    _buildingQueue = [];
+    _wars = [];
+    _alliances = [];
+    _myCountryId = null;
+    _isGameActive = false;
+    _gameSpeed = 0;
+    _lastSavedSpeed = 1;
+    _gameDate = new Date(1936, 0, 1, 12, 0);
+    _tech = { industry: 1, infantry: 1, tank: 1 };
+    _activeResearch = null;
+    _activeFocus = null;
+    _completedFocuses = new Set();
+    _playerResources = { equipment: 1000, factories: 0, manpower: 500000 };
+    _selectedUnitId = null;
+    _activeBattles = [];
+    
+    // Синхронизация с window
+    window._gridData = _gridData;
+    window._cellStats = _cellStats;
+    window._units = _units;
+    window._buildingQueue = _buildingQueue;
+    window._wars = _wars;
+    window._alliances = _alliances;
+    window._myCountryId = _myCountryId;
+    window._isGameActive = _isGameActive;
+    window._gameSpeed = _gameSpeed;
+    window._gameDate = _gameDate;
+    window._tech = _tech;
+    window._activeResearch = _activeResearch;
+    window._activeFocus = _activeFocus;
+    window._completedFocuses = _completedFocuses;
+    window._playerResources = _playerResources;
+    window._selectedUnitId = _selectedUnitId;
+    window._activeBattles = _activeBattles;
 }
