@@ -10,7 +10,6 @@
 </head>
 <body oncontextmenu="return false;">
 
-<!-- ========== ГЛАВНОЕ МЕНЮ ========== -->
 <div id="main-menu">
     <div class="hq-folder" id="menu-home">
         <h1>HEARTS OF IRON V<br><span class="subtitle-main">REMASTERED</span></h1>
@@ -20,7 +19,6 @@
     </div>
 </div>
 
-<!-- ========== ВЫБОР СТРАНЫ ========== -->
 <div id="country-select" class="fullscreen-overlay hidden">
     <div class="select-card">
         <h2>ВЫБЕРИТЕ ДЕРЖАВУ</h2>
@@ -29,44 +27,37 @@
     </div>
 </div>
 
-<!-- ========== ИГРОВОЙ ИНТЕРФЕЙС ========== -->
 <div id="game-container" class="hidden">
-
-    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
     <div id="top-bar">
         <span id="country-name" class="country-name">—</span>
         <span class="separator">|</span>
         <span class="stat-item">👥 <span id="val-manpower">0</span></span>
         <span class="stat-item">🏭 <span id="val-factories">0</span></span>
         <span class="stat-item">🔫 <span id="val-equipment">0</span></span>
-        
-        <span id="research-indicator" class="hidden indicator indicator-blue">🔬 ИССЛЕДОВАНИЕ...</span>
-        <span id="focus-indicator" class="hidden indicator indicator-yellow">⭐ ФОКУС...</span>
-        <span id="build-indicator" class="hidden indicator indicator-green">🏗️ СТРОЙКА...</span>
-        <span id="recruit-hint" class="hidden indicator indicator-yellow">🎯 ВЫБЕРИТЕ ПРОВИНЦИЮ ДЛЯ РАЗВЕРТЫВАНИЯ</span>
-        <span id="order-hint" class="hidden indicator indicator-green">🚶 ВЫБЕРИТЕ ЦЕЛЬ ДЛЯ ДВИЖЕНИЯ</span>
-        <span id="build-hint" class="hidden indicator indicator-blue">📍 ВЫБЕРИТЕ МЕСТО ДЛЯ СТРОИТЕЛЬСТВА</span>
-        
+        <span id="research-indicator" class="hidden indicator indicator-blue">🔬</span>
+        <span id="focus-indicator" class="hidden indicator indicator-yellow">⭐</span>
+        <span id="build-indicator" class="hidden indicator indicator-green">🏗️</span>
+        <span id="recruit-hint" class="hidden indicator indicator-yellow">🎯 ВЫБЕРИТЕ ПРОВИНЦИЮ</span>
+        <span id="order-hint" class="hidden indicator indicator-green">🚶 ВЫБЕРИТЕ ЦЕЛЬ</span>
+        <span id="build-hint" class="hidden indicator indicator-blue">📍 ВЫБЕРИТЕ МЕСТО</span>
         <div class="speed-controls">
             <button class="speed-btn active" data-speed="0">⏸</button>
             <button class="speed-btn" data-speed="1">▶ 1x</button>
             <button class="speed-btn" data-speed="3">▶▶ 3x</button>
             <button class="speed-btn" data-speed="5">▶▶▶ 5x</button>
         </div>
-        
         <span id="game-date" class="date-display">1 ЯНВ 1936</span>
     </div>
 
-    <!-- ВКЛАДКИ -->
     <div id="game-tabs" class="hidden">
         <button class="tab-btn" data-tab="army">🎖️ АРМИЯ</button>
         <button class="tab-btn" data-tab="research">🔬 ТЕХНОЛОГИИ</button>
         <button class="tab-btn" data-tab="focus">⭐ ФОКУСЫ</button>
         <button class="tab-btn" data-tab="diplomacy">🤝 ДИПЛОМАТИЯ</button>
         <button class="tab-btn" data-tab="build">🏗️ СТРОЙКА</button>
+        <button class="tab-btn" data-tab="save">💾 СОХРАНИТЬ</button>
     </div>
 
-    <!-- ОКНО ИНФОРМАЦИИ -->
     <div id="info-window" class="hidden">
         <div class="window-header">
             <span id="window-title">ОКНО</span>
@@ -75,48 +66,26 @@
         <div id="window-content"></div>
     </div>
 
-    <!-- КАНВАС КАРТЫ -->
     <canvas id="map-canvas"></canvas>
 
-    <!-- БОКОВАЯ ПАНЕЛЬ ИНФОРМАЦИИ О СТРАНЕ -->
     <div id="info-sidebar" class="hidden">
         <div class="sidebar-header">
             <h3 id="sidebar-title">—</h3>
             <button id="close-sidebar" class="close-btn">✖</button>
         </div>
         <div class="sidebar-content">
-            <div class="sidebar-row">
-                <span class="sidebar-label">👑 Лидер:</span>
-                <span id="sidebar-leader" class="sidebar-value">—</span>
-            </div>
-            <div class="sidebar-row">
-                <span class="sidebar-label">⚡ Идеология:</span>
-                <span id="sidebar-ideology" class="sidebar-value">—</span>
-            </div>
+            <div class="sidebar-row"><span class="sidebar-label">👑 Лидер:</span><span id="sidebar-leader" class="sidebar-value">—</span></div>
+            <div class="sidebar-row"><span class="sidebar-label">⚡ Идеология:</span><span id="sidebar-ideology" class="sidebar-value">—</span></div>
             <div class="sidebar-divider"></div>
-            <div class="sidebar-row">
-                <span class="sidebar-label">👥 Население:</span>
-                <span id="sidebar-pop" class="sidebar-value value-green">—</span>
-            </div>
-            <div class="sidebar-row">
-                <span class="sidebar-label">🏭 Заводы:</span>
-                <span id="sidebar-factories" class="sidebar-value value-blue">—</span>
-            </div>
-            <div class="sidebar-row">
-                <span class="sidebar-label">🏗️ Постройки:</span>
-                <span id="sidebar-buildings" class="sidebar-value">—</span>
-            </div>
+            <div class="sidebar-row"><span class="sidebar-label">👥 Население:</span><span id="sidebar-pop" class="sidebar-value value-green">—</span></div>
+            <div class="sidebar-row"><span class="sidebar-label">🏭 Заводы:</span><span id="sidebar-factories" class="sidebar-value value-blue">—</span></div>
+            <div class="sidebar-row"><span class="sidebar-label">🏗️ Постройки:</span><span id="sidebar-buildings" class="sidebar-value">—</span></div>
             <div class="sidebar-divider"></div>
             <div id="sidebar-actions" class="hidden"></div>
         </div>
     </div>
 
-    <!-- ПОДСКАЗКА -->
-    <div id="hint" class="hidden">
-        💡 <span id="hint-text"></span>
-    </div>
-
-    <!-- УВЕДОМЛЕНИЯ -->
+    <div id="hint" class="hidden">💡 <span id="hint-text"></span></div>
     <div id="notifications"></div>
 </div>
 
