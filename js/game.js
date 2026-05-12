@@ -1,4 +1,4 @@
-// game.js — центральное состояние игры
+// game.js — центральное состояние игры + сохранения
 
 let _gridData = {};
 let _cellStats = {};
@@ -54,75 +54,27 @@ export function getAICompletedFocuses(countryId) {
 }
 
 // ========== SETTERS ==========
-export function setGridData(data) { 
-    _gridData = data || {}; 
-    window._gridData = _gridData;
-}
-export function setCellStats(data) { 
-    _cellStats = data || {}; 
-    window._cellStats = _cellStats;
-}
-export function setUnits(data) { 
-    _units = data || []; 
-    window._units = _units;
-}
-export function setBuildingQueue(data) { 
-    _buildingQueue = data || []; 
-    window._buildingQueue = _buildingQueue;
-}
-export function setWars(data) { 
-    _wars = data || []; 
-    window._wars = _wars;
-}
-export function setAlliances(data) { 
-    _alliances = data || []; 
-    window._alliances = _alliances;
-}
-export function setMyCountryId(id) { 
-    _myCountryId = id; 
-    window._myCountryId = id;
-}
-export function setGameActive(active) { 
-    _isGameActive = active; 
-    window._isGameActive = active;
-}
+export function setGridData(data) { _gridData = data || {}; window._gridData = _gridData; }
+export function setCellStats(data) { _cellStats = data || {}; window._cellStats = _cellStats; }
+export function setUnits(data) { _units = data || []; window._units = _units; }
+export function setBuildingQueue(data) { _buildingQueue = data || []; window._buildingQueue = _buildingQueue; }
+export function setWars(data) { _wars = data || []; window._wars = _wars; }
+export function setAlliances(data) { _alliances = data || []; window._alliances = _alliances; }
+export function setMyCountryId(id) { _myCountryId = id; window._myCountryId = id; }
+export function setGameActive(active) { _isGameActive = active; window._isGameActive = active; }
 export function setGameSpeed(speed) { 
     if (speed > 0) _lastSavedSpeed = speed;
     _gameSpeed = speed; 
     window._gameSpeed = speed;
 }
-export function setGameDate(date) { 
-    _gameDate = date; 
-    window._gameDate = date;
-}
-export function setTech(newTech) { 
-    Object.assign(_tech, newTech); 
-    window._tech = _tech;
-}
-export function setActiveResearch(research) { 
-    _activeResearch = research; 
-    window._activeResearch = research;
-}
-export function setActiveFocus(focus) { 
-    _activeFocus = focus; 
-    window._activeFocus = focus;
-}
-export function addCompletedFocus(id) { 
-    _completedFocuses.add(id); 
-    window._completedFocuses = _completedFocuses;
-}
-export function setPlayerResources(res) { 
-    Object.assign(_playerResources, res); 
-    window._playerResources = _playerResources;
-}
-export function setSelectedUnitId(id) { 
-    _selectedUnitId = id; 
-    window._selectedUnitId = id;
-}
-export function setActiveBattles(battles) { 
-    _activeBattles = battles || []; 
-    window._activeBattles = _activeBattles;
-}
+export function setGameDate(date) { _gameDate = date; window._gameDate = date; }
+export function setTech(newTech) { Object.assign(_tech, newTech); window._tech = _tech; }
+export function setActiveResearch(research) { _activeResearch = research; window._activeResearch = research; }
+export function setActiveFocus(focus) { _activeFocus = focus; window._activeFocus = focus; }
+export function addCompletedFocus(id) { _completedFocuses.add(id); window._completedFocuses = _completedFocuses; }
+export function setPlayerResources(res) { Object.assign(_playerResources, res); window._playerResources = _playerResources; }
+export function setSelectedUnitId(id) { _selectedUnitId = id; window._selectedUnitId = id; }
+export function setActiveBattles(battles) { _activeBattles = battles || []; window._activeBattles = _activeBattles; }
 
 // Сеттеры для ИИ
 export function setAIActiveFocus(countryId, focus) { _aiActiveFocus[countryId] = focus; }
@@ -168,10 +120,7 @@ export function addAlliance(a, b) {
 }
 
 export function addToBuildingQueue(item) {
-    _buildingQueue.push({
-        ...item,
-        daysLeft: item.daysLeft || 135
-    });
+    _buildingQueue.push({ ...item, daysLeft: item.daysLeft || 135 });
     window._buildingQueue = _buildingQueue;
 }
 
@@ -192,21 +141,12 @@ export function initializeFactories() {
     const cellStats = getCellStats();
     
     const countrySizes = {};
-    Object.values(gridData).forEach(id => {
-        countrySizes[id] = (countrySizes[id] || 0) + 1;
-    });
+    Object.values(gridData).forEach(id => { countrySizes[id] = (countrySizes[id] || 0) + 1; });
     
-    Object.keys(cellStats).forEach(pos => {
-        if (cellStats[pos]) cellStats[pos].factories = 0;
-    });
-    
+    Object.keys(cellStats).forEach(pos => { if (cellStats[pos]) cellStats[pos].factories = 0; });
     Object.keys(gridData).forEach(pos => {
         if (!cellStats[pos]) {
-            cellStats[pos] = {
-                population: Math.floor(Math.random() * 80000) + 5000,
-                factories: 0,
-                buildings: []
-            };
+            cellStats[pos] = { population: Math.floor(Math.random() * 80000) + 5000, factories: 0, buildings: [] };
         }
     });
     
@@ -218,10 +158,7 @@ export function initializeFactories() {
         else if (size >= 10) totalFactories = Math.floor(size * 0.15);
         else totalFactories = Math.max(1, Math.floor(size * 0.1));
         
-        const countryCells = Object.entries(gridData)
-            .filter(([pos, id]) => id === countryId)
-            .map(([pos]) => pos);
-        
+        const countryCells = Object.entries(gridData).filter(([pos, id]) => id === countryId).map(([pos]) => pos);
         const shuffled = countryCells.sort(() => Math.random() - 0.5);
         
         for (let i = 0; i < Math.min(totalFactories, shuffled.length); i++) {
@@ -229,13 +166,10 @@ export function initializeFactories() {
             if (cellStats[pos]) {
                 cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
                 const [x, y] = pos.split(',').map(Number);
-                const neighbors = [[0,1],[0,-1],[1,0],[-1,0]];
-                const isCoastal = neighbors.some(([dx, dy]) => !gridData[`${x+dx},${y+dy}`]);
+                const isCoastal = [[0,1],[0,-1],[1,0],[-1,0]].some(([dx, dy]) => !gridData[`${x+dx},${y+dy}`]);
                 if (isCoastal && Math.random() < 0.1) {
                     if (!cellStats[pos].buildings) cellStats[pos].buildings = [];
-                    if (!cellStats[pos].buildings.includes('port')) {
-                        cellStats[pos].buildings.push('port');
-                    }
+                    if (!cellStats[pos].buildings.includes('port')) cellStats[pos].buildings.push('port');
                 }
             }
         }
@@ -243,6 +177,136 @@ export function initializeFactories() {
     
     setCellStats(cellStats);
     console.log('✅ Заводы и порты распределены по всем странам');
+}
+
+// ========== СИСТЕМА СОХРАНЕНИЙ ==========
+export function saveGame(slot = 'autosave') {
+    const saveData = {
+        version: '2.0',
+        timestamp: Date.now(),
+        gridData: _gridData,
+        cellStats: _cellStats,
+        units: _units.map(u => ({ ...u })),
+        buildingQueue: [..._buildingQueue],
+        wars: [..._wars],
+        alliances: _alliances.map(a => [...a]),
+        myCountryId: _myCountryId,
+        isGameActive: _isGameActive,
+        gameSpeed: _gameSpeed,
+        lastSavedSpeed: _lastSavedSpeed,
+        gameDate: _gameDate.toISOString(),
+        tech: { ..._tech },
+        activeResearch: _activeResearch ? { ..._activeResearch } : null,
+        activeFocus: _activeFocus ? { ..._activeFocus } : null,
+        completedFocuses: [..._completedFocuses],
+        playerResources: { ..._playerResources },
+        selectedUnitId: _selectedUnitId,
+        activeBattles: _activeBattles.map(b => ({
+            attackerId: b.attacker?.id,
+            defenderId: b.defender?.id,
+            daysCounter: b.daysCounter
+        })),
+        aiActiveFocus: Object.fromEntries(Object.entries(_aiActiveFocus).map(([k, v]) => [k, v ? { ...v } : null])),
+        aiCompletedFocuses: Object.fromEntries(Object.entries(_aiCompletedFocuses).map(([k, v]) => [k, [...v]]))
+    };
+    
+    try {
+        localStorage.setItem(`hoi5_save_${slot}`, JSON.stringify(saveData));
+        console.log(`✅ Игра сохранена в слот "${slot}"`);
+        return true;
+    } catch (e) {
+        console.error('❌ Ошибка сохранения:', e);
+        return false;
+    }
+}
+
+export function loadGame(slot = 'autosave') {
+    try {
+        const raw = localStorage.getItem(`hoi5_save_${slot}`);
+        if (!raw) { console.warn(`⚠️ Слот "${slot}" пуст`); return false; }
+        
+        const data = JSON.parse(raw);
+        
+        _gridData = data.gridData || {};
+        _cellStats = data.cellStats || {};
+        _units = data.units || [];
+        _buildingQueue = data.buildingQueue || [];
+        _wars = data.wars || [];
+        _alliances = (data.alliances || []).map(a => new Set(a));
+        _myCountryId = data.myCountryId;
+        _isGameActive = data.isGameActive || false;
+        _gameSpeed = 1;
+        _lastSavedSpeed = data.lastSavedSpeed || 1;
+        _gameDate = data.gameDate ? new Date(data.gameDate) : new Date(1936, 0, 1);
+        _tech = data.tech || { industry: 1, infantry: 1, tank: 1 };
+        _activeResearch = data.activeResearch;
+        _activeFocus = data.activeFocus;
+        _completedFocuses = new Set(data.completedFocuses || []);
+        _playerResources = data.playerResources || { equipment: 1000, factories: 0, manpower: 500000 };
+        _selectedUnitId = data.selectedUnitId;
+        
+        _activeBattles = (data.activeBattles || []).map(b => ({
+            attacker: _units.find(u => u.id === b.attackerId) || null,
+            defender: _units.find(u => u.id === b.defenderId) || null,
+            daysCounter: b.daysCounter || 0
+        })).filter(b => b.attacker && b.defender);
+        
+        _aiActiveFocus = {};
+        if (data.aiActiveFocus) Object.entries(data.aiActiveFocus).forEach(([k, v]) => { _aiActiveFocus[k] = v; });
+        _aiCompletedFocuses = {};
+        if (data.aiCompletedFocuses) Object.entries(data.aiCompletedFocuses).forEach(([k, v]) => { _aiCompletedFocuses[k] = new Set(v || []); });
+        
+        window._gridData = _gridData;
+        window._cellStats = _cellStats;
+        window._units = _units;
+        window._buildingQueue = _buildingQueue;
+        window._wars = _wars;
+        window._alliances = _alliances;
+        window._myCountryId = _myCountryId;
+        window._isGameActive = _isGameActive;
+        window._gameSpeed = _gameSpeed;
+        window._gameDate = _gameDate;
+        window._tech = _tech;
+        window._activeResearch = _activeResearch;
+        window._activeFocus = _activeFocus;
+        window._completedFocuses = _completedFocuses;
+        window._playerResources = _playerResources;
+        window._selectedUnitId = _selectedUnitId;
+        window._activeBattles = _activeBattles;
+        
+        console.log(`✅ Игра загружена из слота "${slot}"`);
+        return true;
+    } catch (e) {
+        console.error('❌ Ошибка загрузки:', e);
+        return false;
+    }
+}
+
+export function getSaveSlots() {
+    const slots = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('hoi5_save_')) {
+            try {
+                const data = JSON.parse(localStorage.getItem(key));
+                slots.push({
+                    name: key.replace('hoi5_save_', ''),
+                    date: new Date(data.timestamp).toLocaleString(),
+                    gameDate: data.gameDate ? new Date(data.gameDate).toLocaleDateString() : '—'
+                });
+            } catch(e) {}
+        }
+    }
+    return slots.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function deleteSave(slot) {
+    localStorage.removeItem(`hoi5_save_${slot}`);
+    console.log(`🗑️ Слот "${slot}" удалён`);
+}
+
+export function autoSave() {
+    if (_isGameActive && _myCountryId) saveGame('autosave');
 }
 
 // ========== СБРОС ==========
