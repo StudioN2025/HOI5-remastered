@@ -1,12 +1,23 @@
+// utils.js — вспомогательные функции
+
 import { COUNTRIES } from './data.js';
 
 export function getCountryInfo(id) {
-    return COUNTRIES[id] || { name: id.toUpperCase(), color: "#555", leader: "?", ideology: "?" };
+    return COUNTRIES[id] || { 
+        name: id.toUpperCase(), 
+        color: generateColor(id), 
+        leader: "Неизвестно", 
+        ideology: "Нейтралитет" 
+    };
 }
 
 export function getCellData(key, cellStats) {
     if (!cellStats[key]) {
-        cellStats[key] = { population: Math.floor(Math.random() * 80000) + 5000, factories: 0, buildings: [] };
+        cellStats[key] = { 
+            population: Math.floor(Math.random() * 80000) + 5000, 
+            factories: Math.random() > 0.9 ? 1 : 0, 
+            buildings: [] 
+        };
     }
     return cellStats[key];
 }
@@ -33,17 +44,59 @@ export function areAllies(c1, c2, alliances) {
     return alliances.some(a => a.has(c1) && a.has(c2));
 }
 
+export function getEnemiesOf(countryId, wars) {
+    const enemies = [];
+    wars.forEach(w => {
+        if (w.a === countryId) enemies.push(w.b);
+        if (w.b === countryId) enemies.push(w.a);
+    });
+    return [...new Set(enemies)];
+}
+
+export function getAlliesOf(countryId, alliances) {
+    const allies = [];
+    alliances.forEach(a => {
+        if (a.has(countryId)) {
+            a.forEach(id => {
+                if (id !== countryId) allies.push(id);
+            });
+        }
+    });
+    return [...new Set(allies)];
+}
+
 export function addNotification(text, type = 'info') {
     const container = document.getElementById('notifications');
+    if (!container) return;
+    
     const notif = document.createElement('div');
-    notif.className = `p-3 rounded border-l-4 ${type === 'war' ? 'bg-red-900/80 border-red-500' : 'bg-blue-900/80 border-blue-500'} text-sm notification-slide`;
-    notif.innerHTML = `<strong>${type === 'war' ? '⚔️ ВОЙНА' : '📢 СООБЩЕНИЕ'}</strong><br>${text}`;
+    notif.className = type === 'war' ? 'notif-war' : 'notif-info';
+    notif.innerHTML = `<strong>${type === 'war' ? '⚔️ ВНИМАНИЕ' : '📢 СООБЩЕНИЕ'}</strong><br><span style="font-size:11px">${text}</span>`;
     container.appendChild(notif);
-    setTimeout(() => notif.remove(), 5000);
+    
+    setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.transition = 'opacity 0.3s';
+        setTimeout(() => notif.remove(), 300);
+    }, 5000);
+}
+
+export function generateColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    let color = '#';
+    for (let i = 0; i < 3; i++) {
+        let value = (hash >> (i * 8)) & 0xFF;
+        value = Math.floor(value * 0.7 + 50);
+        color += ('00' + value.toString(16)).substr(-2);
+    }
+    return color;
 }
 
 export function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
+    return Math.floor(num).toString();
 }
