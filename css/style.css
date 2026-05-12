@@ -25,14 +25,19 @@ body {
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* === ГЛАВНОЕ МЕНЮ === */
+.hidden {
+    display: none !important;
+}
+
+/* ========== ГЛАВНОЕ МЕНЮ ========== */
 #main-menu {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: radial-gradient(circle, rgba(0,0,0,0.2), rgba(0,0,0,0.95)),
+    background: radial-gradient(circle, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.95) 100%),
                 url('../assets/hoi5-backend.png') center/cover;
     display: flex;
     align-items: center;
@@ -55,9 +60,16 @@ body {
     font-size: clamp(28px, 8vw, 48px);
     font-weight: 900;
     letter-spacing: 0.2em;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     padding-bottom: 1rem;
     border-bottom: 4px solid rgba(0,0,0,0.3);
+    text-transform: uppercase;
+}
+
+.subtitle-main {
+    font-size: 0.5em;
+    letter-spacing: 0.3em;
+    color: #4b5320;
 }
 
 .subtitle {
@@ -91,34 +103,28 @@ body {
     box-shadow: 6px 6px 0px #000;
 }
 
-.hq-button.secondary {
-    background: #374151;
-}
-
 .version-text {
     font-size: 10px;
     opacity: 0.5;
     margin-top: 2rem;
     text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
-.hidden {
-    display: none !important;
-}
-
-/* === ВЫБОР СТРАНЫ === */
+/* ========== ВЫБОР СТРАНЫ ========== */
 #country-select {
     position: fixed;
     inset: 0;
     z-index: 2000;
-    background: rgba(0,0,0,0.9);
     display: flex;
     align-items: center;
     justify-content: center;
+    background: radial-gradient(circle, rgba(0,0,0,0.4), rgba(0,0,0,0.9)),
+                url('../assets/uploading-screan.png') center/cover;
 }
 
 .select-card {
-    background: var(--paper);
+    background: rgba(227, 209, 181, 0.92);
     color: #1a1a1a;
     padding: 2rem;
     border-radius: 8px;
@@ -127,6 +133,7 @@ body {
     max-width: 90vw;
     max-height: 80vh;
     overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .select-card h2 {
@@ -134,53 +141,66 @@ body {
     font-size: 24px;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid rgba(0,0,0,0.2);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+#country-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 #country-list button {
     width: 100%;
     text-align: left;
-    padding: 12px;
-    margin-bottom: 8px;
+    padding: 10px 12px;
     border: 1px solid #9ca3af;
     border-radius: 6px;
     font-weight: bold;
-    font-family: inherit;
+    font-family: 'Special Elite', 'Courier New', monospace;
+    font-size: 13px;
     cursor: pointer;
-    background: rgba(255,255,255,0.5);
+    background: rgba(255, 255, 255, 0.5);
     transition: all 0.2s;
 }
 
 #country-list button:hover {
     background: white;
     transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .cancel-btn {
     width: 100%;
     margin-top: 1rem;
-    padding: 10px;
+    padding: 12px;
     background: #991b1b;
     color: white;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
-    font-family: inherit;
+    font-family: 'Special Elite', 'Courier New', monospace;
+    font-size: 14px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
 .cancel-btn:hover {
     background: #7f1d1d;
 }
 
-/* === ИГРОВОЙ КОНТЕЙНЕР === */
+/* ========== ИГРОВОЙ КОНТЕЙНЕР ========== */
 #game-container {
     position: fixed;
     inset: 0;
     background: #1a1c1e;
 }
 
-/* === ВЕРХНЯЯ ПАНЕЛЬ === */
+/* ========== ВЕРХНЯЯ ПАНЕЛЬ ========== */
 #top-bar {
     position: fixed;
     top: 0;
@@ -189,22 +209,52 @@ body {
     height: 44px;
     background: rgba(17, 24, 39, 0.95);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     padding: 0 16px;
-    gap: 16px;
+    gap: 12px;
     z-index: 100;
-    font-size: 13px;
+    font-size: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
+.country-name {
+    font-weight: bold;
+    color: var(--gold);
+    font-size: 15px;
+    min-width: 100px;
+    white-space: nowrap;
 }
 
 .separator {
     color: #6b7280;
 }
 
+.stat-item {
+    white-space: nowrap;
+}
+
 .indicator {
     font-size: 10px;
+    white-space: nowrap;
+    padding: 2px 8px;
+    border-radius: 4px;
     animation: pulse 1.5s infinite;
+}
+
+.indicator-blue {
+    color: #60a5fa;
+}
+
+.indicator-yellow {
+    color: #fbbf24;
+}
+
+.indicator-green {
+    color: #4ade80;
 }
 
 @keyframes pulse {
@@ -224,12 +274,13 @@ body {
     background: #374151;
     color: white;
     border: none;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
     font-family: inherit;
     font-size: 10px;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .speed-btn:hover {
@@ -239,20 +290,22 @@ body {
 .speed-btn.active {
     background: var(--gold);
     color: black;
+    font-weight: bold;
 }
 
-#game-date {
+.date-display {
     background: rgba(0,0,0,0.5);
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 6px;
     font-family: monospace;
-    min-width: 120px;
+    min-width: 110px;
     text-align: center;
     border: 1px solid var(--border-color);
-    font-size: 12px;
+    font-size: 11px;
+    white-space: nowrap;
 }
 
-/* === ВКЛАДКИ === */
+/* ========== ВКЛАДКИ ========== */
 #game-tabs {
     position: fixed;
     top: 48px;
@@ -260,19 +313,21 @@ body {
     display: flex;
     gap: 2px;
     z-index: 100;
+    flex-wrap: wrap;
 }
 
 .tab-btn {
     background: #1f2937;
     color: #d1d5db;
     border: 1px solid var(--border-color);
-    padding: 6px 14px;
+    padding: 6px 12px;
     cursor: pointer;
     font-family: inherit;
     font-size: 10px;
     font-weight: bold;
     border-radius: 6px 6px 0 0;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -280,7 +335,13 @@ body {
     color: white;
 }
 
-/* === ОКНО ИНФОРМАЦИИ === */
+.tab-btn.active {
+    background: #854d0e;
+    border-color: var(--gold);
+    color: white;
+}
+
+/* ========== ОКНО ИНФОРМАЦИИ ========== */
 #info-window {
     position: fixed;
     top: 100px;
@@ -307,24 +368,30 @@ body {
 #window-title {
     font-weight: bold;
     color: var(--gold);
+    font-size: 14px;
 }
 
-#close-window {
+.close-btn {
     background: none;
     border: none;
     color: var(--war-red);
     font-size: 18px;
     cursor: pointer;
     padding: 4px 8px;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: #dc2626;
 }
 
 #window-content {
     padding: 16px;
-    max-height: 70vh;
+    max-height: 65vh;
     overflow-y: auto;
 }
 
-/* === КАНВАС === */
+/* ========== КАНВАС ========== */
 #map-canvas {
     position: fixed;
     inset: 0;
@@ -334,14 +401,16 @@ body {
     touch-action: none;
 }
 
-/* === БОКОВАЯ ПАНЕЛЬ === */
+/* ========== БОКОВАЯ ПАНЕЛЬ ========== */
 #info-sidebar {
     position: fixed;
     top: 100px;
     right: 16px;
     width: 300px;
+    max-width: calc(100vw - 32px);
     background: rgba(31, 41, 55, 0.95);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 16px;
@@ -361,15 +430,62 @@ body {
     color: var(--gold);
 }
 
-#close-sidebar {
-    background: none;
-    border: none;
-    color: #9ca3af;
-    font-size: 18px;
-    cursor: pointer;
+.sidebar-content {
+    font-size: 13px;
 }
 
-/* === ПОДСКАЗКА === */
+.sidebar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sidebar-label {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.sidebar-value {
+    font-size: 12px;
+    color: #e5e5e5;
+    font-weight: bold;
+}
+
+.value-green {
+    color: #4ade80;
+}
+
+.value-blue {
+    color: #60a5fa;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    margin: 8px 0;
+}
+
+#sidebar-actions {
+    margin-top: 8px;
+}
+
+#sidebar-actions button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    font-size: 12px;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+/* ========== ПОДСКАЗКА ========== */
 #hint {
     position: fixed;
     bottom: 24px;
@@ -383,14 +499,16 @@ body {
     z-index: 300;
     border: 1px solid rgba(234, 179, 8, 0.5);
     white-space: nowrap;
+    pointer-events: none;
 }
 
-/* === УВЕДОМЛЕНИЯ === */
+/* ========== УВЕДОМЛЕНИЯ ========== */
 #notifications {
     position: fixed;
     bottom: 16px;
     left: 16px;
     width: 320px;
+    max-width: calc(100vw - 32px);
     z-index: 400;
     display: flex;
     flex-direction: column;
@@ -404,16 +522,19 @@ body {
     border-radius: 8px;
     border-left: 4px solid;
     animation: slideIn 0.3s ease-out;
+    font-size: 12px;
 }
 
 .notif-war {
     background: rgba(185, 28, 28, 0.9);
     border-color: white;
+    color: white;
 }
 
 .notif-info {
     background: rgba(27, 58, 75, 0.9);
     border-color: var(--gold);
+    color: white;
 }
 
 @keyframes slideIn {
@@ -427,7 +548,7 @@ body {
     }
 }
 
-/* === КАРТОЧКИ === */
+/* ========== КАРТОЧКИ (ОБЩИЕ) ========== */
 .unit-card {
     background: #374151;
     padding: 12px;
@@ -436,80 +557,30 @@ body {
     margin-bottom: 8px;
 }
 
-/* === ПРОГРЕСС-БАР === */
 .progress-bar {
+    width: 100%;
+    height: 6px;
     background: #4b5563;
-    border-radius: 999px;
+    border-radius: 3px;
     overflow: hidden;
-    height: 4px;
     margin-top: 4px;
 }
 
 .progress-fill {
-    background: var(--gold);
     height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
     transition: width 0.3s;
 }
 
 .progress-fill-blue {
-    background: #3b82f6;
     height: 100%;
+    background: #3b82f6;
+    border-radius: 3px;
     transition: width 0.3s;
 }
 
-/* === СКРОЛЛ === */
-::-webkit-scrollbar {
-    width: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: #1f2937;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #6b7280;
-    border-radius: 3px;
-}
-
-/* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
-@media (max-width: 768px) {
-    #top-bar {
-        font-size: 10px;
-        padding: 0 8px;
-        gap: 8px;
-    }
-    
-    #game-tabs {
-        left: 8px;
-        right: 8px;
-    }
-    
-    .tab-btn {
-        flex: 1;
-        text-align: center;
-        padding: 6px 8px;
-        font-size: 8px;
-    }
-    
-    #info-window,
-    #info-sidebar {
-        left: 8px;
-        right: 8px;
-        width: auto;
-        top: 90px;
-    }
-    
-    .hq-folder {
-        padding: 1.5rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .separator {
-        display: none;
-    }
-}
-/* === РЕСУРСЫ В ОКНЕ АРМИИ === */
+/* ========== РЕСУРСЫ ========== */
 .resources-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -542,7 +613,7 @@ body {
     margin-top: 4px;
 }
 
-/* === СЕКЦИИ === */
+/* ========== СЕКЦИИ ========== */
 .section {
     margin-top: 16px;
 }
@@ -557,7 +628,7 @@ body {
     text-transform: uppercase;
 }
 
-/* === КАРТОЧКА НАЙМА === */
+/* ========== КАРТОЧКА НАЙМА ========== */
 .recruit-card {
     background: #374151;
     padding: 12px;
@@ -595,6 +666,7 @@ body {
     font-size: 11px;
     color: #d1d5db;
     margin-top: 4px;
+    flex-wrap: wrap;
 }
 
 .recruit-cost {
@@ -632,7 +704,7 @@ body {
     cursor: not-allowed;
 }
 
-/* === КАРТОЧКА ЮНИТА === */
+/* ========== КАРТОЧКА ЮНИТА ========== */
 .unit-card-item {
     background: #374151;
     padding: 12px;
@@ -712,7 +784,7 @@ body {
     text-align: right;
 }
 
-/* === СТРОИТЕЛЬСТВО === */
+/* ========== СТРОИТЕЛЬСТВО ========== */
 .resource-bar {
     background: #374151;
     padding: 12px;
@@ -728,6 +800,7 @@ body {
     border: 1px solid #3b82f6;
     padding: 12px;
     border-radius: 8px;
+    margin-bottom: 16px;
 }
 
 .construction-header {
@@ -785,11 +858,12 @@ body {
     font-family: inherit;
 }
 
-/* === ДИПЛОМАТИЯ === */
+/* ========== ДИПЛОМАТИЯ ========== */
 .diplo-section {
     background: #1f2937;
     padding: 16px;
     border-radius: 8px;
+    margin-bottom: 12px;
 }
 
 .diplo-title {
@@ -882,76 +956,82 @@ body {
     background: #6b7280;
 }
 
-/* === БОКОВАЯ ПАНЕЛЬ === */
-.sidebar-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+/* ========== СКРОЛЛ ========== */
+::-webkit-scrollbar {
+    width: 6px;
 }
 
-.sidebar-label {
-    font-size: 12px;
-    color: #9ca3af;
+::-webkit-scrollbar-track {
+    background: #1f2937;
 }
 
-.sidebar-value {
-    font-size: 13px;
-    color: #e5e5e5;
-    font-weight: bold;
-}
-
-.value-green {
-    color: #4ade80;
-}
-
-.value-blue {
-    color: #60a5fa;
-}
-
-.sidebar-divider {
-    height: 1px;
-    background: rgba(255,255,255,0.1);
-    margin: 8px 0;
-}
-
-/* === ПРОГРЕСС-БАР === */
-.progress-bar {
-    width: 100%;
-    height: 6px;
-    background: #374151;
+::-webkit-scrollbar-thumb {
+    background: #6b7280;
     border-radius: 3px;
-    overflow: hidden;
 }
 
-.progress-fill {
-    height: 100%;
-    background: #eab308;
-    border-radius: 3px;
-    transition: width 0.3s;
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
 }
 
-.progress-fill-blue {
-    height: 100%;
-    background: #3b82f6;
-    border-radius: 3px;
-    transition: width 0.3s;
-}
-
-/* === АДАПТИВНОСТЬ === */
+/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ ========== */
 @media (max-width: 768px) {
+    .hq-folder {
+        padding: 1.5rem;
+    }
+    
+    #top-bar {
+        height: auto;
+        min-height: 44px;
+        padding: 4px 8px;
+        gap: 6px;
+        font-size: 10px;
+    }
+    
+    .separator {
+        display: none;
+    }
+    
+    .speed-btn {
+        padding: 3px 6px;
+        font-size: 9px;
+    }
+    
+    .date-display {
+        font-size: 9px;
+        min-width: 90px;
+    }
+    
+    #game-tabs {
+        left: 8px;
+        right: 8px;
+        top: auto;
+        top: 48px;
+    }
+    
+    .tab-btn {
+        flex: 1;
+        text-align: center;
+        padding: 6px 8px;
+        font-size: 8px;
+    }
+    
+    #info-window,
+    #info-sidebar {
+        left: 8px;
+        right: 8px;
+        width: auto;
+        top: 90px;
+    }
+    
+    .select-card {
+        width: 90vw;
+        padding: 1rem;
+    }
+    
     .resources-grid {
         grid-template-columns: repeat(3, 1fr);
         gap: 4px;
-    }
-    
-    .resource-card {
-        padding: 8px 4px;
-    }
-    
-    .resource-value {
-        font-size: 14px;
     }
     
     .recruit-card {
@@ -960,19 +1040,19 @@ body {
     }
     
     .btn-recruit {
-        margin-top: 8px;
         text-align: center;
+        margin-top: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .country-name {
+        font-size: 12px;
+        min-width: 60px;
     }
     
-    .unit-card-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .diplo-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+    #country-list button {
+        font-size: 10px;
+        padding: 8px;
     }
 }
