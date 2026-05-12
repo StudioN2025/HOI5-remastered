@@ -1,4 +1,4 @@
-// map.js — ОПТИМИЗИРОВАННАЯ ВЕРСИЯ БЕЗ ЛАГОВ
+// map.js — ПОЛНАЯ ОПТИМИЗИРОВАННАЯ ВЕРСИЯ СО СТРЕЛОЧКАМИ
 
 import { getCountryInfo, getCellData } from './utils.js';
 import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId, getCellStats } from './game.js';
@@ -15,7 +15,7 @@ const CELL_SIZE = 20;
 let camera = { x: 0, y: 0, zoom: 0.8 };
 let hoverCell = null;
 
-// Оффскрин-канвас для кэширования
+// Оффскрин-канвас для кэширования статики
 let offscreenCanvas = null;
 let offscreenCtx = null;
 let cacheValid = false;
@@ -63,6 +63,7 @@ function isSameRange(a, b) {
            a.startY === b.startY && a.endY === b.endY;
 }
 
+// Рендер статики в оффскрин
 function renderToOffscreen(range) {
     if (!offscreenCanvas || offscreenCanvas.width !== canvas.width || offscreenCanvas.height !== canvas.height) {
         offscreenCanvas = document.createElement('canvas');
@@ -97,7 +98,7 @@ function renderToOffscreen(range) {
     }
 
     // Сетка и иконки
-    ctx2.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx2.strokeStyle = 'rgba(0,0,0,0.06)';
     ctx2.lineWidth = 0.5;
     
     for (const [pos, id] of Object.entries(gridData)) {
@@ -157,12 +158,14 @@ function renderToOffscreen(range) {
     cachedVisibleRange = { ...range };
 }
 
+// Основная функция рендера
 export function renderMap() {
     if (!ctx) return;
     
     const range = getVisibleRange();
     const gridData = getGridData();
     const units = getUnits();
+    const myId = getMyCountryId();
     const selectedUnitId = getSelectedUnitId();
     
     // Кэшированная отрисовка статики
@@ -175,14 +178,95 @@ export function renderMap() {
         ctx.drawImage(offscreenCanvas, 0, 0);
     }
     
-    // Поверх рисуем динамику (юниты, ховер)
+    // Поверх рисуем динамику
     ctx.save();
     ctx.translate(canvas.width / 2 - camera.x * camera.zoom, canvas.height / 2 - camera.y * camera.zoom);
     ctx.scale(camera.zoom, camera.zoom);
     
     const { startX, endX, startY, endY } = range;
 
-    // Юниты
+    // ========== СТРЕЛКИ ПУТИ ==========
+    const now = Date.now();
+    
+    for (const u of units) {
+        if (!u?.path || u.path.length === 0) continue;
+        if (u.owner !== myId && u.id !== selectedUnitId) continue;
+        
+        const [sx, sy] = u.pos.split(',').map(Number);
+        
+        // Если юнит не в видимой области и не выбран — пропускаем
+        if (sx < startX || sx > endX || sy < startY || sy > endY) {
+            if (u.id !== selectedUnitId) continue;
+        }
+        
+        // Конечная точка пути
+        const lastStep = u.path[u.path.length - 1];
+        const [ex, ey] = lastStep.split(',').map(Number);
+        
+        // Пульсирующая точка в конце
+        const pulse = Math.sin(now / 400) * 0.3 + 0.7;
+        const endCX = ex * CELL_SIZE + CELL_SIZE / 2;
+        const endCY = ey * CELL_SIZE + CELL_SIZE / 2;
+        
+        ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(endCX, endCY, CELL_SIZE * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Линия пути (упрощённая — каждые 4 клетки)
+        ctx.strokeStyle = `rgba(255, 215, 0, 0.4)`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        
+        let firstPoint = true;
+        for (let i = 0; i < u.path.length; i += 4) {
+            const [px, py] = u.path[i].split(',').map(Number);
+            const pxC = px * CELL_SIZE + CELL_SIZE / 2;
+            const pyC = py * CELL_SIZE + CELL_SIZE / 2;
+            
+            if (firstPoint) {
+                ctx.moveTo(sx * CELL_SIZE + CELL_SIZE / 2, sy * CELL_SIZE + CELL_SIZE / 2);
+                firstPoint = false;
+            }
+            ctx.lineTo(pxC, pyC);
+        }
+        // Последняя точка — конец пути
+        ctx.lineTo(endCX, endCY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Маленькие стрелочки через каждые 6 клеток
+        for (let i = 5; i < u.path.length; i += 6) {
+            const [px, py] = u.path[i].split(',').map(Number);
+            const [prevX, prevY] = u.path[i - 1].split(',').map(Number);
+            
+            const arrowCX = px * CELL_SIZE + CELL_SIZE / 2;
+            const arrowCY = py * CELL_SIZE + CELL_SIZE / 2;
+            const angle = Math.atan2(py - prevY, px - prevX);
+            
+            const arrowSize = CELL_SIZE * 0.3;
+            
+            ctx.fillStyle = `rgba(255, 215, 0, 0.6)`;
+            ctx.beginPath();
+            ctx.moveTo(arrowCX, arrowCY);
+            ctx.lineTo(
+                arrowCX - arrowSize * Math.cos(angle - Math.PI / 6),
+                arrowCY - arrowSize * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                arrowCX - arrowSize * Math.cos(angle + Math.PI / 6),
+                arrowCY - arrowSize * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fill();
+        }
+    }
+
+    // ========== ЮНИТЫ ==========
     if (units.length > 0) {
         for (const u of units) {
             if (!u?.pos) continue;
@@ -197,10 +281,16 @@ export function renderMap() {
             if (selectedUnitId && u.id === selectedUnitId) {
                 ctx.strokeStyle = '#fbbf24';
                 ctx.lineWidth = 2;
+                ctx.setLineDash([]);
                 ctx.strokeRect(ux * CELL_SIZE - 1, uy * CELL_SIZE - 1, CELL_SIZE + 2, CELL_SIZE + 2);
+                
+                // Дополнительное свечение
+                ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(ux * CELL_SIZE - 2, uy * CELL_SIZE - 2, CELL_SIZE + 4, CELL_SIZE + 4);
             }
             
-            // Иконка
+            // Иконка юнита
             ctx.font = '14px serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -225,29 +315,39 @@ export function renderMap() {
                 const bx = ux * CELL_SIZE + (CELL_SIZE - bw) / 2;
                 const by = uy * CELL_SIZE + CELL_SIZE - 5;
                 
+                // Фон
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
                 ctx.fillRect(bx, by, bw, 3);
-                ctx.fillStyle = '#ef4444';
-                ctx.fillRect(bx, by, bw, 3);
-                ctx.fillStyle = '#22c55e';
+                
+                // Полоска HP
+                const hpColor = hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444';
+                ctx.fillStyle = hpColor;
                 ctx.fillRect(bx, by, bw * hpPercent, 3);
+            }
+            
+            // Индикатор своего/чужого
+            if (u.owner !== myId) {
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+                ctx.fillRect(ux * CELL_SIZE, uy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             }
         }
     }
 
-    // Ховер
+    // ========== ХОВЕР ==========
     if (hoverCell && gridData[hoverCell]) {
         const [hx, hy] = hoverCell.split(',').map(Number);
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.fillRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.lineWidth = 1;
+        ctx.setLineDash([]);
         ctx.strokeRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
 
     ctx.restore();
 }
 
+// Обновление камеры
 export function updateCamera() {
     const keys = window._keys || {};
     const speed = 12 / camera.zoom;
@@ -264,9 +364,10 @@ export function updateCamera() {
     }
 }
 
+// Настройка событий
 export function setupMapEvents() {
     let lastRender = 0;
-    const RENDER_INTERVAL = 1000 / 30; // 30 FPS максимум
+    const RENDER_INTERVAL = 1000 / 30;
     
     function throttledRender() {
         const now = performance.now();
@@ -279,22 +380,34 @@ export function setupMapEvents() {
     // Зум
     canvas.addEventListener('wheel', e => {
         e.preventDefault();
-        camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.1), 8);
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        const worldBefore = screenToWorld(e.clientX, e.clientY);
+        
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        camera.zoom = Math.min(Math.max(camera.zoom * zoomFactor, 0.1), 8);
+        
+        const worldAfter = screenToWorld(e.clientX, e.clientY);
+        camera.x += worldBefore.x - worldAfter.x;
+        camera.y += worldBefore.y - worldAfter.y;
+        
         cacheValid = false;
         renderMap();
     }, { passive: false });
 
-    // Мышь — ховер с троттлингом
+    // Мышь
     canvas.addEventListener('mousemove', e => {
-        const rect = canvas.getBoundingClientRect();
         const world = screenToWorld(e.clientX, e.clientY);
         const newHover = `${world.x},${world.y}`;
+        const gridData = getGridData();
         
-        if (getGridData()[newHover] && hoverCell !== newHover) {
+        if (gridData[newHover] && hoverCell !== newHover) {
             hoverCell = newHover;
             cacheValid = false;
             throttledRender();
-        } else if (!getGridData()[newHover] && hoverCell) {
+        } else if (!gridData[newHover] && hoverCell) {
             hoverCell = null;
             cacheValid = false;
             throttledRender();
@@ -309,15 +422,19 @@ export function setupMapEvents() {
 
     // Клавиши
     window._keys = {};
-    window.addEventListener('keydown', e => { window._keys[e.code] = true; });
-    window.addEventListener('keyup', e => { window._keys[e.code] = false; });
+    window.addEventListener('keydown', e => { 
+        window._keys[e.code] = true; 
+    });
+    window.addEventListener('keyup', e => { 
+        window._keys[e.code] = false; 
+    });
 
-    // Обновление камеры — тоже с троттлингом
     setInterval(() => {
         updateCamera();
     }, 1000 / 30);
 }
 
+// Инициализация
 resizeCanvas();
 window.addEventListener('resize', () => {
     resizeCanvas();
