@@ -1,12 +1,12 @@
 // main.js — главный файл, точка входа
 
-import { COUNTRIES, UNIT_STATS, BUILDING_STATS, DEMO_MAP } from './data.js';
+import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
     getGridData, setGridData, getCellStats, setCellStats, setMyCountryId, setGameActive,
     setGameSpeed, setGameDate, setUnits, setBuildingQueue, setPlayerResources,
     getMyCountryId, getPlayerResources, getBuildingQueue, getUnits, getGameSpeed,
     getActiveResearch, getActiveFocus, getSelectedUnitId, setSelectedUnitId,
-    advanceDay, getDateString, getTech, setGameDate as setDate
+    advanceDay, getDateString, getTech
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, screenToWorld } from './map.js';
 import { deployUnit, giveOrder, processMovement, processCombat } from './military.js';
@@ -16,7 +16,6 @@ import { updateFocus } from './focuses.js';
 import { runAllAI } from './ai.js';
 import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint } from './ui.js';
 import { getCountryInfo, addNotification } from './utils.js';
-import { declareWar } from './diplomacy.js';
 
 // Глобальные данные
 window._gridData = {};
@@ -32,6 +31,23 @@ window.setPlayerResources = setPlayerResources;
 
 let gameLoopId = null;
 
+// ========== ЗАГРУЗКА КАРТЫ ИЗ ПАПКИ MAPS ==========
+async function loadMapFromFile(filename) {
+    try {
+        const response = await fetch(`maps/${filename}`);
+        if (!response.ok) {
+            throw new Error(`Не удалось загрузить карту: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(`✅ Карта "${filename}" загружена`);
+        return data;
+    } catch (error) {
+        console.error('❌ Ошибка загрузки карты:', error);
+        addNotification(`Ошибка загрузки карты: ${error.message}`, 'war');
+        return null;
+    }
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 async function init() {
     console.log('🚀 HOI V Remastered v2.0');
@@ -41,39 +57,24 @@ async function init() {
     renderMap();
     
     // Кнопка "Начать игру" в меню
-    document.getElementById('btn-play').onclick = () => {
-        setGridData(DEMO_MAP.gridData);
-        setCellStats(DEMO_MAP.cellStats);
+    document.getElementById('btn-play').onclick = async () => {
+        // Загружаем карту из папки maps
+        const mapData = await loadMapFromFile('europe.json');
         
-        const countries = [...new Set(Object.values(DEMO_MAP.gridData))];
-        showCountrySelection(countries);
-    };
-    
-    // Кнопка загрузки карты
-    document.getElementById('btn-load-map').onclick = () => {
-        document.getElementById('map-file-input').click();
-    };
-    
-    // Обработчик загрузки файла
-    document.getElementById('map-file-input').onchange = (e) => {
-        if (e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const data = JSON.parse(ev.target.result);
-                    setGridData(data.gridData || data);
-                    setCellStats(data.cellStats || {});
-                    
-                    const countries = [...new Set(Object.values(getGridData()))];
-                    showCountrySelection(countries);
-                    
-                    addNotification(`Карта "${e.target.files[0].name}" загружена!`, 'info');
-                } catch(err) {
-                    addNotification('Ошибка загрузки JSON файла', 'war');
-                }
-            };
-            reader.readAsText(e.target.files[0]);
+        if (!mapData) {
+            addNotification('Не удалось загрузить карту. Проверьте наличие файла maps/europe.json', 'war');
+            return;
         }
+        
+        // Устанавливаем данные карты
+        setGridData(mapData.gridData || {});
+        setCellStats(mapData.cellStats || {});
+        
+        // Получаем список стран
+        const countries = [...new Set(Object.values(getGridData()))];
+        showCountrySelection(countries);
+        
+        addNotification('Карта Европы (1936) загружена!', 'info');
     };
     
     // Кнопка отмены выбора страны
