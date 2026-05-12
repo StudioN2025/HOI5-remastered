@@ -509,3 +509,470 @@ body {
         display: none;
     }
 }
+/* === РЕСУРСЫ В ОКНЕ АРМИИ === */
+.resources-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.resource-card {
+    background: #374151;
+    padding: 12px 8px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.resource-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.resource-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #eab308;
+}
+
+.resource-label {
+    font-size: 9px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+/* === СЕКЦИИ === */
+.section {
+    margin-top: 16px;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #eab308;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #374151;
+    text-transform: uppercase;
+}
+
+/* === КАРТОЧКА НАЙМА === */
+.recruit-card {
+    background: #374151;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid #eab308;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.recruit-info {
+    flex: 1;
+}
+
+.recruit-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.recruit-icon {
+    font-size: 24px;
+}
+
+.recruit-name {
+    font-weight: bold;
+    color: white;
+}
+
+.recruit-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #d1d5db;
+    margin-top: 4px;
+}
+
+.recruit-cost {
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    color: #9ca3af;
+    margin-top: 4px;
+}
+
+.btn-recruit {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-active {
+    background: #15803d;
+    color: white;
+}
+
+.btn-active:hover {
+    background: #16a34a;
+}
+
+.btn-disabled {
+    background: #4b5563;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* === КАРТОЧКА ЮНИТА === */
+.unit-card-item {
+    background: #374151;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.unit-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.unit-card-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.unit-icon {
+    font-size: 24px;
+}
+
+.unit-name {
+    font-weight: bold;
+    color: white;
+    font-size: 14px;
+}
+
+.unit-status {
+    font-size: 10px;
+}
+
+.btn-select {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    background: #2563eb;
+    color: white;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-select:hover {
+    background: #3b82f6;
+}
+
+.unit-hp-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hp-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: #4b5563;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.hp-bar-fill {
+    height: 100%;
+    background: #22c55e;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.hp-text {
+    font-size: 10px;
+    color: #9ca3af;
+    min-width: 60px;
+    text-align: right;
+}
+
+/* === СТРОИТЕЛЬСТВО === */
+.resource-bar {
+    background: #374151;
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.construction-active {
+    background: rgba(30, 58, 138, 0.3);
+    border: 1px solid #3b82f6;
+    padding: 12px;
+    border-radius: 8px;
+}
+
+.construction-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.construction-days {
+    color: #93c5fd;
+}
+
+.build-card {
+    background: #374151;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.build-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.build-icon {
+    font-size: 28px;
+}
+
+.build-name {
+    font-weight: bold;
+    color: white;
+    font-size: 14px;
+}
+
+.build-cost {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+.btn-build {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+/* === ДИПЛОМАТИЯ === */
+.diplo-section {
+    background: #1f2937;
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.diplo-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #374151;
+}
+
+.diplo-allies {
+    color: #4ade80;
+}
+
+.diplo-enemies {
+    color: #f87171;
+}
+
+.diplo-empty {
+    text-align: center;
+    color: #6b7280;
+    padding: 16px;
+    font-size: 12px;
+    font-style: italic;
+}
+
+.diplo-card {
+    background: #374151;
+    padding: 12px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.enemy-card {
+    border-left: 4px solid #ef4444;
+}
+
+.diplo-country {
+    font-weight: bold;
+    color: white;
+}
+
+.diplo-ideology {
+    font-size: 10px;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+.diplo-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.diplo-status-war {
+    color: #f87171;
+    font-size: 11px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.btn-red {
+    background: #991b1b;
+    color: white;
+}
+
+.btn-red:hover {
+    background: #b91c1c;
+}
+
+.btn-gray {
+    background: #4b5563;
+    color: white;
+}
+
+.btn-gray:hover {
+    background: #6b7280;
+}
+
+/* === БОКОВАЯ ПАНЕЛЬ === */
+.sidebar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sidebar-label {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.sidebar-value {
+    font-size: 13px;
+    color: #e5e5e5;
+    font-weight: bold;
+}
+
+.value-green {
+    color: #4ade80;
+}
+
+.value-blue {
+    color: #60a5fa;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    margin: 8px 0;
+}
+
+/* === ПРОГРЕСС-БАР === */
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #374151;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #eab308;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.progress-fill-blue {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+/* === АДАПТИВНОСТЬ === */
+@media (max-width: 768px) {
+    .resources-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+    
+    .resource-card {
+        padding: 8px 4px;
+    }
+    
+    .resource-value {
+        font-size: 14px;
+    }
+    
+    .recruit-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .btn-recruit {
+        margin-top: 8px;
+        text-align: center;
+    }
+    
+    .unit-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .diplo-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
