@@ -1,416 +1,307 @@
-import { getCountryInfo, addNotification } from './utils.js';
-import { getMyCountryId, getWars, getAlliances, getUnits, getResources, getBuildingQueue } from './game.js';
-import { UNIT_STATS, BUILDING_STATS } from './data.js';
-import { declareWar, proposeAlliance } from './diplomacy.js';
+// ui.js — пользовательский интерфейс
 
-// Определение мобильного устройства
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+import { getMyCountryId, getPlayerResources, getBuildingQueue, getWars, getAlliances, getTech, getActiveResearch, getActiveFocus, getCompletedFocuses, getUnits, getGameSpeed } from './game.js';
+import { UNIT_STATS, BUILDING_STATS, TECH_TREE, COUNTRIES } from './data.js';
+import { getCountryInfo, getCellData, calculateCountryStats, isAtWar, areAllies, getEnemiesOf, getAlliesOf, addNotification } from './utils.js';
+import { declareWar, proposeAlliance, kickFromAlliance, callToWar } from './diplomacy.js';
+import { setRecruitMode, clearRecruitMode, getRecruitMode } from './military.js';
 
-if (isMobile) {
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('button, .tab-btn, .speed-btn').forEach(btn => {
-            btn.style.minHeight = '44px';
-            btn.style.touchAction = 'manipulation';
-        });
+// Глобальные ссылки для onclick из HTML
+window.startResearch = async (type, level) => {
+    const { startResearch } = await import('./tech.js');
+    startResearch(type, level);
+    openWindow('research');
+};
+
+window.startFocus = async (focusId) => {
+    const { startFocus } = await import('./focuses.js');
+    startFocus(focusId);
+    openWindow('focus');
+};
+
+window.selectUnitForMove = (unitId) => {
+    import('./game.js').then(m => {
+        m.setSelectedUnitId(unitId);
+        closeWindow();
+        showHint('Выберите цель для движения юнита');
+        setTimeout(() => document.getElementById('order-hint')?.classList.add('hidden'), 10000);
     });
-}
+};
 
-// ЭКСПОРТ ДЛЯ main.js
-export function openTab(tab) {
-    console.log('openTab called:', tab);
-    const windowDiv = document.getElementById('info-window');
-    const content = document.getElementById('window-content');
+window.recruitUnit = (type) => {
+    setRecruitMode(type);
+    closeWindow();
+    document.getElementById('recruit-hint')?.classList.remove('hidden');
+};
+
+window.declareWarOn = (id) => {
+    declareWar(id);
+    const sidebar = document.getElementById('info-sidebar');
+    if (sidebar) sidebar.classList.add('hidden');
+};
+
+window.proposeAlly = (id) => {
+    proposeAlliance(id);
+    const sidebar = document.getElementById('info-sidebar');
+    if (sidebar) sidebar.classList.add('hidden');
+};
+
+export function openWindow(tab) {
+    const win = document.getElementById('info-window');
     const title = document.getElementById('window-title');
+    const content = document.getElementById('window-content');
     
-    if (!windowDiv || !content || !title) {
-        console.error('Window elements not found');
-        return;
-    }
+    if (!win || !title || !content) return;
     
-    windowDiv.classList.remove('hidden');
+    win.classList.remove('hidden');
     
-    if (tab === 'army') {
-        title.innerText = '🎖️ АРМИЯ';
-        renderArmy(content);
-    } else if (tab === 'build') {
-        title.innerText = '🏗️ СТРОИТЕЛЬСТВО';
-        renderBuild(content);
-    } else if (tab === 'diplomacy') {
-        title.innerText = '🤝 ДИПЛОМАТИЯ';
-        renderDiplomacy(content);
-    } else if (tab === 'research') {
-        title.innerText = '🔬 ТЕХНОЛОГИИ';
-        renderResearch(content);
-    } else if (tab === 'focus') {
-        title.innerText = '⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ';
-        renderFocus(content);
+    switch(tab) {
+        case 'army': renderArmyWindow(title, content); break;
+        case 'research': renderResearchWindow(title, content); break;
+        case 'focus': renderFocusWindow(title, content); break;
+        case 'diplomacy': renderDiplomacyWindow(title, content); break;
+        case 'build': renderBuildWindow(title, content); break;
     }
 }
 
 export function closeWindow() {
-    const windowDiv = document.getElementById('info-window');
-    if (windowDiv) windowDiv.classList.add('hidden');
+    document.getElementById('info-window')?.classList.add('hidden');
 }
 
-window.openTab = openTab;
-window.closeWindow = closeWindow;
-
-function renderArmy(container) {
-    const units = getUnits();
-    const myId = getMyCountryId();
-    const myUnits = units.filter(u => u.owner === myId);
-    const resources = getResources();
-    
-    let html = `
-        <div class="space-y-3 mb-4">
-            <div class="bg-gray-700 p-3 rounded-lg">
-                <div class="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                        <div class="text-xs text-gray-400">🔫 СНАРЯЖЕНИЕ</div>
-                        <div class="text-lg font-bold text-yellow-400">${Math.floor(resources.equipment).toLocaleString()}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">👥 ЛЮДИ</div>
-                        <div class="text-lg font-bold text-emerald-400">${Math.floor(resources.manpower).toLocaleString()}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">🏭 ЗАВОДЫ</div>
-                        <div class="text-lg font-bold text-blue-400">${resources.factories}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="font-bold text-yellow-500 text-sm mb-2">🆕 НАБОР ВОЙСК</div>
-            <div class="space-y-2">
-    `;
-    
-    Object.entries(UNIT_STATS).forEach(([key, u]) => {
-        const canAfford = resources.equipment >= u.cost && resources.manpower >= u.manpower;
-        html += `
-            <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-yellow-500">
-                <div class="flex justify-between items-center flex-wrap gap-2">
-                    <div>
-                        <span class="text-2xl">${u.icon}</span>
-                        <span class="font-bold text-white ml-2">${u.name}</span>
-                        <div class="text-xs text-gray-300 mt-1">⚔️ Атака: ${u.attack} | 🛡️ Защита: ${u.defense} | ❤️ HP: ${u.hp}</div>
-                        <div class="text-[10px] text-gray-400">💰 ${u.cost} 🔫 | 👥 ${u.manpower} чел</div>
-                    </div>
-                    <button onclick="window.recruitUnit('${key}')" 
-                        class="px-3 py-1.5 text-xs rounded-lg font-bold transition ${canAfford ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-gray-600 cursor-not-allowed'} text-white"
-                        ${!canAfford ? 'disabled' : ''}>
-                        НАБРАТЬ
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += `
-            </div>
-            <div class="mt-4">
-                <div class="font-bold text-yellow-500 text-sm mb-2">⚔️ ВОЙСКА (${myUnits.length})</div>
-                <div class="space-y-2 max-h-60 overflow-y-auto">
-    `;
-    
-    if (myUnits.length === 0) {
-        html += '<div class="text-center text-gray-500 py-4">Нет войск. Наберите новые!</div>';
-    } else {
-        myUnits.forEach(u => {
-            const stats = UNIT_STATS[u.type];
-            const hpPercent = u.hp ? (u.hp / stats.hp * 100) : 100;
-            html += `
-                <div class="bg-gray-700 p-2 rounded-lg">
-                    <div class="flex justify-between items-center flex-wrap gap-2">
-                        <div>
-                            <span class="text-xl">${stats.icon}</span>
-                            <span class="font-bold text-white ml-1">${stats.name}</span>
-                            ${u.trainingDaysLeft > 0 ? `<span class="text-xs text-yellow-400 ml-2">(тренировка: ${u.trainingDaysLeft} дн.)</span>` : '<span class="text-xs text-green-400 ml-2">✓ готов</span>'}
-                        </div>
-                        <button onclick="window.selectUnitForMove('${u.id}')" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 text-xs rounded text-white">ВЫБРАТЬ</button>
-                    </div>
-                    <div class="mt-1">
-                        <div class="flex justify-between text-xs text-gray-400 mb-0.5">
-                            <span>❤️ Здоровье</span>
-                            <span>${Math.floor(u.hp || stats.hp)}/${stats.hp}</span>
-                        </div>
-                        <div class="w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                            <div class="bg-green-500 h-full rounded-full" style="width: ${hpPercent}%"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-    }
-    
-    html += `
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-function renderBuild(container) {
-    const resources = getResources();
-    const buildingQueue = getBuildingQueue();
-    
-    let html = `
-        <div class="space-y-3">
-            <div class="bg-gray-700 p-3 rounded-lg text-center">
-                <div class="text-xs text-gray-400">🔫 ДОСТУПНО СНАРЯЖЕНИЯ</div>
-                <div class="text-2xl font-bold text-yellow-400">${Math.floor(resources.equipment).toLocaleString()}</div>
-            </div>
-    `;
-    
-    if (buildingQueue.length > 0) {
-        const current = buildingQueue[0];
-        const stats = BUILDING_STATS[current.type];
-        const progress = ((stats.buildTime - current.daysLeft) / stats.buildTime) * 100;
-        html += `
-            <div class="bg-blue-900/50 border border-blue-500 p-3 rounded-lg">
-                <div class="flex justify-between text-sm mb-1">
-                    <span class="text-white">🏗️ СТРОИТСЯ: ${stats.name}</span>
-                    <span class="text-blue-300">${current.daysLeft} дн.</span>
-                </div>
-                <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                    <div class="bg-blue-500 h-full rounded-full transition-all" style="width: ${progress}%"></div>
-                </div>
-            </div>
-        `;
-    }
-    
-    html += `
-            <div class="font-bold text-yellow-500 text-sm mb-2">📦 ДОСТУПНЫЕ ПОСТРОЙКИ</div>
-            <div class="space-y-2">
-                <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-blue-500">
-                    <div class="flex justify-between items-center flex-wrap gap-2">
-                        <div>
-                            <span class="text-2xl">🏭</span>
-                            <span class="font-bold text-white ml-2">ВОЕННЫЙ ЗАВОД</span>
-                            <div class="text-xs text-gray-300 mt-1">Увеличивает производство снаряжения на +1.5 в день</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-yellow-400 font-bold">500 🔫</div>
-                            <button onclick="window.buildFactory()" 
-                                class="mt-1 px-3 py-1 text-xs rounded-lg font-bold ${resources.equipment >= 500 ? 'bg-blue-700 hover:bg-blue-600' : 'bg-gray-600 cursor-not-allowed'} text-white"
-                                ${resources.equipment >= 500 ? '' : 'disabled'}>
-                                ПОСТРОИТЬ
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-cyan-500">
-                    <div class="flex justify-between items-center flex-wrap gap-2">
-                        <div>
-                            <span class="text-2xl">⚓</span>
-                            <span class="font-bold text-white ml-2">МОРСКОЙ ПОРТ</span>
-                            <div class="text-xs text-gray-300 mt-1">Позволяет морские десанты и переброски</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-yellow-400 font-bold">300 🔫</div>
-                            <button onclick="window.buildPort()" 
-                                class="mt-1 px-3 py-1 text-xs rounded-lg font-bold ${resources.equipment >= 300 ? 'bg-cyan-700 hover:bg-cyan-600' : 'bg-gray-600 cursor-not-allowed'} text-white"
-                                ${resources.equipment >= 300 ? '' : 'disabled'}>
-                                ПОСТРОИТЬ
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-function renderDiplomacy(container) {
-    const myId = getMyCountryId();
-    const wars = getWars();
-    const alliances = getAlliances();
-    
-    const enemies = [];
-    wars.forEach(w => {
-        if (w.a === myId) enemies.push(w.b);
-        if (w.b === myId) enemies.push(w.a);
-    });
-    
-    const allies = [];
-    alliances.forEach(a => {
-        if (a.has(myId)) {
-            a.forEach(id => { if (id !== myId) allies.push(id); });
-        }
-    });
-    
-    let html = `
-        <div class="space-y-4">
-            <div class="bg-gray-700 p-3 rounded-lg">
-                <div class="font-bold text-emerald-400 mb-2">🤝 СОЮЗНИКИ</div>
-                ${allies.length === 0 ? '<div class="text-gray-400 text-sm text-center py-2">Нет союзников</div>' : ''}
-                ${allies.map(a => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center flex-wrap"><span class="text-white">${getCountryInfo(a).name}</span><span class="text-emerald-400 text-xs">★ в альянсе</span></div>`).join('')}
-            </div>
-            <div class="bg-gray-700 p-3 rounded-lg">
-                <div class="font-bold text-red-400 mb-2">⚔️ ВОЙНЫ</div>
-                ${enemies.length === 0 ? '<div class="text-gray-400 text-sm text-center py-2">Мирное время</div>' : ''}
-                ${enemies.map(e => `<div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center flex-wrap"><span class="text-white">${getCountryInfo(e).name}</span><span class="text-red-400 text-xs">⚔️ война</span></div>`).join('')}
-            </div>
-            <div class="bg-gray-700 p-3 rounded-lg">
-                <div class="font-bold text-blue-400 mb-2">ℹ️ ИНФОРМАЦИЯ</div>
-                <div class="text-xs text-gray-300">Кликните ПКМ по любой клетке на карте, чтобы посмотреть информацию о стране и дипломатические действия.</div>
-                <div class="text-xs text-gray-300 mt-1">На телефоне: долгое нажатие</div>
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-function renderResearch(container) {
-    let html = `
-        <div class="space-y-3">
-            <div class="bg-gray-700 p-3 rounded-lg text-center">
-                <div class="text-xs text-gray-400">🔬 ТЕХНОЛОГИЧЕСКИЙ ЦЕНТР</div>
-                <div class="text-sm text-gray-300 mt-1">Исследования увеличивают боевую мощь и эффективность</div>
-            </div>
-            <div class="space-y-2">
-                <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-blue-500">
-                    <div class="flex justify-between items-center flex-wrap">
-                        <div>
-                            <span class="font-bold text-white">🏭 ПРОМЫШЛЕННОСТЬ</span>
-                            <div class="text-xs text-gray-300">Увеличивает производство снаряжения на +5% за уровень</div>
-                        </div>
-                        <div class="text-yellow-400">Ур. 1/5</div>
-                    </div>
-                    <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-blue-500 h-full rounded-full" style="width: 20%"></div>
-                    </div>
-                </div>
-                <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-green-500">
-                    <div class="flex justify-between items-center flex-wrap">
-                        <div>
-                            <span class="font-bold text-white">💂 ПЕХОТА</span>
-                            <div class="text-xs text-gray-300">+5% атака/защита, +10% стоимость за уровень</div>
-                        </div>
-                        <div class="text-yellow-400">Ур. 1/5</div>
-                    </div>
-                    <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-green-500 h-full rounded-full" style="width: 20%"></div>
-                    </div>
-                </div>
-                <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-orange-500">
-                    <div class="flex justify-between items-center flex-wrap">
-                        <div>
-                            <span class="font-bold text-white">🚜 ТАНКИ</span>
-                            <div class="text-xs text-gray-300">+5% атака/броня за уровень</div>
-                        </div>
-                        <div class="text-yellow-400">Ур. 1/5</div>
-                    </div>
-                    <div class="mt-2 w-full bg-gray-600 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-orange-500 h-full rounded-full" style="width: 20%"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="text-center text-xs text-gray-500">Технологии в разработке</div>
-        </div>
-    `;
-    container.innerHTML = html;
-}
-
-function renderFocus(container) {
-    container.innerHTML = `
-        <div class="space-y-3">
-            <div class="bg-gray-700 p-3 rounded-lg text-center">
-                <div class="text-xs text-gray-400">⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ</div>
-                <div class="text-sm text-gray-300 mt-1">Уникальные деревья решений для каждой страны</div>
-            </div>
-            <div class="bg-gray-700 p-3 rounded-lg">
-                <div class="text-center text-gray-400 py-4">
-                    Фокусы будут доступны в следующем обновлении<br>
-                    Каждая страна получит уникальное дерево решений
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-window.recruitUnit = (type) => {
-    closeWindow();
+export function showHint(text) {
     const hint = document.getElementById('hint');
     const hintText = document.getElementById('hint-text');
     if (hint && hintText) {
-        hintText.innerText = `Выберите провинцию для развертывания ${UNIT_STATS[type].icon} ${UNIT_STATS[type].name}`;
+        hintText.innerText = text;
         hint.classList.remove('hidden');
-        window.pendingRecruit = type;
-        setTimeout(() => {
-            hint.classList.add('hidden');
-            window.pendingRecruit = null;
-        }, 15000);
     }
-};
+}
 
-window.selectUnitForMove = (unitId) => {
-    closeWindow();
-    window.selectedUnitId = unitId;
-    const hint = document.getElementById('hint');
-    const hintText = document.getElementById('hint-text');
-    if (hint && hintText) {
-        hintText.innerText = `Выберите цель для движения юнита`;
-        hint.classList.remove('hidden');
-        setTimeout(() => {
-            hint.classList.add('hidden');
-            window.selectedUnitId = null;
-        }, 15000);
-    }
-};
-
-window.buildFactory = () => {
-    closeWindow();
-    addNotification('Выберите провинцию для строительства завода (ЛКМ по клетке)', 'info');
-    window.pendingBuild = 'factory';
-    setTimeout(() => { window.pendingBuild = null; }, 15000);
-};
-
-window.buildPort = () => {
-    closeWindow();
-    addNotification('Выберите провинцию для строительства порта (ЛКМ по клетке)', 'info');
-    window.pendingBuild = 'port';
-    setTimeout(() => { window.pendingBuild = null; }, 15000);
-};
+export function updateTopBar() {
+    const myCountryId = getMyCountryId();
+    if (!myCountryId) return;
+    
+    const resources = getPlayerResources();
+    const stats = calculateCountryStats(myCountryId, window._gridData || {}, window._cellStats || {});
+    
+    resources.factories = stats.totalFactories;
+    
+    const countryNameElem = document.getElementById('country-name');
+    const manpowerElem = document.getElementById('val-manpower');
+    const factoriesElem = document.getElementById('val-factories');
+    const equipmentElem = document.getElementById('val-equipment');
+    
+    if (countryNameElem) countryNameElem.innerText = getCountryInfo(myCountryId).name;
+    if (manpowerElem) manpowerElem.innerText = Math.floor(resources.manpower || 0).toLocaleString();
+    if (factoriesElem) factoriesElem.innerText = resources.factories || 0;
+    if (equipmentElem) equipmentElem.innerText = Math.floor(resources.equipment || 0).toLocaleString();
+}
 
 export function showCountryInfo(countryId, posKey) {
     const info = getCountryInfo(countryId);
-    const sidebar = document.getElementById('sidebar');
-    const title = document.getElementById('sidebar-title');
-    const actions = document.getElementById('sidebar-actions');
+    const cell = getCellData(posKey, window._cellStats || {});
     const myId = getMyCountryId();
     
-    if (!sidebar || !title || !actions) return;
+    const sidebar = document.getElementById('info-sidebar');
+    if (!sidebar) return;
     
-    title.innerText = info.name;
+    document.getElementById('sidebar-title').innerText = info.name;
+    document.getElementById('sidebar-leader').innerText = info.leader;
+    document.getElementById('sidebar-ideology').innerText = info.ideology;
+    document.getElementById('sidebar-pop').innerText = (cell.population || 0).toLocaleString();
+    document.getElementById('sidebar-factories').innerText = cell.factories || 0;
+    
+    const actionsDiv = document.getElementById('sidebar-actions');
     
     if (countryId !== myId) {
-        actions.innerHTML = `
-            <button onclick="window.declareWarOn('${countryId}')" class="w-full bg-red-700 hover:bg-red-600 py-2 text-sm rounded-lg mb-2 text-white font-bold transition">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>
-            <button onclick="window.proposeAlly('${countryId}')" class="w-full bg-emerald-700 hover:bg-emerald-600 py-2 text-sm rounded-lg text-white font-bold transition">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>
+        actionsDiv.classList.remove('hidden');
+        const atWar = isAtWar(myId, countryId, getWars());
+        const allied = areAllies(myId, countryId, getAlliances());
+        
+        actionsDiv.innerHTML = `
+            ${!atWar ? `<button onclick="window.declareWarOn('${countryId}')" class="w-full bg-red-700 hover:bg-red-600 py-2 text-sm font-bold rounded mb-2">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>` : '<div class="text-red-500 text-sm text-center mb-2">⚔️ В СОСТОЯНИИ ВОЙНЫ</div>'}
+            ${!atWar && !allied ? `<button onclick="window.proposeAlly('${countryId}')" class="w-full bg-emerald-700 hover:bg-emerald-600 py-2 text-sm font-bold rounded">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>` : ''}
         `;
     } else {
-        actions.innerHTML = '<div class="text-center text-gray-400 text-sm py-2">Это ваша страна</div>';
+        actionsDiv.classList.add('hidden');
     }
     
     sidebar.classList.remove('hidden');
 }
 
-window.declareWarOn = (id) => declareWar(id);
-window.proposeAlly = (id) => proposeAlliance(id);
+function renderArmyWindow(title, content) {
+    title.innerText = '🎖️ АРМИЯ';
+    const myId = getMyCountryId();
+    const units = getUnits().filter(u => u.owner === myId);
+    const resources = getPlayerResources();
+    
+    let html = `
+        <div class="space-y-3 mb-4">
+            <div class="bg-gray-700 p-4 rounded-lg">
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <div class="text-xs text-gray-400">🔫 СНАРЯЖЕНИЕ</div>
+                        <div class="text-lg font-bold text-yellow-400">${Math.floor(resources.equipment || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400">👥 ЛЮДИ</div>
+                        <div class="text-lg font-bold text-emerald-400">${Math.floor(resources.manpower || 0).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400">🏭 ЗАВОДЫ</div>
+                        <div class="text-lg font-bold text-blue-400">${resources.factories || 0}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="font-bold text-yellow-500">🆕 НАБОР ВОЙСК</div>
+            <div class="space-y-2">
+                ${Object.entries(UNIT_STATS).map(([key, u]) => `
+                    <div class="bg-gray-700 p-3 rounded-lg border-l-4 border-yellow-500">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-2xl">${u.icon}</span>
+                                <span class="font-bold ml-2">${u.name}</span>
+                                <div class="text-xs text-gray-400 mt-1">💰 ${u.costEquipment} 🔫 | 👥 ${u.costManpower} чел</div>
+                            </div>
+                            <button onclick="window.recruitUnit('${key}')" class="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 text-xs rounded font-bold">НАБРАТЬ</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div class="font-bold text-yellow-500 mt-4">⚔️ ВОЙСКА (${units.length})</div>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                ${units.length === 0 ? '<div class="text-center text-gray-500 py-4">Нет войск</div>' : ''}
+                ${units.map(u => {
+                    const stats = UNIT_STATS[u.type];
+                    const hpPercent = stats ? (u.hp / stats.hp * 100) : 100;
+                    return `
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <span class="text-xl">${stats?.icon || '❓'}</span>
+                                    <span class="font-bold ml-1">${stats?.name || u.type}</span>
+                                    ${u.trainingDaysLeft > 0 ? `<span class="text-xs text-yellow-400 ml-2">(тренировка: ${u.trainingDaysLeft} дн.)</span>` : '<span class="text-xs text-green-400 ml-2">✓ готов</span>'}
+                                </div>
+                                <button onclick="window.selectUnitForMove('${u.id}')" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 text-xs rounded">ВЫБРАТЬ</button>
+                            </div>
+                            <div class="mt-2">
+                                <div class="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-green-500 h-full rounded-full" style="width: ${hpPercent}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+}
 
-// Закрытие сайдбара при клике вне
-document.addEventListener('click', (e) => {
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar && !sidebar.contains(e.target)) {
-        const actions = document.getElementById('sidebar-actions');
-        if (actions && !actions.contains(e.target)) {
-            if (e.target !== document.getElementById('map-canvas')) {
-                sidebar.classList.add('hidden');
-            }
-        }
+function renderBuildWindow(title, content) {
+    title.innerText = '🏗️ СТРОИТЕЛЬСТВО';
+    const resources = getPlayerResources();
+    const queue = getBuildingQueue();
+    
+    let html = '';
+    
+    if (queue.length > 0 && queue[0]) {
+        const current = queue[0];
+        const stats = BUILDING_STATS[current.type];
+        const progress = stats ? ((stats.buildTime - current.daysLeft) / stats.buildTime) * 100 : 0;
+        
+        html += `
+            <div class="bg-blue-900/30 border border-blue-500 p-4 rounded mb-4">
+                <div class="flex justify-between text-sm mb-2">
+                    <span>🏗️ ${stats?.name || current.type}</span>
+                    <span>${current.daysLeft} дн.</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill-blue" style="width: ${progress}%"></div>
+                </div>
+            </div>
+        `;
     }
-});
+    
+    html += '<div class="grid grid-cols-1 gap-2">';
+    Object.entries(BUILDING_STATS).forEach(([key, b]) => {
+        html += `
+            <button onclick="window.selectBuildType('${key}')" class="bg-blue-800 hover:bg-blue-700 p-4 rounded text-center">
+                <div class="text-2xl">${b.icon}</div>
+                <div class="text-sm font-bold">${b.name}</div>
+                <div class="text-xs text-gray-300">${b.costEquipment} 🔫</div>
+            </button>
+        `;
+    });
+    html += '</div>';
+    
+    content.innerHTML = html;
+}
+
+function renderDiplomacyWindow(title, content) {
+    title.innerText = '🤝 ДИПЛОМАТИЯ';
+    const myId = getMyCountryId();
+    const allies = getAlliesOf(myId, getAlliances());
+    const enemies = getEnemiesOf(myId, getWars());
+    
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-gray-700 p-4 rounded-lg">
+                <div class="font-bold text-emerald-400 mb-2">🤝 СОЮЗНИКИ</div>
+                ${allies.length === 0 ? '<div class="text-gray-400 text-sm py-2">Нет союзников</div>' : 
+                    allies.map(a => `
+                        <div class="bg-gray-600 p-2 rounded mb-1 flex justify-between items-center">
+                            <span>${getCountryInfo(a).name}</span>
+                            <div class="flex gap-2">
+                                <button onclick="window.callToWar('${a}')" class="bg-red-700 hover:bg-red-600 px-2 py-1 text-xs rounded">ПРИЗВАТЬ</button>
+                                <button onclick="window.kickAlly('${a}')" class="bg-gray-600 hover:bg-gray-500 px-2 py-1 text-xs rounded">ИСКЛЮЧИТЬ</button>
+                            </div>
+                        </div>
+                    `).join('')
+                }
+            </div>
+            <div class="bg-gray-700 p-4 rounded-lg">
+                <div class="font-bold text-red-400 mb-2">⚔️ ВОЙНЫ</div>
+                ${enemies.length === 0 ? '<div class="text-gray-400 text-sm py-2">Мирное время</div>' : 
+                    enemies.map(e => `
+                        <div class="bg-gray-600 p-2 rounded mb-1">
+                            <span>${getCountryInfo(e).name}</span>
+                            <span class="text-red-400 text-xs ml-2">⚔️ война</span>
+                        </div>
+                    `).join('')
+                }
+            </div>
+        </div>
+    `;
+}
+
+function renderResearchWindow(title, content) {
+    title.innerText = '🔬 ТЕХНОЛОГИИ';
+    import('./tech.js').then(m => m.updateResearchUI());
+}
+
+function renderFocusWindow(title, content) {
+    title.innerText = '⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ';
+    import('./focuses.js').then(m => m.updateFocusUI());
+}
+
+// Глобальные функции для окон
+window.openWindow = openWindow;
+window.closeWindow = closeWindow;
+window.selectBuildType = (type) => {
+    import('./economy.js').then(m => {
+        closeWindow();
+        m.startBuilding(type, null);
+        showHint('Выберите провинцию для строительства');
+        window._pendingBuild = type;
+        setTimeout(() => {
+            document.getElementById('hint')?.classList.add('hidden');
+            window._pendingBuild = null;
+        }, 10000);
+    });
+};
+window.callToWar = callToWar;
+window.kickAlly = kickFromAlliance;
