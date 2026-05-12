@@ -19,6 +19,10 @@ let _playerResources = { equipment: 1000, factories: 0, manpower: 500000 };
 let _selectedUnitId = null;
 let _activeBattles = [];
 
+// Отдельные данные для ИИ
+let _aiActiveFocus = {};
+let _aiCompletedFocuses = {};
+
 const MONTHS = ["ЯНВ", "ФЕВ", "МАР", "АПР", "МАЙ", "ИЮН", "ИЮЛ", "АВГ", "СЕН", "ОКТ", "НОЯ", "ДЕК"];
 
 // ========== GETTERS ==========
@@ -41,6 +45,13 @@ export function getPlayerResources() { return _playerResources; }
 export function getSelectedUnitId() { return _selectedUnitId; }
 export function getActiveBattles() { return _activeBattles; }
 export function getMonths() { return MONTHS; }
+
+// Геттеры для ИИ
+export function getAIActiveFocus(countryId) { return _aiActiveFocus[countryId] || null; }
+export function getAICompletedFocuses(countryId) {
+    if (!_aiCompletedFocuses[countryId]) _aiCompletedFocuses[countryId] = new Set();
+    return _aiCompletedFocuses[countryId];
+}
 
 // ========== SETTERS ==========
 export function setGridData(data) { 
@@ -113,15 +124,21 @@ export function setActiveBattles(battles) {
     window._activeBattles = _activeBattles;
 }
 
+// Сеттеры для ИИ
+export function setAIActiveFocus(countryId, focus) { _aiActiveFocus[countryId] = focus; }
+export function addAICompletedFocus(countryId, focusId) {
+    if (!_aiCompletedFocuses[countryId]) _aiCompletedFocuses[countryId] = new Set();
+    _aiCompletedFocuses[countryId].add(focusId);
+}
+
 // ========== ДОБАВЛЕНИЕ / УДАЛЕНИЕ ==========
 export function addUnit(unit) {
-    if (!unit.id) {
-        unit.id = `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
+    if (!unit.id) unit.id = `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     unit.hp = unit.hp ?? 100;
     unit.trainingDaysLeft = unit.trainingDaysLeft ?? 10;
     unit.path = unit.path || [];
     unit.moveCooldown = unit.moveCooldown || 0;
+    unit.inCombat = unit.inCombat || false;
     _units.push(unit);
     window._units = _units;
 }
@@ -174,20 +191,15 @@ export function initializeFactories() {
     const gridData = getGridData();
     const cellStats = getCellStats();
     
-    // Считаем размеры стран
     const countrySizes = {};
     Object.values(gridData).forEach(id => {
         countrySizes[id] = (countrySizes[id] || 0) + 1;
     });
     
-    // Очищаем заводы
     Object.keys(cellStats).forEach(pos => {
-        if (cellStats[pos]) {
-            cellStats[pos].factories = 0;
-        }
+        if (cellStats[pos]) cellStats[pos].factories = 0;
     });
     
-    // Создаём cellStats для клеток где его нет
     Object.keys(gridData).forEach(pos => {
         if (!cellStats[pos]) {
             cellStats[pos] = {
@@ -198,10 +210,8 @@ export function initializeFactories() {
         }
     });
     
-    // Распределяем заводы по странам
     Object.entries(countrySizes).forEach(([countryId, size]) => {
         let totalFactories = 0;
-        
         if (size >= 100) totalFactories = Math.floor(size * 0.3);
         else if (size >= 50) totalFactories = Math.floor(size * 0.25);
         else if (size >= 20) totalFactories = Math.floor(size * 0.2);
@@ -218,7 +228,6 @@ export function initializeFactories() {
             const pos = shuffled[i];
             if (cellStats[pos]) {
                 cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
-                // Шанс порта для прибрежных клеток
                 const [x, y] = pos.split(',').map(Number);
                 const neighbors = [[0,1],[0,-1],[1,0],[-1,0]];
                 const isCoastal = neighbors.some(([dx, dy]) => !gridData[`${x+dx},${y+dy}`]);
@@ -256,22 +265,6 @@ export function resetGameState() {
     _playerResources = { equipment: 1000, factories: 0, manpower: 500000 };
     _selectedUnitId = null;
     _activeBattles = [];
-    
-    window._gridData = _gridData;
-    window._cellStats = _cellStats;
-    window._units = _units;
-    window._buildingQueue = _buildingQueue;
-    window._wars = _wars;
-    window._alliances = _alliances;
-    window._myCountryId = _myCountryId;
-    window._isGameActive = _isGameActive;
-    window._gameSpeed = _gameSpeed;
-    window._gameDate = _gameDate;
-    window._tech = _tech;
-    window._activeResearch = _activeResearch;
-    window._activeFocus = _activeFocus;
-    window._completedFocuses = _completedFocuses;
-    window._playerResources = _playerResources;
-    window._selectedUnitId = _selectedUnitId;
-    window._activeBattles = _activeBattles;
+    _aiActiveFocus = {};
+    _aiCompletedFocuses = {};
 }
