@@ -9,16 +9,18 @@ import {
     getUnits, getGameSpeed, getActiveResearch, getActiveFocus, 
     getSelectedUnitId, setSelectedUnitId, advanceDay, getDateString, 
     getTech, setWars, setAlliances, getWars, getAlliances,
-    getActiveBattles, setActiveBattles
+    getActiveBattles, setActiveBattles, initializeFactories,
+    getCellStats as getCellStatsData
 } from './game.js';
 import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty } from './map.js';
-import { deployUnit, giveOrder, processMovement, processCombat, clearRecruitMode, setRecruitMode } from './military.js';
-import { processConstruction } from './economy.js';
+import { deployUnit, giveOrder, processMovement, processCombat, clearRecruitMode } from './military.js';
+import { processConstruction, updateEconomy } from './economy.js';
 import { updateResearch } from './tech.js';
 import { updateFocus } from './focuses.js';
 import { runAllAI } from './ai.js';
 import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint } from './ui.js';
 import { getCountryInfo, addNotification } from './utils.js';
+import { checkCapitulation } from './diplomacy.js';
 
 // ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 window._gridData = {};
@@ -55,7 +57,8 @@ async function loadMapFromFile(filename) {
             throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
-        console.log(`✅ Карта "${filename}" загружена (${Object.keys(data.gridData || {}).length} клеток)`);
+        const cellCount = Object.keys(data.gridData || {}).length;
+        console.log(`✅ Карта "${filename}" загружена (${cellCount} клеток)`);
         return data;
     } catch (error) {
         console.error('❌ Ошибка загрузки карты:', error);
@@ -255,17 +258,21 @@ function startGame(countryId) {
     setPlayerResources({ equipment: 1000, factories: 0, manpower: 500000 });
     setSelectedUnitId(null);
     
+    // Инициализируем заводы для всех стран
+    initializeFactories();
+    
     document.getElementById('country-select').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     document.getElementById('game-tabs').classList.remove('hidden');
     
     updateSpeedButtons(1);
     updateTopBar();
+    markDirty();
     renderMap();
     
     addNotification(`Игра начата! Вы играете за ${getCountryInfo(countryId).name}`, 'info');
-    addNotification('ПКМ по вражеской стране — объявить войну', 'info');
-    addNotification('WASD — движение камеры, колёсико — зум', 'info');
+    addNotification('ПКМ по вражеской стране — дипломатия', 'info');
+    addNotification('WASD — камера, колёсико — зум', 'info');
     
     // Запуск игрового цикла
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
@@ -275,7 +282,7 @@ function startGame(countryId) {
 // ========== ИГРОВОЙ ЦИКЛ ==========
 function startGameLoop() {
     let lastTick = performance.now();
-    const TICK_INTERVAL = 1000; // 1 секунда = 1 день на скорости 1x
+    const TICK_INTERVAL = 1000;
     
     function loop(timestamp) {
         const elapsed = timestamp - lastTick;
@@ -299,13 +306,16 @@ function startGameLoop() {
             processCombat();
             
             // Обновление экономики
-            import('./economy.js').then(m => {
+            try {
                 const { getUnitStatsWithTech } = require('./tech.js');
                 const unitStats = getUnitStatsWithTech();
-                m.updateEconomy(getTech().industry, unitStats);
-            }).catch(() => {
-                // Fallback если модуль не загрузился
-            });
+                updateEconomy(getTech().industry, unitStats);
+            } catch(e) {
+                updateEconomy(1, {
+                    infantry: { maintenance: 0.2 },
+                    tank: { maintenance: 1.5 }
+                });
+            }
             
             // ИИ
             runAllAI();
@@ -342,7 +352,6 @@ function updateOpenWindows() {
     } else if (title.innerText.includes('ФОКУСЫ')) {
         import('./focuses.js').then(m => m.updateFocusUI());
     } else if (title.innerText.includes('СТРОИТЕЛЬСТВО')) {
-        // Обновляем окно стройки
         openWindow('build');
     }
 }
