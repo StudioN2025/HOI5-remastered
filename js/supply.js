@@ -300,68 +300,72 @@ function applySupplyPenalties() {
 
 // ========== ВИЗУАЛИЗАЦИЯ КОТЛОВ ==========
 
+// supply.js — замени renderSupplyOverlay
+
 export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
     const myId = getMyCountryId();
     const gridData = getGridData();
     const wars = getWars();
     
-    const allPockets = [];
+    // ✅ Проверяем что есть война
+    if (!myId || !wars.length) return;
+    
+    const now = Date.now();
+    
+    // ✅ Проверяем только страны с которыми воюем
     for (const countryId of [...new Set(Object.values(gridData))]) {
         const isEnemy = isAtWar(myId, countryId, wars);
         const isOurs = countryId === myId;
         
         if (!isEnemy && !isOurs) continue;
         
+        // ✅ НАХОДИМ КОТЛЫ
         const pockets = findPockets(countryId);
-        for (const pocket of pockets) {
-            allPockets.push({ ...pocket, isEnemy, isOurs });
-        }
-    }
-    
-    if (allPockets.length === 0) return;
-    
-    const now = Date.now();
-    
-    for (const pocket of allPockets) {
-        const pulse = Math.sin(now / 500) * 0.3 + 0.7;
         
-        for (const pos of pocket.cells) {
-            const [x, y] = pos.split(',').map(Number);
-            const screenX = x * CELL_SIZE;
-            const screenY = y * CELL_SIZE;
+        // ✅ ПРОПУСКАЕМ ЕСЛИ КОТЛОВ НЕТ
+        if (pockets.length === 0) continue;
+        
+        // ✅ РИСУЕМ ТОЛЬКО КОТЛЫ
+        for (const pocket of pockets) {
+            const pulse = Math.sin(now / 500) * 0.3 + 0.7;
             
-            // Пульсирующая рамка
-            ctx.strokeStyle = pocket.isEnemy ? 
-                `rgba(255, 30, 30, ${pulse})` : 
-                `rgba(255, 200, 0, ${pulse})`;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-            ctx.strokeRect(screenX + 1, screenY + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-            ctx.setLineDash([]);
-            
-            // Затемнение
-            ctx.fillStyle = pocket.isEnemy ? 
-                'rgba(255, 0, 0, 0.12)' : 
-                'rgba(255, 200, 0, 0.12)';
-            ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
-            
-            // Иконка черепа для больших котлов
-            if (pocket.size > 3) {
-                const cx = screenX + CELL_SIZE / 2;
-                const cy = screenY + CELL_SIZE / 2;
+            for (const pos of pocket.cells) {
+                const [x, y] = pos.split(',').map(Number);
+                const screenX = x * CELL_SIZE;
+                const screenY = y * CELL_SIZE;
                 
-                ctx.font = `${CELL_SIZE * 0.6}px serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = pocket.isEnemy ? 
-                    `rgba(255, 50, 50, ${pulse})` : 
-                    `rgba(255, 180, 0, ${pulse})`;
-                ctx.fillText('💀', cx, cy);
+                // Пульсирующая рамка только для котла
+                ctx.strokeStyle = isEnemy ? 
+                    `rgba(255, 30, 30, ${pulse})` : 
+                    `rgba(255, 200, 0, ${pulse})`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(screenX + 1, screenY + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                ctx.setLineDash([]);
+                
+                // Лёгкое затемнение
+                ctx.fillStyle = isEnemy ? 
+                    'rgba(255, 0, 0, 0.08)' : 
+                    'rgba(255, 200, 0, 0.08)';
+                ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
+                
+                // 💀 только для больших котлов
+                if (pocket.size > 5) {
+                    const cx = screenX + CELL_SIZE / 2;
+                    const cy = screenY + CELL_SIZE / 2;
+                    
+                    ctx.font = `${CELL_SIZE * 0.6}px serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = isEnemy ? 
+                        `rgba(255, 50, 50, ${pulse + 0.2})` : 
+                        `rgba(255, 180, 0, ${pulse + 0.2})`;
+                    ctx.fillText('💀', cx, cy);
+                }
             }
         }
     }
 }
-
 // ========== ЭКСПОРТ ДЛЯ ИГРОВОГО ЦИКЛА ==========
 
 export function processSupply() {
