@@ -1,4 +1,4 @@
-// supply.js — ПОЛНАЯ СИСТЕМА СНАБЖЕНИЯ И КОТЛОВ
+// supply.js — ПОЛНАЯ ФИНАЛЬНАЯ СИСТЕМА СНАБЖЕНИЯ И КОТЛОВ
 
 import { getGridData, getUnits, getMyCountryId, getWars, getCellStats, getAlliances } from './game.js';
 import { isAtWar, addNotification } from './utils.js';
@@ -91,8 +91,8 @@ function hasSupplyPath(pos, countryId, capitalGroup, visited = new Set()) {
     visited.add(pos);
     
     const gridData = getGridData();
-    const [x, y] = pos.split(',').map(Number);
     const cellStats = getCellStats();
+    const myCells = Object.keys(gridData).filter(p => gridData[p] === countryId);
     
     // Порт = бесконечное снабжение
     const cell = cellStats[pos];
@@ -100,13 +100,16 @@ function hasSupplyPath(pos, countryId, capitalGroup, visited = new Set()) {
         return true;
     }
     
-    // Завод снабжает маленькую группу (до 5 клеток)
+    // Завод снабжает если страна маленькая
     if (cell && cell.factories > 0) {
+        if (myCells.length <= 10) return true;
+        
         const groupSize = countConnectedCells(pos, countryId, new Set());
         if (groupSize <= 5) return true;
     }
     
     // Ищем путь к основной группе
+    const [x, y] = pos.split(',').map(Number);
     for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
         const neighborPos = `${x+dx},${y+dy}`;
         const owner = gridData[neighborPos];
@@ -160,6 +163,33 @@ function findPockets(countryId) {
     if (capitalGroup.size === 0) return [];
     
     const myCells = Object.keys(gridData).filter(pos => gridData[pos] === countryId);
+    
+    // ✅ МАЛЕНЬКАЯ СТРАНА (≤5 клеток) — всегда в снабжении
+    if (myCells.length <= 5) return [];
+    
+    const cellStats = getCellStats();
+    
+    // ✅ Есть порт — вся страна в снабжении
+    let hasPort = false;
+    for (const pos of myCells) {
+        const cell = cellStats[pos];
+        if (cell && cell.buildings && cell.buildings.includes('port')) {
+            hasPort = true;
+            break;
+        }
+    }
+    if (hasPort) return [];
+    
+    // ✅ Достаточно заводов (1 завод на 3 клетки) — страна в снабжении
+    let totalFactories = 0;
+    for (const pos of myCells) {
+        const cell = cellStats[pos];
+        if (cell) totalFactories += cell.factories || 0;
+    }
+    if (totalFactories > 0 && myCells.length <= totalFactories * 3) {
+        return [];
+    }
+    
     const pockets = [];
     const processed = new Set();
     
@@ -167,25 +197,27 @@ function findPockets(countryId) {
         if (capitalGroup.has(pos)) continue;
         if (processed.has(pos)) continue;
         
-        const cellStats = getCellStats();
         const cell = cellStats[pos];
         
         // Порт всегда в снабжении
         if (cell && cell.buildings && cell.buildings.includes('port')) continue;
-        
-        // Завод снабжает маленькую группу
-        if (cell && cell.factories > 0) {
-            const groupSize = countConnectedCells(pos, countryId, new Set());
-            if (groupSize <= 5) continue;
-        }
         
         // Проверяем связь с основной группой
         if (!hasSupplyPath(pos, countryId, capitalGroup, new Set())) {
             const pocketGroup = new Set();
             collectPocketGroup(pos, countryId, capitalGroup, pocketGroup, new Set());
             
+            // ✅ Маленькая группа с заводом — не котёл
+            if (pocketGroup.size <= 5) {
+                let pocketFactories = 0;
+                for (const p of pocketGroup) {
+                    const c = cellStats[p];
+                    if (c) pocketFactories += c.factories || 0;
+                }
+                if (pocketFactories > 0) continue;
+            }
+            
             if (pocketGroup.size > 0) {
-                // Отмечаем все клетки группы как обработанные
                 for (const p of pocketGroup) processed.add(p);
                 
                 pockets.push({
@@ -195,6 +227,12 @@ function findPockets(countryId) {
                 });
             }
         }
+    }
+    
+    // ✅ Маленькая страна (≤10 клеток) с 80%+ в котлах — не считаем котлами
+    const totalPocketCells = pockets.reduce((sum, p) => sum + p.size, 0);
+    if (myCells.length <= 10 && totalPocketCells >= myCells.length * 0.8) {
+        return [];
     }
     
     return pockets;
@@ -207,13 +245,12 @@ function applySupplyPenalties() {
     const gridData = getGridData();
     const allCountries = [...new Set(Object.values(gridData))];
     const wars = getWars();
-    const notifiedPockets = new Set(); // Чтобы не спамить уведомлениями
+    const notifiedPockets = new Set();
     
     for (const countryId of allCountries) {
         const pockets = findPockets(countryId);
         
         for (const pocket of pockets) {
-            // Урон юнитам в котле
             const units = getUnits();
             let unitsLost = 0;
             
@@ -222,8 +259,6 @@ function applySupplyPenalties() {
                     // Урон 2-5 HP в день от голода
                     const supplyDamage = 2 + Math.floor(Math.random() * 4);
                     u.hp = Math.max(0, (u.hp || 0) - supplyDamage);
-                    
-                    // Штраф к атаке в котле
                     u.supplyPenalty = true;
                     
                     if (u.hp <= 0) {
@@ -233,20 +268,18 @@ function applySupplyPenalties() {
                 }
             }
             
-            // Уведомления (не чаще раза в 10 дней на котёл)
+            // Уведомления
             const pocketKey = `${countryId}_${pocket.size}`;
             
             if (countryId === myId && !notifiedPockets.has(pocketKey)) {
                 notifiedPockets.add(pocketKey);
-                addNotification(`⚠️ ${pocket.size} провинций в котле без снабжения! Потери: ${unitsLost} юнитов.`, 'war');
-                
-                // Очищаем ключ через 10 вызовов
+                addNotification(`⚠️ ${pocket.size} провинций отрезаны от снабжения!`, 'war');
                 setTimeout(() => notifiedPockets.delete(pocketKey), 10000);
             }
             
             if (isAtWar(myId, countryId, wars) && !notifiedPockets.has(`enemy_${pocketKey}`)) {
                 notifiedPockets.add(`enemy_${pocketKey}`);
-                addNotification(`🔥 Враг отрезан! ${pocket.size} клеток в окружении.`, 'war');
+                addNotification(`🔥 Враг в котле! ${pocket.size} клеток без снабжения.`, 'war');
                 setTimeout(() => notifiedPockets.delete(`enemy_${pocketKey}`), 10000);
             }
         }
@@ -272,7 +305,6 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
     const gridData = getGridData();
     const wars = getWars();
     
-    // Собираем все котлы
     const allPockets = [];
     for (const countryId of [...new Set(Object.values(gridData))]) {
         const isEnemy = isAtWar(myId, countryId, wars);
@@ -282,11 +314,7 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
         
         const pockets = findPockets(countryId);
         for (const pocket of pockets) {
-            allPockets.push({
-                ...pocket,
-                isEnemy,
-                isOurs
-            });
+            allPockets.push({ ...pocket, isEnemy, isOurs });
         }
     }
     
@@ -299,7 +327,6 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
         
         for (const pos of pocket.cells) {
             const [x, y] = pos.split(',').map(Number);
-            
             const screenX = x * CELL_SIZE;
             const screenY = y * CELL_SIZE;
             
@@ -318,7 +345,7 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
                 'rgba(255, 200, 0, 0.12)';
             ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
             
-            // Иконка черепа для котлов
+            // Иконка черепа для больших котлов
             if (pocket.size > 3) {
                 const cx = screenX + CELL_SIZE / 2;
                 const cy = screenY + CELL_SIZE / 2;
@@ -350,9 +377,11 @@ export function getPocketsForCountry(countryId) {
 export function debugSupply(countryId) {
     const capitalGroup = findCapitalGroup(countryId);
     const pockets = findPockets(countryId);
+    const myCells = Object.keys(getGridData()).filter(pos => getGridData()[pos] === countryId);
     
     console.log(`=== СНАБЖЕНИЕ: ${countryId} ===`);
-    console.log(`Основная группа (столица): ${capitalGroup.size} клеток`);
+    console.log(`Всего клеток: ${myCells.length}`);
+    console.log(`Основная группа: ${capitalGroup.size} клеток`);
     console.log(`Котлы: ${pockets.length}`);
     
     for (const p of pockets) {
@@ -360,15 +389,4 @@ export function debugSupply(countryId) {
     }
     
     return { capitalGroup, pockets };
-}
-
-// Авто-отладка для игрока раз в 30 дней (вызывается из main.js)
-export function autoDebug() {
-    const myId = getMyCountryId();
-    if (myId) {
-        const pockets = findPockets(myId);
-        if (pockets.length > 0) {
-            console.warn(`⚠️ У игрока ${pockets.length} котлов!`);
-        }
-    }
 }
