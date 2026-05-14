@@ -1,4 +1,4 @@
-// main.js — ПОЛНЫЙ ФИНАЛЬНЫЙ С СИСТЕМОЙ СНАБЖЕНИЯ
+// main.js — ПОЛНЫЙ С КОМАНДУЮЩИМИ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -21,6 +21,7 @@ import { updateFocus } from './focuses.js';
 import { runAllAI } from './ai.js';
 import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint, showSaveLoadMenu } from './ui.js';
 import { getCountryInfo, addNotification, isAtWar } from './utils.js';
+import { getCommanderBonus } from './commanders.js';
 
 // ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 window._gridData = {};
@@ -180,7 +181,7 @@ function startGame(countryId) {
     addNotification(`👑 ${info.leader} | ⚡ ${info.ideology}`, 'info');
     addNotification('🖱️ ПКМ по юниту → ЛКМ по врагу = АТАКА', 'info');
     addNotification('⌨️ WASD — камера | Пробел — пауза', 'info');
-    addNotification('🔥 Окружайте врага — без снабжения он погибнет!', 'info');
+    addNotification('🎖️ Вкладка АРМИИ — создавайте армейские группировки', 'info');
     
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     startGameLoop();
@@ -191,19 +192,16 @@ function startGameLoop() {
     let lastTick = performance.now();
     let autoSaveCounter = 0;
     let wasPaused = false;
-    let supplyCounter = 0; // Счётчик для снабжения
     
     function loop(timestamp) {
         const speed = getGameSpeed();
         
-        // Пауза
         if (speed === 0) {
             wasPaused = true;
             gameLoopId = requestAnimationFrame(loop);
             return;
         }
         
-        // Выход из паузы
         if (wasPaused) {
             lastTick = timestamp;
             wasPaused = false;
@@ -221,23 +219,18 @@ function startGameLoop() {
             for (let i = 0; i < ticksToProcess; i++) {
                 advanceDay();
                 autoSaveCounter++;
-                supplyCounter++;
                 
-                // Автосохранение каждые 30 дней
                 if (autoSaveCounter >= 30) {
                     autoSaveCounter = 0;
                     autoSave();
                 }
                 
-                // Обновление даты
                 const dateElem = document.getElementById('game-date');
                 if (dateElem) dateElem.innerText = getDateString();
                 
-                // ✅ СНАБЖЕНИЕ — каждый день
                 processSupply();
             }
             
-            // Системы раз за кадр
             updateResearch();
             updateFocus();
             processConstruction();
@@ -274,11 +267,12 @@ function updateOpenWindows() {
     if (title.innerText.includes('ТЕХНОЛОГИИ')) import('./tech.js').then(m => m.updateResearchUI());
     else if (title.innerText.includes('ФОКУСЫ')) import('./focuses.js').then(m => m.updateFocusUI());
     else if (title.innerText.includes('СТРОИТЕЛЬСТВО')) openWindow('build');
+    else if (title.innerText.includes('КОМАНДУЮЩИЕ')) openWindow('commanders');
 }
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 async function init() {
-    console.log('🚀 HOI V Remastered v2.0 — с системой снабжения');
+    console.log('🚀 HOI V Remastered v2.0');
     
     const ls = showLoadingScreen();
     ls.setText('ЗАГРУЗКА ИЗОБРАЖЕНИЙ...');
@@ -367,6 +361,29 @@ async function init() {
             return;
         }
         
+        // ✅ ВЫБРАНА АРМИЯ
+        if (window._selectedArmy) {
+            const armyId = window._selectedArmy;
+            const targetOwner = gridData[key];
+            
+            if (targetOwner && isAtWar(myId, targetOwner, wars)) {
+                import('./commanders.js').then(m => {
+                    m.orderArmyAttack(armyId, key);
+                });
+                addNotification('⚔️ Армия получила приказ атаковать!', 'war');
+            } else if (targetOwner === myId || areAlliesCheck(myId, targetOwner)) {
+                import('./commanders.js').then(m => {
+                    m.orderArmyDefend(armyId, [key]);
+                });
+                addNotification('🛡️ Армия заняла оборону!', 'info');
+            }
+            
+            window._selectedArmy = null;
+            document.getElementById('order-hint')?.classList.add('hidden');
+            markDirty();
+            return;
+        }
+        
         // Выбран юнит
         const selUnitId = getSelectedUnitId();
         if (selUnitId) {
@@ -379,7 +396,6 @@ async function init() {
             
             const targetOwner = gridData[key];
             
-            // АТАКА ВРАГА
             if (targetOwner && isAtWar(myId, targetOwner, wars)) {
                 const enemyUnit = units.find(u => u.pos === key && u.owner !== myId && isAtWar(myId, u.owner, wars));
                 if (enemyUnit) {
@@ -403,7 +419,6 @@ async function init() {
                 return;
             }
             
-            // Движение по своей/союзной территории
             if (targetOwner === myId || areAlliesCheck(myId, targetOwner)) {
                 giveOrder(key, selUnitId);
                 setSelectedUnitId(null);
@@ -411,7 +426,6 @@ async function init() {
                 return;
             }
             
-            // Нейтральная территория
             if (targetOwner) addNotification('⚡ Объявите войну! ПКМ по клетке страны.', 'war');
             else addNotification('🌊 Юниты не ходят по воде!', 'war');
             setSelectedUnitId(null);
@@ -419,7 +433,6 @@ async function init() {
             return;
         }
         
-        // Показ информации о клетке
         if (gridData[key]) showCountryInfo(gridData[key], key);
     });
     
