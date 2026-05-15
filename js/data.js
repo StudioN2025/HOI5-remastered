@@ -26,6 +26,7 @@ export const COUNTRIES = {
     "latvia": { name: "Латвия", color: "#8b0000", leader: "Карлис Улманис", ideology: "Нейтралитет" },
     "estonia": { name: "Эстония", color: "#4682b4", leader: "Константин Пятс", ideology: "Нейтралитет" },
     "slovakia": { name: "Словакия", color: "#60a5fa", leader: "Йозеф Тисо", ideology: "Фашизм" }
+    "turkey": { name: "Турция", color: "#c8102e", leader: "Мустафа Кемаль Ататюрк", ideology: "Нейтралитет" },
 };
 
 export const UNIT_STATS = {
