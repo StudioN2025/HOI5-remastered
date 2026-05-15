@@ -70,6 +70,57 @@ export const NATIONAL_FOCUSES = {
         { id: 'ussr_patriotic', name: 'Великая Отечественная', description: 'Мобилизация', 
           effect: (ctx) => { /* мобилизация */ } }
     ]
+    // В NATIONAL_FOCUSES добавь:
+"turkey": [
+    { 
+        id: 'tur_modernize', 
+        name: "Модернизация армии", 
+        description: "+1000 снаряжения, +2 пехотные дивизии", 
+        effect: (ctx) => { 
+            ctx.resources.equipment += 1000;
+            ctx.addUnits('infantry', 2);
+        } 
+    },
+    { 
+        id: 'tur_balkans', 
+        name: "Влияние на Балканах", 
+        description: "Предложить альянс Болгарии и объявить войну Греции", 
+        effect: (ctx) => { 
+            ctx.proposeAlliance('bulgaria');
+            ctx.declareWar('greece');
+        } 
+    },
+    { 
+        id: 'tur_straits', 
+        name: "Контроль над проливами", 
+        description: "+2 порта на побережье", 
+        effect: (ctx) => {
+            const gridData = getGridData();
+            const cellStats = getCellStats();
+            let portsAdded = 0;
+            for (const [pos, id] of Object.entries(gridData)) {
+                if (id === 'turkey' && portsAdded < 2) {
+                    const [x, y] = pos.split(',').map(Number);
+                    const isCoastal = [[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy]) => !gridData[`${x+dx},${y+dy}`]);
+                    if (isCoastal) {
+                        if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
+                        if (!cellStats[pos].buildings) cellStats[pos].buildings = [];
+                        cellStats[pos].buildings.push('port');
+                        portsAdded++;
+                    }
+                }
+            }
+        } 
+    },
+    { 
+        id: 'tur_pan_turkic', 
+        name: "Пантюркизм", 
+        description: "Объявить войну СССР за тюркские народы", 
+        effect: (ctx) => { 
+            ctx.declareWar('ussr');
+        } 
+    }
+]
 };
 
 export const DEMO_MAP = {
