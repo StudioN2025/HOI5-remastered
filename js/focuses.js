@@ -1,10 +1,11 @@
-// focuses.js — фокусы только для игрока
+// focuses.js — ПОЛНЫЙ С addPorts
 
 import { 
     getMyCountryId, getActiveFocus, setActiveFocus, 
     getCompletedFocuses, addCompletedFocus, 
     getPlayerResources, setPlayerResources, 
-    getGridData, addUnit, addWar 
+    getGridData, getCellStats, setCellStats,
+    addUnit, addWar 
 } from './game.js';
 import { NATIONAL_FOCUSES } from './data.js';
 import { addNotification } from './utils.js';
@@ -70,15 +71,13 @@ function createFocusContext() {
         addFactories: (count) => {
             const gridData = getGridData();
             const myCells = Object.keys(gridData).filter(k => gridData[k] === myId);
+            const cellStats = getCellStats();
             for (let i = 0; i < count && i < myCells.length; i++) {
-                import('./game.js').then(m => {
-                    const cellStats = m.getCellStats();
-                    const pos = myCells[i];
-                    if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
-                    cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
-                    m.setCellStats(cellStats);
-                });
+                const pos = myCells[i];
+                if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
+                cellStats[pos].factories = (cellStats[pos].factories || 0) + 1;
             }
+            setCellStats(cellStats);
         },
         addUnits: (type, count) => {
             const gridData = getGridData();
@@ -89,7 +88,30 @@ function createFocusContext() {
                     addUnit({ pos, owner: myId, type, trainingDaysLeft: 0, path: [], inCombat: false });
                 }
             }
-        }
+        },
+        addPorts: (count) => {
+            const gridData = getGridData();
+            const cellStats = getCellStats();
+            const myCells = Object.keys(gridData).filter(k => gridData[k] === myId);
+            let portsAdded = 0;
+            
+            for (const pos of myCells) {
+                if (portsAdded >= count) break;
+                const [x, y] = pos.split(',').map(Number);
+                const isCoastal = [[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy]) => !gridData[`${x+dx},${y+dy}`]);
+                if (isCoastal) {
+                    if (!cellStats[pos]) cellStats[pos] = { population: 10000, factories: 0, buildings: [] };
+                    if (!cellStats[pos].buildings) cellStats[pos].buildings = [];
+                    if (!cellStats[pos].buildings.includes('port')) {
+                        cellStats[pos].buildings.push('port');
+                        portsAdded++;
+                    }
+                }
+            }
+            setCellStats(cellStats);
+        },
+        getGridData: () => getGridData(),
+        getCellStats: () => getCellStats()
     };
 }
 
