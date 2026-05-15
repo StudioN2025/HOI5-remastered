@@ -1,10 +1,8 @@
-// supply.js — ПОЛНАЯ ФИНАЛЬНАЯ СИСТЕМА СНАБЖЕНИЯ И КОТЛОВ (ФИКС ЭКСКЛАВОВ)
+// supply.js — ПОЛНАЯ ФИНАЛЬНАЯ ВЕРСИЯ (КОТЁЛ = 100% ОКРУЖЕНИЕ ВРАГАМИ)
 
 import { getGridData, getUnits, getMyCountryId, getWars, getCellStats, getAlliances } from './game.js';
 import { isAtWar, addNotification } from './utils.js';
 import { checkCapitulation } from './diplomacy.js';
-
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
 function areAlliesWith(c1, c2) {
     if (c1 === c2) return true;
@@ -21,12 +19,11 @@ function getEnemiesOf(countryId, wars) {
     return [...new Set(enemies)];
 }
 
-// ========== ПОИСК КОТЛОВ ==========
+// ========== ПОИСК СВЯЗНЫХ ГРУПП ==========
 
 function findAllGroups(countryId) {
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(pos => gridData[pos] === countryId);
-    
     if (myCells.length === 0) return [];
     
     const visited = new Set();
@@ -49,7 +46,6 @@ function findAllGroups(countryId) {
                 if (visited.has(neighbor)) continue;
                 
                 const owner = gridData[neighbor];
-                // Своя территория ИЛИ союзная (снабжение через союзников)
                 if (owner === countryId || areAlliesWith(countryId, owner)) {
                     visited.add(neighbor);
                     queue.push(neighbor);
@@ -60,77 +56,82 @@ function findAllGroups(countryId) {
         allGroups.push(group);
     }
     
-    // Сортируем по размеру (самая большая = столица)
     allGroups.sort((a, b) => b.size - a.size);
     return allGroups;
 }
 
-function isGroupSelfSufficient(group, countryId, allMyCells) {
-    const cellStats = getCellStats();
+// ✅ ПРОВЕРКА: клетка полностью окружена врагами?
+function isFullySurroundedByEnemies(pos, countryId, enemies) {
     const gridData = getGridData();
+    const [x, y] = pos.split(',').map(Number);
     
-    let hasPort = false;
-    let totalFactories = 0;
-    let waterBorderCount = 0;
-    let totalBorderCount = 0;
+    let totalNeighbors = 0;
+    let enemyNeighbors = 0;
     
-    for (const pos of group) {
-        const cell = cellStats[pos];
-        if (cell?.buildings?.includes('port')) hasPort = true;
-        if (cell) totalFactories += cell.factories || 0;
+    for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+        const neighbor = `${x+dx},${y+dy}`;
+        const owner = gridData[neighbor];
         
-        // Считаем водные границы
-        const [x, y] = pos.split(',').map(Number);
-        for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            totalBorderCount++;
-            if (!gridData[`${x+dx},${y+dy}`]) waterBorderCount++;
+        if (owner === undefined) continue; // Вода — не считается соседом для окружения
+        
+        totalNeighbors++;
+        
+        // Враг или вода (море тоже блокирует)
+        if (enemies.includes(owner) || !owner) {
+            enemyNeighbors++;
         }
     }
     
-    const waterRatio = totalBorderCount > 0 ? waterBorderCount / totalBorderCount : 0;
+    // 100% сухопутных соседей — враги
+    return totalNeighbors > 0 && enemyNeighbors >= totalNeighbors;
+}
+
+// ✅ ПРОВЕРКА: вся группа окружена врагами?
+function isGroupSurrounded(group, countryId, enemies) {
+    if (group.size === 0) return false;
     
-    // ✅ Порт = морское снабжение (не котёл)
-    if (hasPort) return true;
+    const gridData = getGridData();
     
-    // ✅ Полуостров/остров (30%+ водных границ) = не котёл
-    if (waterRatio >= 0.3) return true;
-    
-    // ✅ Крупный регион с заводами
-    if (group.size >= 10 && totalFactories >= 2) return true;
-    
-    // ✅ Средний регион с заводами
-    if (group.size >= 5 && totalFactories >= 1) return true;
-    
-    // ✅ Очень маленькая группа (1-4 клетки) с заводом
-    if (group.size <= 4 && totalFactories >= 1) return true;
-    
-    // ✅ Снабжение через союзников
+    // Проверяем внешние границы группы
     for (const pos of group) {
         const [x, y] = pos.split(',').map(Number);
+        
         for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             const neighbor = `${x+dx},${y+dy}`;
             const owner = gridData[neighbor];
-            if (owner && owner !== countryId && areAlliesWith(countryId, owner)) {
-                return true; // Есть граница с союзником = снабжение
-            }
+            
+            // Пропускаем клетки внутри группы
+            if (group.has(neighbor)) continue;
+            
+            // Вода — не враг (морское снабжение)
+            if (!owner) return false;
+            
+            // Союзник или нейтрал — не враг
+            if (owner === countryId) continue;
+            if (areAlliesWith(countryId, owner)) return false;
+            if (!enemies.includes(owner)) return false;
         }
     }
     
-    return false;
+    return true;
 }
 
 function findPockets(countryId) {
     const gridData = getGridData();
+    const wars = getWars();
+    const enemies = getEnemiesOf(countryId, wars);
     const myCells = Object.keys(gridData).filter(pos => gridData[pos] === countryId);
     
     if (myCells.length === 0) return [];
     
-    // ✅ МАЛЕНЬКАЯ СТРАНА (≤5 клеток) — всегда в снабжении
+    // ✅ Нет врагов — нет котлов
+    if (enemies.length === 0) return [];
+    
+    // ✅ Страна ≤5 клеток — не считаем котлы
     if (myCells.length <= 5) return [];
     
-    // ✅ Собираем все связные группы
     const allGroups = findAllGroups(countryId);
-    if (allGroups.length <= 1) return []; // Одна группа = нет котлов
+    if (allGroups.length === 0) return [];
     
     const pockets = [];
     
@@ -138,58 +139,62 @@ function findPockets(countryId) {
     for (let i = 1; i < allGroups.length; i++) {
         const group = allGroups[i];
         
-        // Проверяем самодостаточность
-        if (isGroupSelfSufficient(group, countryId, myCells)) {
-            continue; // Не котёл
+        // ✅ Группа с портом — не котёл (морское снабжение)
+        const cellStats = getCellStats();
+        let hasPort = false;
+        for (const pos of group) {
+            const cell = cellStats[pos];
+            if (cell?.buildings?.includes('port')) {
+                hasPort = true;
+                break;
+            }
         }
+        if (hasPort) continue;
         
-        // Проверяем связь с основной группой через союзников
-        let connectedToMain = false;
-        const mainGroup = allGroups[0];
+        // ✅ Группа граничит с водой (порт не обязателен, но море рядом) — не котёл
+        let touchesWater = false;
+        for (const pos of group) {
+            const [x, y] = pos.split(',').map(Number);
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                if (!gridData[`${x+dx},${y+dy}`]) {
+                    touchesWater = true;
+                    break;
+                }
+            }
+            if (touchesWater) break;
+        }
+        if (touchesWater) continue; // Море = снабжение
         
+        // ✅ Группа граничит с нейтралом — не котёл
+        let touchesNeutral = false;
         for (const pos of group) {
             const [x, y] = pos.split(',').map(Number);
             for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 const neighbor = `${x+dx},${y+dy}`;
                 const owner = gridData[neighbor];
-                
-                // Если сосед — союзник, и союзник граничит с основной группой
-                if (owner && areAlliesWith(countryId, owner) && owner !== countryId) {
-                    // Проверяем граничит ли союзник с основной группой
-                    for (const mainPos of mainGroup) {
-                        const [mx, my] = mainPos.split(',').map(Number);
-                        const dist = Math.abs(x+dx - mx) + Math.abs(y+dy - my);
-                        if (dist <= 3) { // Союзник рядом с основной группой
-                            connectedToMain = true;
-                            break;
-                        }
-                    }
+                if (owner && owner !== countryId && !enemies.includes(owner) && !areAlliesWith(countryId, owner)) {
+                    touchesNeutral = true;
+                    break;
                 }
-                if (connectedToMain) break;
             }
-            if (connectedToMain) break;
+            if (touchesNeutral) break;
         }
+        if (touchesNeutral) continue; // Нейтрал = нет окружения
         
-        if (connectedToMain) continue; // Снабжение через союзника
-        
-        // Это реальный котёл
-        pockets.push({
-            cells: [...group],
-            size: group.size,
-            countryId: countryId
-        });
-    }
-    
-    // ✅ Финальная проверка: если "котлы" = почти вся страна, а страна небольшая
-    const totalPocketCells = pockets.reduce((sum, p) => sum + p.size, 0);
-    if (myCells.length <= 30 && totalPocketCells >= myCells.length * 0.8) {
-        return []; // Это не котлы, это основная территория разделена
+        // ✅ ФИНАЛЬНАЯ ПРОВЕРКА: 100% окружение врагами
+        if (isGroupSurrounded(group, countryId, enemies)) {
+            pockets.push({
+                cells: [...group],
+                size: group.size,
+                countryId: countryId
+            });
+        }
     }
     
     return pockets;
 }
 
-// ========== ПРИМЕНЕНИЕ ШТРАФОВ ==========
+// ========== ШТРАФЫ ==========
 
 function applySupplyPenalties() {
     const myId = getMyCountryId();
@@ -200,14 +205,7 @@ function applySupplyPenalties() {
     
     for (const countryId of allCountries) {
         const pockets = findPockets(countryId);
-        
         if (pockets.length === 0) continue;
-        
-        const allCells = Object.values(gridData).filter(id => id === countryId).length;
-        const totalPocketCells = pockets.reduce((sum, p) => sum + p.size, 0);
-        
-        // ✅ Если котлы = почти вся страна — не применяем штрафы (ложное срабатывание)
-        if (totalPocketCells >= allCells * 0.8 && allCells <= 30) continue;
         
         for (const pocket of pockets) {
             const units = getUnits();
@@ -215,7 +213,6 @@ function applySupplyPenalties() {
             
             for (const u of units) {
                 if (u.owner === countryId && pocket.cells.includes(u.pos)) {
-                    // Урон 2-5 HP в день от голода
                     const supplyDamage = 2 + Math.floor(Math.random() * 4);
                     u.hp = Math.max(0, (u.hp || 0) - supplyDamage);
                     u.supplyPenalty = true;
@@ -227,34 +224,35 @@ function applySupplyPenalties() {
                 }
             }
             
-            // Уведомления (не спамим)
             const pocketKey = `${countryId}_${pocket.size}`;
             
             if (countryId === myId && !notifiedPockets.has(pocketKey)) {
                 notifiedPockets.add(pocketKey);
-                addNotification(`⚠️ ${pocket.size} провинций отрезаны от снабжения! Потери: ${unitsLost} юнитов.`, 'war');
+                addNotification(`⚠️ ${pocket.size} провинций в котле! Потери: ${unitsLost} юнитов.`, 'war');
                 setTimeout(() => notifiedPockets.delete(pocketKey), 10000);
             }
             
             if (isAtWar(myId, countryId, wars) && !notifiedPockets.has(`enemy_${pocketKey}`)) {
                 notifiedPockets.add(`enemy_${pocketKey}`);
-                addNotification(`🔥 Враг в котле! ${pocket.size} клеток без снабжения.`, 'war');
+                addNotification(`🔥 Враг в котле! ${pocket.size} клеток окружены.`, 'war');
                 setTimeout(() => notifiedPockets.delete(`enemy_${pocketKey}`), 10000);
             }
         }
         
-        // Авто-капитуляция только если 90%+ в РЕАЛЬНЫХ котлах и страна не маленькая
+        const allCells = Object.values(gridData).filter(id => id === countryId).length;
+        const totalPocketCells = pockets.reduce((sum, p) => sum + p.size, 0);
+        
         if (totalPocketCells >= allCells * 0.9 && allCells > 10) {
             const enemies = getEnemiesOf(countryId, wars);
             if (enemies.length > 0) {
-                addNotification(`💀 ${countryId.toUpperCase()} полностью окружена! Капитуляция!`, 'war');
+                addNotification(`💀 ${countryId.toUpperCase()} капитулирует!`, 'war');
                 checkCapitulation(countryId, enemies[0]);
             }
         }
     }
 }
 
-// ========== ВИЗУАЛИЗАЦИЯ КОТЛОВ ==========
+// ========== ВИЗУАЛИЗАЦИЯ ==========
 
 export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
     const myId = getMyCountryId();
@@ -268,7 +266,6 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
     for (const countryId of [...new Set(Object.values(gridData))]) {
         const isEnemy = isAtWar(myId, countryId, wars);
         const isOurs = countryId === myId;
-        
         if (!isEnemy && !isOurs) continue;
         
         const pockets = findPockets(countryId);
@@ -279,36 +276,22 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
             
             for (const pos of pocket.cells) {
                 const [x, y] = pos.split(',').map(Number);
-                const screenX = x * CELL_SIZE;
-                const screenY = y * CELL_SIZE;
                 
-                // Пульсирующая рамка
-                ctx.strokeStyle = isEnemy ? 
-                    `rgba(255, 30, 30, ${pulse})` : 
-                    `rgba(255, 200, 0, ${pulse})`;
+                ctx.strokeStyle = isEnemy ? `rgba(255,30,30,${pulse})` : `rgba(255,200,0,${pulse})`;
                 ctx.lineWidth = 2;
                 ctx.setLineDash([4, 4]);
-                ctx.strokeRect(screenX + 1, screenY + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                ctx.strokeRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
                 ctx.setLineDash([]);
                 
-                // Лёгкое затемнение
-                ctx.fillStyle = isEnemy ? 
-                    'rgba(255, 0, 0, 0.08)' : 
-                    'rgba(255, 200, 0, 0.08)';
-                ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
+                ctx.fillStyle = isEnemy ? 'rgba(255,0,0,0.08)' : 'rgba(255,200,0,0.08)';
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 
-                // 💀 только для больших котлов (>5 клеток)
-                if (pocket.size > 5) {
-                    const cx = screenX + CELL_SIZE / 2;
-                    const cy = screenY + CELL_SIZE / 2;
-                    
+                if (pocket.size > 3) {
                     ctx.font = `${CELL_SIZE * 0.6}px serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillStyle = isEnemy ? 
-                        `rgba(255, 50, 50, ${pulse + 0.2})` : 
-                        `rgba(255, 180, 0, ${pulse + 0.2})`;
-                    ctx.fillText('💀', cx, cy);
+                    ctx.fillStyle = isEnemy ? `rgba(255,50,50,${pulse+0.2})` : `rgba(255,180,0,${pulse+0.2})`;
+                    ctx.fillText('💀', x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
                 }
             }
         }
@@ -317,39 +300,12 @@ export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
 
 // ========== ЭКСПОРТ ==========
 
-export function processSupply() {
-    applySupplyPenalties();
-}
-
-export function getPocketsForCountry(countryId) {
-    return findPockets(countryId);
-}
-
-// ========== ОТЛАДКА ==========
+export function processSupply() { applySupplyPenalties(); }
+export function getPocketsForCountry(countryId) { return findPockets(countryId); }
 
 export function debugSupply(countryId) {
     const allGroups = findAllGroups(countryId);
     const pockets = findPockets(countryId);
-    const myCells = Object.keys(getGridData()).filter(pos => getGridData()[pos] === countryId);
-    
-    console.log(`=== СНАБЖЕНИЕ: ${countryId} ===`);
-    console.log(`Всего клеток: ${myCells.length}`);
-    console.log(`Связных групп: ${allGroups.length}`);
-    
-    allGroups.forEach((group, i) => {
-        const cellStats = getCellStats();
-        let ports = 0, factories = 0;
-        for (const pos of group) {
-            const cell = cellStats[pos];
-            if (cell?.buildings?.includes('port')) ports++;
-            if (cell) factories += cell.factories || 0;
-        }
-        
-        const status = i === 0 ? '🏛️ СТОЛИЦА' : 
-            pockets.some(p => p.cells.some(c => group.has(c))) ? '🔥 КОТЁЛ' : '✅ Снабжается';
-        
-        console.log(`  Группа ${i+1}: ${group.size} клеток | 🏭${factories} | ⚓${ports} | ${status}`);
-    });
-    
+    console.log(`=== ${countryId}: ${allGroups.length} групп, ${pockets.length} котлов ===`);
     return { allGroups, pockets };
 }
