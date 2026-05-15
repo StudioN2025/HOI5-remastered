@@ -1,4 +1,4 @@
-// ui.js — ПОЛНЫЙ ИНТЕРФЕЙС С КОМАНДУЮЩИМИ
+// ui.js — ПОЛНЫЙ С ФЛАГАМИ
 
 import { 
     getMyCountryId, getPlayerResources, getBuildingQueue, 
@@ -60,6 +60,14 @@ window.proposeAlly = (id) => { proposeAlliance(id); document.getElementById('inf
 window.callToWar = callToWar;
 window.kickAlly = kickFromAlliance;
 
+// ========== ФЛАГИ ==========
+
+function flagImg(countryId, size = 'normal') {
+    const w = size === 'small' ? 24 : size === 'tiny' ? 18 : 32;
+    const h = size === 'small' ? 15 : size === 'tiny' ? 11 : 20;
+    return `<img src="assets/flags/${countryId}.png" style="width:${w}px;height:${h}px;border:1px solid rgba(255,255,255,0.2);border-radius:2px;object-fit:cover;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" alt="">`;
+}
+
 // ========== УПРАВЛЕНИЕ ОКНАМИ ==========
 
 export function openWindow(tab) {
@@ -114,12 +122,18 @@ export function updateTopBar() {
     const factoriesElem = document.getElementById('val-factories');
     const equipmentElem = document.getElementById('val-equipment');
     
-    if (countryNameElem) countryNameElem.innerText = getCountryInfo(myId).name;
+    if (countryNameElem) {
+        countryNameElem.innerHTML = `
+            <span class="flex items-center gap-2">
+                ${flagImg(myId, 'small')}
+                ${getCountryInfo(myId).name}
+            </span>
+        `;
+    }
     if (manpowerElem) manpowerElem.innerText = Math.floor(Math.max(0, totalManpower - usedManpower)).toLocaleString();
     if (factoriesElem) factoriesElem.innerText = stats.totalFactories;
     if (equipmentElem) equipmentElem.innerText = Math.floor(resources.equipment || 0).toLocaleString();
     
-    // Обновление индикаторов
     import('./game.js').then(m => {
         const research = m.getActiveResearch();
         const focus = m.getActiveFocus();
@@ -144,7 +158,12 @@ export function showCountryInfo(countryId, posKey) {
     const wars = getWars();
     const alliances = getAlliances();
     
-    document.getElementById('sidebar-title').innerText = info.name;
+    document.getElementById('sidebar-title').innerHTML = `
+        <div class="flex items-center gap-2">
+            ${flagImg(countryId, 'small')}
+            ${info.name}
+        </div>
+    `;
     document.getElementById('sidebar-leader').innerText = info.leader;
     document.getElementById('sidebar-ideology').innerText = info.ideology;
     document.getElementById('sidebar-pop').innerText = (cell.population || 0).toLocaleString();
@@ -359,7 +378,10 @@ function renderDiplomacyWindow(content) {
                     allies.map(a => `
                         <div class="diplo-card">
                             <div>
-                                <div class="diplo-country">${getCountryInfo(a).name}</div>
+                                <div class="diplo-country flex items-center gap-2">
+                                    ${flagImg(a, 'small')}
+                                    ${getCountryInfo(a).name}
+                                </div>
                                 <div class="diplo-ideology">${getCountryInfo(a).ideology}</div>
                             </div>
                             <div class="diplo-actions">
@@ -378,7 +400,10 @@ function renderDiplomacyWindow(content) {
                     enemies.map(e => `
                         <div class="diplo-card enemy-card">
                             <div>
-                                <div class="diplo-country">${getCountryInfo(e).name}</div>
+                                <div class="diplo-country flex items-center gap-2">
+                                    ${flagImg(e, 'small')}
+                                    ${getCountryInfo(e).name}
+                                </div>
                                 <div class="diplo-ideology">${getCountryInfo(e).ideology}</div>
                             </div>
                             <div class="diplo-status-war">⚔️ ВОЙНА</div>
@@ -666,3 +691,22 @@ window.disbandArmy = async (armyId) => {
 };
 
 window.showSaveMenu = () => showSaveLoadMenu();
+
+// ========== ВЫБОР СТРАНЫ (экспорт для main.js) ==========
+
+export function createCountryButton(countryId, sizes) {
+    const info = getCountryInfo(countryId);
+    const btn = document.createElement('button');
+    btn.style.borderLeftColor = info.color;
+    btn.style.borderLeftWidth = '4px';
+    btn.innerHTML = `
+        <div class="flex items-center gap-3">
+            ${flagImg(countryId)}
+            <div>
+                <div class="font-bold">${info.name}</div>
+                <div class="text-xs opacity-70">${info.ideology} • ${info.leader}</div>
+                <div class="text-xs opacity-50 mt-1">📊 Провинций: ${sizes[countryId]||0}</div>
+            </div>
+        </div>`;
+    return btn;
+}
