@@ -1,4 +1,4 @@
-// main.js — ПОЛНЫЙ ИСПРАВЛЕННЫЙ ФАЙЛ ДЛЯ СЕРВЕРА GITHUB PAGES
+// main.js — С ИСПРАВЛЕНИЕМ ОШИБКИ HUD И СИСТЕМОЙ ФЛАГОВ ИЗ ПАПКИ assets/flags
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', resizeCanvas);
     setupMapEvents();
 
-    // ✅ ТОЧНЫЙ ПУТЬ ДЛЯ GITHUB PAGES К ПАПКЕ maps
+    // Загрузка карты из подпапки maps
     try {
         const res = await fetch('./maps/europe.json'); 
         const data = await res.json();
@@ -148,21 +148,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // ✅ БЕЗОПАСНОЕ УДАЛЕНИЕ ЭКРАНА ЗАГРУЗКИ
+    // Безопасное удаление экрана загрузки
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
     
-    // ✅ ИДЕАЛЬНО ПЛАВНЫЙ ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ ЭКРАНА
+    // Игровой цикл рендеринга
     function animate() { 
-        processCameraMovement(); // Двигаем камеру каждый кадр на основе нажатых клавиш
-        renderMap();             // Отрисовываем карту под новыми плавными координатами
+        processCameraMovement(); 
+        renderMap();             
         requestAnimationFrame(animate); 
     }
     animate();
 });
 
-// ✅ ВЫНЕСЕНО В ОТДЕЛЬНУЮ ФУНКЦИЮ ДЛЯ БЕЗОПАСНОГО ВЫЗОВА ПОСЛЕ FETCH
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -183,13 +182,20 @@ function renderCountrySelectionList() {
     });
 }
 
-// Функции-помощники
 function selectCountryAndStart(id) {
     setMyCountryId(id);
     setGameActive(true);
     setGameSpeed(0);
-    document.getElementById('country-select').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
+    
+    document.getElementById('country-select')?.classList.add('hidden');
+    
+    // ✅ ИСПРАВЛЕНО ПАДЕНИЕ: Безопасное переключение игрового интерфейса (HUD)
+    const hud = document.getElementById('hud');
+    if (hud) {
+        hud.classList.remove('hidden');
+    } else {
+        console.warn("Предупреждение: Элемент #hud не найден в index.html. Проверьте разметку!");
+    }
     
     // Центрирование камеры на провинциях выбранного игрока
     const myCells = Object.keys(getGridData()).filter(k => getGridData()[k] === id);
@@ -204,7 +210,8 @@ function selectCountryAndStart(id) {
     }
     
     updateTopBar(getPlayerResources());
-    document.getElementById('game-date').innerText = getDateString();
+    const dateElem = document.getElementById('game-date');
+    if (dateElem) dateElem.innerText = getDateString();
 }
 
 function changeSpeedUI(val) {
@@ -222,7 +229,7 @@ function updateSpeedButtons(speed) {
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
 }
 
-// Эмуляция CommonJS require внутри браузерных ESM модулей для ui.js
+// Эмуляция require с интеграцией графических флагов из assets/flags/
 function require(moduleName) {
     if (moduleName === './ui.js') {
         return {
@@ -231,9 +238,14 @@ function require(moduleName) {
                 const btn = document.createElement('button');
                 btn.style.borderLeftColor = info.color;
                 btn.style.borderLeftWidth = '4px';
+                
+                // ✅ Заменяем эмодзи флага на реальную картинку из вашей папки assets/flags/
                 btn.innerHTML = `
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:16px;">🏳️</span>
+                        <img src="./assets/flags/${countryId}.png" 
+                             onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'16\' viewBox=\'0 0 24 16\'><rect width=\'24\' height=\'16\' fill=\'%23555\'/></svg>'" 
+                             style="width:28px; height:18px; object-fit:cover; border:1px solid #444; border-radius:2px;" 
+                             alt="${info.name}"/>
                         <div style="text-align:left;">
                             <div style="font-weight:bold; font-size:13px;">${info.name}</div>
                             <div style="font-size:10px; color:#888;">Провинций: ${sizes[countryId]} | Лидер: ${info.leader}</div>
