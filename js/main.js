@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const supplyMod = await import('./supply.js');
     window._modules.supply.drawPockets = supplyMod.drawPockets;
 
-    // Скрываем загрузочный экран
     const ls = document.getElementById('loading-screen');
     
     // Инициализация размеров экрана и событий
@@ -39,36 +38,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', resizeCanvas);
     setupMapEvents();
 
-    // Загрузка карты Европы из json конфигурации
+    // ✅ ИСПРАВЛЕНО: Изменен путь на относительный локальный для корректной работы fetch
     try {
-        const res = await fetch('uploaded:europe.json');
+        const res = await fetch('europe.json'); // Если файл лежит в корне проекта. Если в папке: 'js/europe.json'
         const data = await res.json();
         if (data && data.gridData) {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             markDirty();
+            
+            // Генерируем список стран только после того, как карта загружена в память
+            renderCountrySelectionList();
         }
     } catch (e) {
         console.error('Ошибка загрузки карты:', e);
-    }
-
-    // Рендер стартового меню выбора стран
-    const listContainer = document.getElementById('country-list');
-    if (listContainer) {
-        listContainer.innerHTML = '';
-        const sizes = {};
-        Object.keys(getGridData()).forEach(pos => {
-            const cid = getGridData()[pos];
-            sizes[cid] = (sizes[cid] || 0) + 1;
-        });
-
-        Object.keys(COUNTRIES).forEach(cid => {
-            if (!sizes[cid]) return; 
-            const { createCountryButton } = require('./ui.js');
-            const btn = createCountryButton(cid, sizes);
-            btn.addEventListener('click', () => selectCountryAndStart(cid));
-            listContainer.appendChild(btn);
-        });
     }
 
     // Привязка UI кнопок управления скоростью и меню
@@ -165,7 +148,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    setTimeout(() => ls.remove(), 400);
+    // ✅ ИСПРАВЛЕНО: Безопасное удаление экрана загрузки
+    if (ls) {
+        setTimeout(() => ls.remove(), 400);
+    }
     
     // ✅ ИДЕАЛЬНО ПЛАВНЫЙ ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ ЭКРАНА
     function animate() { 
@@ -175,6 +161,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     animate();
 });
+
+// ✅ Вынесено в отдельную функцию для безопасного вызова после fetch
+function renderCountrySelectionList() {
+    const listContainer = document.getElementById('country-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = '';
+    const sizes = {};
+    Object.keys(getGridData()).forEach(pos => {
+        const cid = getGridData()[pos];
+        sizes[cid] = (sizes[cid] || 0) + 1;
+    });
+
+    Object.keys(COUNTRIES).forEach(cid => {
+        if (!sizes[cid]) return; 
+        const { createCountryButton } = require('./ui.js');
+        const btn = createCountryButton(cid, sizes);
+        btn.addEventListener('click', () => selectCountryAndStart(cid));
+        listContainer.appendChild(btn);
+    });
+}
 
 // Функции-помощники
 function selectCountryAndStart(id) {
