@@ -1,4 +1,4 @@
-// main.js — ПОЛНЫЙ С КОМАНДУЮЩИМИ
+// main.js — ПОЛНЫЙ С КОМАНДУЮЩИМИ И ПЛАВНЫМ ИГРОВЫМ ЦИКЛОМ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -12,7 +12,7 @@ import {
     getActiveBattles, setActiveBattles, initializeFactories,
     autoSave
 } from './game.js';
-import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty } from './map.js';
+import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty, processCameraMovement } from './map.js';
 import { deployUnit, giveOrder, processMovement, processCombat } from './military.js';
 import { processConstruction, updateEconomy } from './economy.js';
 import { processSupply } from './supply.js';
@@ -23,447 +23,136 @@ import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint, showS
 import { getCountryInfo, addNotification, isAtWar } from './utils.js';
 import { getCommanderBonus } from './commanders.js';
 
-// ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
-window._gridData = {};
-window._cellStats = {};
-window._units = [];
-window._wars = [];
-window._alliances = [];
-window._countries = COUNTRIES;
-window._buildingQueue = [];
-window._activeBattles = [];
-window._myCountryId = null;
-window._isGameActive = false;
-window._gameSpeed = 0;
-window._gameDate = new Date(1936, 0, 1, 12, 0);
-window._tech = { industry: 1, infantry: 1, tank: 1 };
-window._activeResearch = null;
-window._activeFocus = null;
-window._completedFocuses = new Set();
-window._playerResources = { equipment: 1000, factories: 0, manpower: 500000 };
-window._selectedUnitId = null;
+// Глобальная шина модулей для ленивых связей
+window._modules = { supply: { drawPockets: null } };
 
-window.getPlayerResources = getPlayerResources;
-window.setPlayerResources = setPlayerResources;
-window.updateTopBar = updateTopBar;
+document.addEventListener('DOMContentLoaded', async () => {
+    // Подгружаем отрисовку котлов из supply.js в общую шину
+    const supplyMod = await import('./supply.js');
+    window._modules.supply.drawPockets = supplyMod.drawPockets;
 
-let gameLoopId = null;
-
-// ========== ПРЕДЗАГРУЗКА ==========
-const IMAGES_TO_PRELOAD = ['assets/hoi5-backend.png', 'assets/uploading-screan.png'];
-
-function preloadImages() {
-    return Promise.all(IMAGES_TO_PRELOAD.map(src => new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => { console.log(`✅ ${src}`); resolve(img); };
-        img.onerror = () => { console.warn(`⚠️ ${src}`); resolve(null); };
-        img.src = src;
-    })));
-}
-
-function showLoadingScreen() {
-    const menu = document.getElementById('main-menu');
-    if (menu) menu.style.display = 'none';
+    // Скрываем загрузочный экран
+    const ls = document.getElementById('loading-screen');
     
-    const div = document.createElement('div');
-    div.id = 'loading-screen';
-    div.innerHTML = `
-        <div style="position:fixed;inset:0;z-index:9999;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Special Elite',monospace;color:#eab308;">
-            <div style="font-size:48px;margin-bottom:20px;">⚙️</div>
-            <div style="font-size:24px;letter-spacing:.2em;margin-bottom:30px;">HOI V REMASTERED</div>
-            <div id="loading-bar-container" style="width:300px;height:8px;background:#1f2937;border-radius:4px;overflow:hidden;border:1px solid #4b5563;">
-                <div id="loading-bar-fill" style="width:0%;height:100%;background:linear-gradient(90deg,#eab308,#fbbf24);transition:width .3s ease;"></div>
-            </div>
-            <div id="loading-text" style="margin-top:16px;font-size:12px;color:#9ca3af;letter-spacing:.1em;">ЗАГРУЗКА...</div>
-        </div>`;
-    document.body.appendChild(div);
-    
-    return {
-        setProgress: p => { const f = document.getElementById('loading-bar-fill'); if (f) f.style.width = `${Math.min(100,Math.max(0,p))}%`; },
-        setText: t => { const el = document.getElementById('loading-text'); if (el) el.innerText = t; },
-        remove: () => {
-            const s = document.getElementById('loading-screen');
-            if (s) { s.style.opacity = '0'; s.style.transition = 'opacity .3s'; setTimeout(() => s.remove(), 300); }
-            if (menu) menu.style.display = '';
-        }
-    };
-}
+    // Инициализация размеров экрана и событий
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    setupMapEvents();
 
-// ========== ЗАГРУЗКА КАРТЫ ==========
-async function loadMapFromFile(filename) {
+    // Загрузка карты Европы из json конфигурации
     try {
-        const r = await fetch(`maps/${filename}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        console.log(`✅ Карта "${filename}" — ${Object.keys(d.gridData||{}).length} клеток`);
-        return d;
-    } catch(e) {
-        console.error('❌ Ошибка карты:', e);
-        addNotification(`Ошибка загрузки карты: ${e.message}`, 'war');
-        return null;
+        const res = await fetch('uploaded:europe.json');
+        const data = await res.json();
+        if (data && data.gridData) {
+            setGridData(data.gridData);
+            initializeFactories(data.gridData);
+            markDirty();
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки карты:', e);
     }
-}
 
-// ========== ПРОВЕРКА АЛЬЯНСА ==========
-function areAlliesCheck(c1, c2) {
-    if (c1 === c2) return true;
-    return getAlliances().some(a => a.has && a.has(c1) && a.has(c2));
-}
+    // Рендер стартового меню выбора стран
+    const listContainer = document.getElementById('country-list');
+    if (listContainer) {
+        listContainer.innerHTML = '';
+        const sizes = {};
+        Object.keys(getGridData()).forEach(pos => {
+            const cid = getGridData()[pos];
+            sizes[cid] = (sizes[cid] || 0) + 1;
+        });
 
-// ========== ВЫБОР СТРАНЫ ==========
-function showCountrySelection(list) {
-    const c = document.getElementById('country-list');
-    if (!c) return;
-    c.innerHTML = '';
-    
-    const sizes = {};
-    Object.values(getGridData()).forEach(id => sizes[id] = (sizes[id]||0)+1);
-    list.sort((a,b) => (sizes[b]||0) - (sizes[a]||0));
-    
-    const major = list.filter(id => (sizes[id]||0) >= 30);
-    const minor = list.filter(id => (sizes[id]||0) < 30);
-    
-    if (major.length) {
-        const l = document.createElement('div');
-        l.style.cssText = 'font-size:10px;color:#854d0e;text-transform:uppercase;letter-spacing:.1em;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.1);margin-bottom:4px;';
-        l.innerText = 'Великие державы';
-        c.appendChild(l);
-        major.forEach(id => c.appendChild(createBtn(id, sizes)));
+        Object.keys(COUNTRIES).forEach(cid => {
+            if (!sizes[cid]) return; 
+            const { createCountryButton } = require('./ui.js');
+            const btn = createCountryButton(cid, sizes);
+            btn.addEventListener('click', () => selectCountryAndStart(cid));
+            listContainer.appendChild(btn);
+        });
     }
-    if (minor.length) {
-        const l = document.createElement('div');
-        l.style.cssText = 'font-size:10px;color:#854d0e;text-transform:uppercase;letter-spacing:.1em;padding:8px 0 4px;border-bottom:1px solid rgba(0,0,0,.1);margin-bottom:4px;';
-        l.innerText = 'Региональные державы';
-        c.appendChild(l);
-        minor.forEach(id => c.appendChild(createBtn(id, sizes)));
-    }
-    
-    document.getElementById('main-menu').classList.add('hidden');
-    document.getElementById('country-select').classList.remove('hidden');
-}
 
-function createBtn(countryId, sizes) {
-    const info = getCountryInfo(countryId);
-    const btn = document.createElement('button');
-    btn.style.borderLeftColor = info.color;
-    btn.style.borderLeftWidth = '4px';
-    btn.innerHTML = `<div class="font-bold">${info.name}</div><div class="text-xs opacity-70">${info.ideology} • ${info.leader}</div><div class="text-xs opacity-50 mt-1">📊 Провинций: ${sizes[countryId]||0}</div>`;
-    btn.onclick = () => startGame(countryId);
-    return btn;
-}
+    // Привязка UI кнопок управления скоростью и меню
+    document.getElementById('btn-play')?.addEventListener('click', () => {
+        document.getElementById('main-menu')?.classList.add('hidden');
+        document.getElementById('country-select')?.classList.remove('hidden');
+    });
 
-// ========== ЗАПУСК ИГРЫ ==========
-function startGame(countryId) {
-    setMyCountryId(countryId);
-    setGameActive(true);
-    setGameSpeed(1);
-    setGameDate(new Date(1936, 0, 1, 12, 0));
-    setUnits([]);
-    setBuildingQueue([]);
-    setWars([]);
-    setAlliances([]);
-    setActiveBattles([]);
-    setPlayerResources({ equipment: 1000, factories: 0, manpower: 500000 });
-    setSelectedUnitId(null);
-    initializeFactories();
-    
-    document.getElementById('country-select').classList.add('hidden');
-    document.getElementById('game-container').classList.remove('hidden');
-    document.getElementById('game-tabs').classList.remove('hidden');
-    
-    updateSpeedButtons(1);
-    updateTopBar();
-    markDirty();
-    renderMap();
-    
-    const info = getCountryInfo(countryId);
-    addNotification(`🎌 Вы играете за ${info.name}`, 'info');
-    addNotification(`👑 ${info.leader} | ⚡ ${info.ideology}`, 'info');
-    addNotification('🖱️ ПКМ по юниту → ЛКМ по врагу = АТАКА', 'info');
-    addNotification('⌨️ WASD — камера | Пробел — пауза', 'info');
-    addNotification('🎖️ Вкладка АРМИИ — создавайте армейские группировки', 'info');
-    
-    if (gameLoopId) cancelAnimationFrame(gameLoopId);
-    startGameLoop();
-}
+    document.getElementById('btn-cancel')?.addEventListener('click', () => {
+        document.getElementById('country-select')?.classList.add('hidden');
+        document.getElementById('main-menu')?.classList.remove('hidden');
+    });
 
-// ========== ИГРОВОЙ ЦИКЛ ==========
-function startGameLoop() {
-    let lastTick = performance.now();
-    let autoSaveCounter = 0;
-    let wasPaused = false;
-    
-    function loop(timestamp) {
+    document.getElementById('speed-pause')?.addEventListener('click', () => changeSpeedUI(0));
+    document.getElementById('speed-1')?.addEventListener('click', () => changeSpeedUI(1));
+    document.getElementById('speed-2')?.addEventListener('click', () => changeSpeedUI(2));
+    document.getElementById('speed-3')?.addEventListener('click', () => changeSpeedUI(3));
+
+    document.getElementById('nav-research')?.addEventListener('click', () => openWindow('research'));
+    document.getElementById('nav-focus')?.addEventListener('click', () => openWindow('focus'));
+    document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
+    document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
+
+    // Сердце игрового времени (Таймер суток)
+    setInterval(() => {
         const speed = getGameSpeed();
-        
-        if (speed === 0) {
-            wasPaused = true;
-            gameLoopId = requestAnimationFrame(loop);
-            return;
-        }
-        
-        if (wasPaused) {
-            lastTick = timestamp;
-            wasPaused = false;
-            gameLoopId = requestAnimationFrame(loop);
-            return;
-        }
-        
-        const elapsed = timestamp - lastTick;
-        const tickDuration = 1000 / speed;
-        
-        if (elapsed >= tickDuration) {
-            const ticksToProcess = Math.min(Math.floor(elapsed / tickDuration), 5);
-            lastTick += ticksToProcess * tickDuration;
+        if (speed === 0 || !getMyCountryId()) return;
+
+        let ticks = 1;
+        if (speed === 2) ticks = 2;
+        if (speed === 3) ticks = 4;
+
+        for (let i = 0; i < ticks; i++) {
+            advanceDay();
             
-            for (let i = 0; i < ticksToProcess; i++) {
-                advanceDay();
-                autoSaveCounter++;
-                
-                if (autoSaveCounter >= 30) {
-                    autoSaveCounter = 0;
-                    autoSave();
-                }
-                
-                const dateElem = document.getElementById('game-date');
-                if (dateElem) dateElem.innerText = getDateString();
-                
-                processSupply();
-            }
-            
-            updateResearch();
-            updateFocus();
-            processConstruction();
+            // Расчет экономических, военных и логистических тиков
             processMovement();
             processCombat();
-            
-            try {
-                updateEconomy(getTech().industry, { infantry: { maintenance: 0.2 }, tank: { maintenance: 1.5 } });
-            } catch(e) {}
-            
+            processConstruction();
+            updateEconomy();
+            processSupply();
+            updateResearch();
+            updateFocus();
             runAllAI();
-            updateTopBar();
-            updateOpenWindows();
-            markDirty();
         }
-        
-        gameLoopId = requestAnimationFrame(loop);
-    }
-    
-    gameLoopId = requestAnimationFrame(loop);
-}
 
-function updateSpeedButtons(speed) {
-    document.querySelectorAll('.speed-btn').forEach(b => {
-        b.classList.toggle('active', parseInt(b.dataset.speed) === speed);
-    });
-}
+        updateTopBar(getPlayerResources());
+        document.getElementById('game-date').innerText = getDateString();
+        
+        if (Math.random() < 0.03) autoSave();
 
-function updateOpenWindows() {
-    const win = document.getElementById('info-window');
-    if (!win || win.classList.contains('hidden')) return;
-    const title = document.getElementById('window-title');
-    if (!title) return;
-    if (title.innerText.includes('ТЕХНОЛОГИИ')) import('./tech.js').then(m => m.updateResearchUI());
-    else if (title.innerText.includes('ФОКУСЫ')) import('./focuses.js').then(m => m.updateFocusUI());
-    else if (title.innerText.includes('СТРОИТЕЛЬСТВО')) openWindow('build');
-    else if (title.innerText.includes('КОМАНДУЮЩИЕ')) openWindow('commanders');
-}
+        markDirty();
+    }, 1000);
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
-async function init() {
-    console.log('🚀 HOI V Remastered v2.0');
-    
-    const ls = showLoadingScreen();
-    ls.setText('ЗАГРУЗКА ИЗОБРАЖЕНИЙ...');
-    ls.setProgress(10);
-    await preloadImages();
-    
-    ls.setText('ИНИЦИАЛИЗАЦИЯ КАРТЫ...');
-    ls.setProgress(40);
-    await new Promise(r => setTimeout(r, 100));
-    
-    resizeCanvas();
-    setupMapEvents();
-    renderMap();
-    
-    ls.setText('ЗАГРУЗКА МОДУЛЕЙ...');
-    ls.setProgress(70);
-    await new Promise(r => setTimeout(r, 200));
-    
-    ls.setText('ГОТОВО');
-    ls.setProgress(100);
-    
-    // ========== ОБРАБОТЧИКИ ==========
-    
-    document.getElementById('btn-play').onclick = async () => {
-        const mapData = await loadMapFromFile('europe.json');
-        if (!mapData) { addNotification('Не удалось загрузить карту.', 'war'); return; }
-        setGridData(mapData.gridData || {});
-        setCellStats(mapData.cellStats || {});
-        showCountrySelection([...new Set(Object.values(getGridData()))]);
-        addNotification('Карта Европы (1936) загружена!', 'info');
-    };
-    
-    document.getElementById('btn-cancel').onclick = () => {
-        document.getElementById('country-select').classList.add('hidden');
-        document.getElementById('main-menu').classList.remove('hidden');
-    };
-    
-    document.querySelectorAll('.speed-btn').forEach(btn => {
-        btn.onclick = () => {
-            const s = parseInt(btn.dataset.speed);
-            setGameSpeed(s);
-            updateSpeedButtons(s);
-        };
+    // Закрытие бокового меню информации о провинции
+    document.getElementById('close-sidebar')?.addEventListener('click', () => {
+        document.getElementById('info-sidebar')?.classList.add('hidden');
     });
-    
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.onclick = () => {
-            if (btn.dataset.tab === 'save') showSaveLoadMenu();
-            else openWindow(btn.dataset.tab);
-        };
-    });
-    
-    document.getElementById('close-window').onclick = closeWindow;
-    document.getElementById('close-sidebar').onclick = () => {
-        document.getElementById('info-sidebar').classList.add('hidden');
-    };
-    
-    // ========== КЛИКИ ПО КАРТЕ ==========
-    const canvas = document.getElementById('map-canvas');
-    
-    canvas.addEventListener('click', async (e) => {
-        const world = screenToWorld(e.clientX, e.clientY);
-        const key = `${world.x},${world.y}`;
-        const gridData = getGridData();
-        const myId = getMyCountryId();
-        const units = getUnits();
-        const wars = getWars();
-        
-        // Режим найма
-        if (window._recruitMode) {
-            if (gridData[key] === myId) deployUnit(key, window._recruitMode);
-            else addNotification('Только на своей территории!', 'war');
-            window._recruitMode = null;
-            document.getElementById('recruit-hint')?.classList.add('hidden');
-            return;
-        }
-        
-        // Режим стройки
-        if (window._pendingBuild) {
-            if (gridData[key] === myId) {
-                const { startBuilding } = await import('./economy.js');
-                if (startBuilding(window._pendingBuild, key)) { markDirty(); renderMap(); updateTopBar(); }
-            } else addNotification('Только на своей территории!', 'war');
-            window._pendingBuild = null;
-            document.getElementById('build-hint')?.classList.add('hidden');
-            return;
-        }
-        
-        // ✅ ВЫБРАНА АРМИЯ
-        if (window._selectedArmy) {
-            const armyId = window._selectedArmy;
-            const targetOwner = gridData[key];
-            
-            if (targetOwner && isAtWar(myId, targetOwner, wars)) {
-                import('./commanders.js').then(m => {
-                    m.orderArmyAttack(armyId, key);
-                });
-                addNotification('⚔️ Армия получила приказ атаковать!', 'war');
-            } else if (targetOwner === myId || areAlliesCheck(myId, targetOwner)) {
-                import('./commanders.js').then(m => {
-                    m.orderArmyDefend(armyId, [key]);
-                });
-                addNotification('🛡️ Армия заняла оборону!', 'info');
-            }
-            
-            window._selectedArmy = null;
-            document.getElementById('order-hint')?.classList.add('hidden');
-            markDirty();
-            return;
-        }
-        
-        // Выбран юнит
-        const selUnitId = getSelectedUnitId();
-        if (selUnitId) {
-            const selUnit = units.find(u => u.id === selUnitId);
-            if (!selUnit) {
-                setSelectedUnitId(null);
-                document.getElementById('order-hint')?.classList.add('hidden');
-                return;
-            }
-            
-            const targetOwner = gridData[key];
-            
-            if (targetOwner && isAtWar(myId, targetOwner, wars)) {
-                const enemyUnit = units.find(u => u.pos === key && u.owner !== myId && isAtWar(myId, u.owner, wars));
-                if (enemyUnit) {
-                    const battles = getActiveBattles();
-                    if (!battles.some(b => 
-                        (b.attacker?.id===selUnit.id && b.defender?.id===enemyUnit.id) ||
-                        (b.attacker?.id===enemyUnit.id && b.defender?.id===selUnit.id)
-                    )) {
-                        battles.push({ attacker: selUnit, defender: enemyUnit, daysCounter: 0 });
-                        setActiveBattles(battles);
-                        selUnit.inCombat = true;
-                        enemyUnit.inCombat = true;
-                        addNotification(`⚔️ Атака! ${selUnit.type==='tank'?'🚜':'💂'} vs ${enemyUnit.type==='tank'?'🚜':'💂'}`, 'war');
-                    }
-                } else {
-                    giveOrder(key, selUnitId);
-                }
-                setSelectedUnitId(null);
-                document.getElementById('order-hint')?.classList.add('hidden');
-                markDirty();
-                return;
-            }
-            
-            if (targetOwner === myId || areAlliesCheck(myId, targetOwner)) {
-                giveOrder(key, selUnitId);
-                setSelectedUnitId(null);
-                document.getElementById('order-hint')?.classList.add('hidden');
-                return;
-            }
-            
-            if (targetOwner) addNotification('⚡ Объявите войну! ПКМ по клетке страны.', 'war');
-            else addNotification('🌊 Юниты не ходят по воде!', 'war');
+
+    // Деактивация выделения юнитов по клику на правую кнопку мыши (ПКМ)
+    window.addEventListener('mousedown', (e) => {
+        if (e.button === 2) { 
             setSelectedUnitId(null);
+            window._recruitMode = null;
+            window._selectedArmy = null;
+            document.getElementById('recruit-hint')?.classList.add('hidden');
             document.getElementById('order-hint')?.classList.add('hidden');
-            return;
-        }
-        
-        if (gridData[key]) showCountryInfo(gridData[key], key);
-    });
-    
-    // ========== ПКМ ==========
-    canvas.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (!getMyCountryId()) return;
-        
-        const world = screenToWorld(e.clientX, e.clientY);
-        const key = `${world.x},${world.y}`;
-        const units = getUnits();
-        const myId = getMyCountryId();
-        const gridData = getGridData();
-        
-        const unit = units.find(u => u.pos === key && u.owner === myId);
-        if (unit) {
-            setSelectedUnitId(unit.id);
-            document.getElementById('order-hint')?.classList.remove('hidden');
             document.getElementById('info-sidebar')?.classList.add('hidden');
             showHint('⚔️ ЛКМ по врагу = атака | ЛКМ по клетке = движение');
             return;
         }
         
-        if (gridData[key] && gridData[key] !== myId) {
-            showCountryInfo(gridData[key], key);
+        const key = screenToWorld(e.clientX, e.clientY);
+        const gridData = getGridData();
+        const myId = getMyCountryId();
+        if (gridData[`${key.x},${key.y}`] && gridData[`${key.x},${key.y}`] !== myId) {
+            showCountryInfo(gridData[`${key.x},${key.y}`], `${key.x},${key.y}`);
         }
     });
     
-    // ========== ПРОБЕЛ ==========
+    // ========== ГЛОБАЛЬНЫЙ ХОТКЕЙ: ПРОБЕЛ ДЛЯ ПАУЗЫ ==========
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
             e.preventDefault();
             const s = getGameSpeed();
             if (s === 0) {
@@ -478,23 +167,81 @@ async function init() {
     
     setTimeout(() => ls.remove(), 400);
     
-    function animate() { renderMap(); requestAnimationFrame(animate); }
+    // ✅ ИДЕАЛЬНО ПЛАВНЫЙ ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ ЭКРАНА
+    function animate() { 
+        processCameraMovement(); // Двигаем камеру каждый кадр на основе нажатых клавиш
+        renderMap();             // Отрисовываем карту под новыми плавными координатами
+        requestAnimationFrame(animate); 
+    }
     animate();
+});
+
+// Функции-помощники
+function selectCountryAndStart(id) {
+    setMyCountryId(id);
+    setGameActive(true);
+    setGameSpeed(0);
+    document.getElementById('country-select').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    
+    // Центрирование камеры на провинциях выбранного игрока
+    const myCells = Object.keys(getGridData()).filter(k => getGridData()[k] === id);
+    if (myCells.length > 0) {
+        let sx = 0, sy = 0;
+        myCells.forEach(c => {
+            const [cx, cy] = c.split(',').map(Number);
+            sx += cx * 20; sy += cy * 20;
+        });
+        const { setCamera } = require('./map.js');
+        setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.9 });
+    }
+    
+    updateTopBar(getPlayerResources());
+    document.getElementById('game-date').innerText = getDateString();
 }
 
-// ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ==========
+function changeSpeedUI(val) {
+    setGameSpeed(val);
+    updateSpeedButtons(val);
+}
+
+function updateSpeedButtons(speed) {
+    ['speed-pause', 'speed-1', 'speed-2', 'speed-3'].forEach(id => {
+        document.getElementById(id)?.classList.remove('active');
+    });
+    if (speed === 0) document.getElementById('speed-pause')?.classList.add('active');
+    if (speed === 1) document.getElementById('speed-1')?.classList.add('active');
+    if (speed === 2) document.getElementById('speed-2')?.classList.add('active');
+    if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
+}
+
+// Эмуляция CommonJS require внутри браузерных ESM модулей для ui.js
+function require(moduleName) {
+    if (moduleName === './ui.js') {
+        return {
+            createCountryButton: (countryId, sizes) => {
+                const info = getCountryInfo(countryId);
+                const btn = document.createElement('button');
+                btn.style.borderLeftColor = info.color;
+                btn.style.borderLeftWidth = '4px';
+                btn.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:16px;">🏳️</span>
+                        <div style="text-align:left;">
+                            <div style="font-weight:bold; font-size:13px;">${info.name}</div>
+                            <div style="font-size:10px; color:#888;">Провинций: ${sizes[countryId]} | Лидер: ${info.leader}</div>
+                        </div>
+                    </div>`;
+                return btn;
+            }
+        };
+    }
+    return {};
+}
+
 window.recruitUnit = (type) => {
     document.getElementById('info-window')?.classList.add('hidden');
     window._recruitMode = type;
-    showHint(`🎯 Выберите провинцию для ${UNIT_STATS[type]?.icon} ${UNIT_STATS[type]?.name}`);
+    showHint(`🎯 Выберите провинцию для развёртывания ${UNIT_STATS[type]?.icon || '🎖️'}`);
     document.getElementById('recruit-hint')?.classList.remove('hidden');
 };
-
-window.showSaveMenu = () => showSaveLoadMenu();
-
-// ========== ЗАПУСК ==========
-init().catch(e => {
-    console.error('❌ Ошибка:', e);
-    document.getElementById('loading-screen')?.remove();
-    document.getElementById('main-menu').style.display = '';
-});
