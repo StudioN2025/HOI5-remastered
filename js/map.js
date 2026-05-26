@@ -8,7 +8,7 @@ const canvas = document.getElementById('map-canvas');
 let ctx = canvas.getContext('2d', { 
     alpha: false,
     desynchronized: true,
-    willReadFrequently: false
+    willReadFrequently: true // ✅ ИСПРАВЛЕНО: Оптимизирует частый вызов getImageData/putImageData
 });
 
 const CELL_SIZE = 20;
@@ -359,7 +359,10 @@ function renderTile(tx, ty) {
         offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = TILE_SIZE;
         offscreenCanvas.height = TILE_SIZE;
-        offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false });
+        offscreenCtx = offscreenCanvas.getContext('2d', { 
+            alpha: false,
+            willReadFrequently: true // ✅ ИСПРАВЛЕНО и тут
+        });
     }
 
     // Заполнение фона океана на тайле
