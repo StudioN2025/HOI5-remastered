@@ -1,4 +1,4 @@
-// main.js — С ИСПРАВЛЕНИЕМ ОШИБКИ HUD И СИСТЕМОЙ ФЛАГОВ ИЗ ПАПКИ assets/flags
+// main.js — ПОЛНАЯ ФИНАЛЬНАЯ СБОРКА С ФИКСOM КАРТЫ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -12,7 +12,7 @@ import {
     getActiveBattles, setActiveBattles, initializeFactories,
     autoSave
 } from './game.js';
-import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty, processCameraMovement } from './map.js';
+import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty, processCameraMovement, setCamera } from './map.js';
 import { deployUnit, giveOrder, processMovement, processCombat } from './military.js';
 import { processConstruction, updateEconomy } from './economy.js';
 import { processSupply } from './supply.js';
@@ -33,25 +33,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // Инициализация размеров экрана и событий
+    // Инициализация размеров экрана, холста и событий перед загрузкой карты
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        markDirty();
+    });
     setupMapEvents();
 
     // Загрузка карты из подпапки maps
     try {
         const res = await fetch('./maps/europe.json'); 
+        if (!res.ok) throw new Error(`Сервер ответил со статусом ${res.status}`);
+        
         const data = await res.json();
         if (data && data.gridData) {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
+            
+            // Заставляем рендерер перерисовать кэш карты
             markDirty();
             
             // Генерируем список стран строго после успешной загрузки JSON
             renderCountrySelectionList();
         }
     } catch (e) {
-        console.error('Ошибка загрузки карты:', e);
+        console.error('КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ КАРТЫ:', e);
     }
 
     // Привязка UI кнопок управления скоростью и меню
@@ -86,8 +93,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         for (let i = 0; i < ticks; i++) {
             advanceDay();
-            
-            // Расчет экономических, военных и логистических тиков
             processMovement();
             processCombat();
             processConstruction();
@@ -99,7 +104,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         updateTopBar(getPlayerResources());
-        document.getElementById('game-date').innerText = getDateString();
+        const dateElem = document.getElementById('game-date');
+        if (dateElem) dateElem.innerText = getDateString();
         
         if (Math.random() < 0.03) autoSave();
 
@@ -153,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => ls.remove(), 400);
     }
     
-    // Игровой цикл рендеринга
+    // Игровой цикл непрерывного рендеринга
     function animate() { 
         processCameraMovement(); 
         renderMap();             
@@ -162,21 +168,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
+// Генерация списка стран на чистом JS без импорта ui.js костылей
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
     
     listContainer.innerHTML = '';
     const sizes = {};
-    Object.keys(getGridData()).forEach(pos => {
-        const cid = getGridData()[pos];
+    const gridData = getGridData();
+    
+    Object.keys(gridData).forEach(pos => {
+        const cid = gridData[pos];
         sizes[cid] = (sizes[cid] || 0) + 1;
     });
 
     Object.keys(COUNTRIES).forEach(cid => {
         if (!sizes[cid]) return; 
-        const { createCountryButton } = require('./ui.js');
-        const btn = createCountryButton(cid, sizes);
+        
+        const info = getCountryInfo(cid);
+        const btn = document.createElement('button');
+        btn.style.borderLeftColor = info.color;
+        btn.style.borderLeftWidth = '4px';
+        btn.className = 'country-select-btn'; // Можно стилизовать в CSS
+        
+        btn.innerHTML = `
+            <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
+                <img src="./assets/flags/${cid}.png" 
+                     onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'16\' viewBox=\'0 0 24 16\'><rect width=\'24\' height=\'16\' fill=\'%23555\'/></svg>'" 
+                     style="width:28px; height:18px; object-fit:cover; border:1px solid #444; border-radius:2px;" 
+                     alt="${info.name}"/>
+                <div style="text-align:left;">
+                    <div style="font-weight:bold; font-size:13px; color:#fff;">${info.name}</div>
+                    <div style="font-size:10px; color:#aaa;">Провинций: ${sizes[cid]} | Лидер: ${info.leader}</div>
+                </div>
+            </div>`;
+            
         btn.addEventListener('click', () => selectCountryAndStart(cid));
         listContainer.appendChild(btn);
     });
@@ -188,30 +214,25 @@ function selectCountryAndStart(id) {
     setGameSpeed(0);
     
     document.getElementById('country-select')?.classList.add('hidden');
-    
-    // ✅ ИСПРАВЛЕНО ПАДЕНИЕ: Безопасное переключение игрового интерфейса (HUD)
-    const hud = document.getElementById('hud');
-    if (hud) {
-        hud.classList.remove('hidden');
-    } else {
-        console.warn("Предупреждение: Элемент #hud не найден в index.html. Проверьте разметку!");
-    }
+    document.getElementById('hud')?.classList.remove('hidden');
     
     // Центрирование камеры на провинциях выбранного игрока
-    const myCells = Object.keys(getGridData()).filter(k => getGridData()[k] === id);
+    const gridData = getGridData();
+    const myCells = Object.keys(gridData).filter(k => gridData[k] === id);
     if (myCells.length > 0) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            sx += cx * 20; sy += cy * 20;
+            sx += cx * 20; sy += cy * 20; // 20 — размер ячейки CELL_SIZE
         });
-        const { setCamera } = require('./map.js');
-        setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.9 });
+        setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.8 });
     }
     
     updateTopBar(getPlayerResources());
     const dateElem = document.getElementById('game-date');
     if (dateElem) dateElem.innerText = getDateString();
+    
+    markDirty();
 }
 
 function changeSpeedUI(val) {
@@ -227,42 +248,6 @@ function updateSpeedButtons(speed) {
     if (speed === 1) document.getElementById('speed-1')?.classList.add('active');
     if (speed === 2) document.getElementById('speed-2')?.classList.add('active');
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
-}
-
-// Эмуляция require с интеграцией графических флагов из assets/flags/
-function require(moduleName) {
-    if (moduleName === './ui.js') {
-        return {
-            createCountryButton: (countryId, sizes) => {
-                const info = getCountryInfo(countryId);
-                const btn = document.createElement('button');
-                btn.style.borderLeftColor = info.color;
-                btn.style.borderLeftWidth = '4px';
-                
-                // ✅ Заменяем эмодзи флага на реальную картинку из вашей папки assets/flags/
-                btn.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <img src="./assets/flags/${countryId}.png" 
-                             onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'16\' viewBox=\'0 0 24 16\'><rect width=\'24\' height=\'16\' fill=\'%23555\'/></svg>'" 
-                             style="width:28px; height:18px; object-fit:cover; border:1px solid #444; border-radius:2px;" 
-                             alt="${info.name}"/>
-                        <div style="text-align:left;">
-                            <div style="font-weight:bold; font-size:13px;">${info.name}</div>
-                            <div style="font-size:10px; color:#888;">Провинций: ${sizes[countryId]} | Лидер: ${info.leader}</div>
-                        </div>
-                    </div>`;
-                return btn;
-            }
-        };
-    }
-    if (moduleName === './map.js') {
-        return {
-            setCamera: (c) => {
-                import('./map.js').then(m => m.setCamera(c));
-            }
-        };
-    }
-    return {};
 }
 
 window.recruitUnit = (type) => {
