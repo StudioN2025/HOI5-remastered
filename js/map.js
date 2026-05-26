@@ -13,8 +13,11 @@ let ctx = canvas.getContext('2d', {
 
 const CELL_SIZE = 20;
 
-// Камера
+// Камера и переменные плавности
 let camera = { x: 0, y: 0, zoom: 0.8 };
+let targetCamera = { x: 0, y: 0 }; // Целевая позиция для интерполяции
+let isFirstFrame = true;           // Флаг для начальной привязки
+
 let hoverCell = null;
 
 // Кэши
@@ -33,420 +36,94 @@ let pocketCache = null;
 let pocketFrame = 0;
 const POCKET_INTERVAL = 60;
 
-// Кэш юнитов (обновляется каждый кадр, но рендерится быстро)
-let visibleUnits = [];
+// Кэш юнитов
+let unitCache = null;
+let unitCacheValid = false;
+
+// Состояние клавиш клавиатуры
+let keys = {};
 
 export function getCamera() { return camera; }
-export function getHoverCell() { return hoverCell; }
-export function setHoverCell(cell) { hoverCell = cell; }
-export function getCellSize() { return CELL_SIZE; }
-export { canvas, ctx };
+export function setCamera(c) { 
+    camera = c; 
+    targetCamera.x = c.x;
+    targetCamera.y = c.y;
+    tileCache.clear(); 
+}
 
 export function markDirty() {
     cacheValid = false;
-    tileCache.clear();
-    pocketCache = null;
+    unitCacheValid = false;
 }
 
+// Перевод координат экрана в координаты игрового мира
+export function screenToWorld(sx, sy) {
+    const worldX = (sx - canvas.width / 2) / camera.zoom + camera.x;
+    const worldY = (sy - canvas.height / 2) / camera.zoom + camera.y;
+    return {
+        x: Math.floor(worldX / CELL_SIZE),
+        y: Math.floor(worldY / CELL_SIZE)
+    };
+}
+
+// Изменение размеров холста
 export function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     tileCache.clear();
-    cacheValid = false;
+    markDirty();
+    renderMap();
 }
 
-export function screenToWorld(sx, sy) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-        x: Math.floor(((sx - rect.left - canvas.width/2) / camera.zoom + camera.x) / CELL_SIZE),
-        y: Math.floor(((sy - rect.top - canvas.height/2) / camera.zoom + camera.y) / CELL_SIZE)
-    };
-}
-
-// ✅ ПОЛУЧЕНИЕ ИНДЕКСОВ ВИДИМЫХ КЛЕТОК БЕЗ ПЕРЕБОРА ВСЕХ
-function getVisibleCells() {
-    const invZoom = 1 / camera.zoom;
-    const startX = Math.floor((camera.x - canvas.width/2 * invZoom) / CELL_SIZE) - 1;
-    const endX = Math.ceil((camera.x + canvas.width/2 * invZoom) / CELL_SIZE) + 1;
-    const startY = Math.floor((camera.y - canvas.height/2 * invZoom) / CELL_SIZE) - 1;
-    const endY = Math.ceil((camera.y + canvas.height/2 * invZoom) / CELL_SIZE) + 1;
-    
-    return { startX, endX, startY, endY, 
-        count: (endX - startX) * (endY - startY) 
-    };
-}
-
-// ✅ ТАЙЛОВЫЙ РЕНДЕР
-function getTileKey(tx, ty, zoomLevel) {
-    return `${tx},${ty},${zoomLevel}`;
-}
-
-function renderTile(tx, ty, zoomLevel) {
-    const key = getTileKey(tx, ty, zoomLevel);
-    
-    // Проверяем кэш
-    if (tileCache.has(key)) return tileCache.get(key);
-    
-    // Создаём тайл
-    const tileCanvas = document.createElement('canvas');
-    tileCanvas.width = TILE_SIZE;
-    tileCanvas.height = TILE_SIZE;
-    const tileCtx = tileCanvas.getContext('2d', { alpha: false });
-    
-    const gridData = getGridData();
-    const cellStats = getCellStats() || {};
-    
-    // Вычисляем границы тайла в клетках
-    const cellStartX = tx * Math.floor(TILE_SIZE / CELL_SIZE / zoomLevel);
-    const cellStartY = ty * Math.floor(TILE_SIZE / CELL_SIZE / zoomLevel);
-    const cellsPerTile = Math.ceil(TILE_SIZE / CELL_SIZE / zoomLevel);
-    
-    // Фон
-    tileCtx.fillStyle = '#1b3a4b';
-    tileCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    // ✅ РЕНДЕРИМ ТОЛЬКО КЛЕТКИ ЭТОГО ТАЙЛА
-    for (let dx = 0; dx < cellsPerTile; dx++) {
-        for (let dy = 0; dy < cellsPerTile; dy++) {
-            const cx = cellStartX + dx;
-            const cy = cellStartY + dy;
-            const key = `${cx},${cy}`;
-            const owner = gridData[key];
-            
-            if (!owner) continue;
-            
-            const screenX = dx * CELL_SIZE * zoomLevel;
-            const screenY = dy * CELL_SIZE * zoomLevel;
-            const size = CELL_SIZE * zoomLevel;
-            
-            tileCtx.fillStyle = getCountryInfo(owner).color;
-            tileCtx.fillRect(screenX, screenY, size, size);
-            tileCtx.strokeStyle = 'rgba(0,0,0,0.08)';
-            tileCtx.lineWidth = 0.5;
-            tileCtx.strokeRect(screenX, screenY, size, size);
-            
-            // Иконки только при достаточном зуме
-            if (zoomLevel > 0.5) {
-                const cell = cellStats[key];
-                if (!cell) continue;
-                
-                tileCtx.font = `${Math.max(7, 9 * zoomLevel)}px sans-serif`;
-                tileCtx.textAlign = 'left';
-                tileCtx.textBaseline = 'top';
-                
-                let iconY = screenY + 2 * zoomLevel;
-                if (cell.buildings?.includes('port')) {
-                    tileCtx.fillStyle = '#3b82f6';
-                    tileCtx.fillText('⚓', screenX + 1, iconY);
-                    iconY += 10 * zoomLevel;
-                }
-                if (cell.factories > 0) {
-                    tileCtx.fillStyle = '#fff';
-                    tileCtx.fillText('🏭', screenX + 1, iconY);
-                }
-            }
-        }
-    }
-    
-    // Управление размером кэша
-    if (tileCache.size >= MAX_TILES) {
-        const firstKey = tileCache.keys().next().value;
-        tileCache.delete(firstKey);
-    }
-    
-    tileCache.set(key, tileCanvas);
-    return tileCanvas;
-}
-
-// Основной рендер
-export function renderMap() {
-    if (!ctx) return;
-    
-    const gridData = getGridData();
-    const visible = getVisibleCells();
-    const now = Date.now();
-    
-    // ✅ ЕСЛИ ВИДИМО МАЛО КЛЕТОК — ПРЯМОЙ РЕНДЕР
-    if (visible.count < 10000) {
-        renderDirect(visible, gridData, now);
-        return;
-    }
-    
-    // ✅ ТАЙЛОВЫЙ РЕНДЕР ДЛЯ БОЛЬШИХ КАРТ
-    const zoomLevel = Math.round(camera.zoom * 4) / 4; // Квантуем зум
-    const tilesX = Math.ceil(canvas.width / TILE_SIZE) + 1;
-    const tilesY = Math.ceil(canvas.height / TILE_SIZE) + 1;
-    
-    const baseTx = Math.floor(camera.x / (TILE_SIZE / zoomLevel));
-    const baseTy = Math.floor(camera.y / (TILE_SIZE / zoomLevel));
-    
-    ctx.fillStyle = '#1b3a4b';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    for (let ty = 0; ty < tilesY; ty++) {
-        for (let tx = 0; tx < tilesX; tx++) {
-            const tile = renderTile(baseTx + tx, baseTy + ty, zoomLevel);
-            if (!tile) continue;
-            
-            const screenX = (baseTx + tx) * TILE_SIZE - camera.x * zoomLevel + canvas.width/2;
-            const screenY = (baseTy + ty) * TILE_SIZE - camera.y * zoomLevel + canvas.height/2;
-            
-            ctx.drawImage(tile, screenX, screenY, TILE_SIZE, TILE_SIZE);
-        }
-    }
-    
-    // ✅ КОТЛЫ (редко)
-    pocketFrame++;
-    if (pocketFrame >= POCKET_INTERVAL) {
-        pocketFrame = 0;
-        updatePocketCache();
-    }
-    
-    if (pocketCache) {
-        ctx.save();
-        ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
-        ctx.scale(camera.zoom, camera.zoom);
-        
-        for (const pocket of pocketCache) {
-            const pulse = Math.sin(now / 500) * 0.3 + 0.7;
-            for (const pos of pocket.cells) {
-                const [x, y] = pos.split(',').map(Number);
-                ctx.strokeStyle = pocket.isEnemy ? `rgba(255,30,30,${pulse})` : `rgba(255,200,0,${pulse})`;
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
-                ctx.strokeRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-                ctx.setLineDash([]);
-            }
-        }
-        ctx.restore();
-    }
-    
-    // ✅ ЮНИТЫ и ховер
-    renderDynamicLayer(visible, now);
-}
-
-// Прямой рендер для маленьких карт
-function renderDirect(visible, gridData, now) {
-    ctx.fillStyle = '#1b3a4b';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    const cellStats = getCellStats() || {};
-    const buildingQueue = getBuildingQueue();
-    
-    ctx.save();
-    ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
-    ctx.scale(camera.zoom, camera.zoom);
-    
-    const { startX, endX, startY, endY } = visible;
-    
-    // Клетки
-    for (let x = startX; x <= endX; x++) {
-        for (let y = startY; y <= endY; y++) {
-            const key = `${x},${y}`;
-            const owner = gridData[key];
-            if (!owner) continue;
-            
-            ctx.fillStyle = getCountryInfo(owner).color;
-            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            
-            const cell = cellStats[key];
-            if (cell) {
-                ctx.font = '9px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-                let iy = y * CELL_SIZE + 2;
-                if (cell.buildings?.includes('port')) {
-                    ctx.fillStyle = '#3b82f6';
-                    ctx.fillText('⚓', x * CELL_SIZE + 1, iy);
-                    iy += 10;
-                }
-                if (cell.factories > 0) {
-                    ctx.fillStyle = '#fff';
-                    ctx.fillText('🏭', x * CELL_SIZE + 1, iy);
-                }
-            }
-        }
-    }
-    
-    // Стройка
-    if (buildingQueue.length > 0 && buildingQueue[0]?.pos) {
-        const [bx, by] = buildingQueue[0].pos.split(',').map(Number);
-        const stats = BUILDING_STATS[buildingQueue[0].type];
-        if (stats) {
-            const p = Math.max(0, Math.min(1, (stats.buildTime - buildingQueue[0].daysLeft) / stats.buildTime));
-            ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.fillRect(bx * CELL_SIZE, by * CELL_SIZE + CELL_SIZE - 3, CELL_SIZE, 3);
-            ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(bx * CELL_SIZE, by * CELL_SIZE + CELL_SIZE - 3, CELL_SIZE * p, 3);
-        }
-    }
-    
-    ctx.restore();
-    
-    // Котлы
-    pocketFrame++;
-    if (pocketFrame >= POCKET_INTERVAL) {
-        pocketFrame = 0;
-        updatePocketCache();
-    }
-    
-    if (pocketCache) {
-        ctx.save();
-        ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
-        ctx.scale(camera.zoom, camera.zoom);
-        
-        for (const pocket of pocketCache) {
-            const pulse = Math.sin(now / 500) * 0.3 + 0.7;
-            for (const pos of pocket.cells) {
-                const [x, y] = pos.split(',').map(Number);
-                ctx.strokeStyle = pocket.isEnemy ? `rgba(255,30,30,${pulse})` : `rgba(255,200,0,${pulse})`;
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
-                ctx.strokeRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-                ctx.setLineDash([]);
-            }
-        }
-        ctx.restore();
-    }
-    
-    renderDynamicLayer(visible, now);
-}
-
-// ✅ ДИНАМИЧЕСКИЙ СЛОЙ (юниты, ховер)
-function renderDynamicLayer(visible, now) {
-    const units = getUnits();
-    const myId = getMyCountryId();
-    const selectedUnitId = getSelectedUnitId();
-    const gridData = getGridData();
-    const { startX, endX, startY, endY } = visible;
-    
-    ctx.save();
-    ctx.translate(canvas.width/2 - camera.x * camera.zoom, canvas.height/2 - camera.y * camera.zoom);
-    ctx.scale(camera.zoom, camera.zoom);
-    
-    // ✅ ТОЛЬКО ВИДИМЫЕ ЮНИТЫ
-    for (const u of units) {
-        if (!u?.pos) continue;
-        const [ux, uy] = u.pos.split(',').map(Number);
-        if (ux < startX || ux > endX || uy < startY || uy > endY) continue;
-        
-        const cx = ux * CELL_SIZE + CELL_SIZE/2;
-        const cy = uy * CELL_SIZE + CELL_SIZE/2;
-        
-        // Путь (только для выбранного)
-        if (u.id === selectedUnitId && u.path?.length > 0) {
-            const lastStep = u.path[u.path.length - 1];
-            if (lastStep) {
-                const [ex, ey] = lastStep.split(',').map(Number);
-                
-                ctx.strokeStyle = 'rgba(255,215,0,0.5)';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([3, 5]);
-                ctx.beginPath();
-                ctx.arc(ex * CELL_SIZE + CELL_SIZE/2, ey * CELL_SIZE + CELL_SIZE/2, CELL_SIZE * 0.3, 0, Math.PI*2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-        }
-        
-        // Подсветка
-        if (u.id === selectedUnitId) {
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([]);
-            ctx.strokeRect(ux * CELL_SIZE - 1, uy * CELL_SIZE - 1, CELL_SIZE + 2, CELL_SIZE + 2);
-        }
-        
-        // Иконка
-        ctx.font = `${Math.min(14, CELL_SIZE * camera.zoom * 0.7)}px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#fff';
-        
-        if (u.trainingDaysLeft > 0) {
-            ctx.globalAlpha = 0.5;
-            ctx.fillText('🛠', cx, cy);
-            ctx.globalAlpha = 1;
-        } else {
-            ctx.fillText(u.type === 'tank' ? '🚜' : '💂', cx, cy);
-        }
-        
-        // HP
-        if (u.hp != null) {
-            const maxHp = u.type === 'tank' ? 50 : 100;
-            const hpP = Math.max(0, Math.min(1, u.hp / maxHp));
-            const bw = CELL_SIZE * 0.5;
-            const bx = ux * CELL_SIZE + (CELL_SIZE - bw)/2;
-            const by = uy * CELL_SIZE + CELL_SIZE - 4;
-            
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.fillRect(bx, by, bw, 2);
-            ctx.fillStyle = hpP > 0.5 ? '#22c55e' : hpP > 0.25 ? '#eab308' : '#ef4444';
-            ctx.fillRect(bx, by, bw * hpP, 2);
-        }
-    }
-    
-    // Ховер
-    if (hoverCell && gridData[hoverCell]) {
-        const [hx, hy] = hoverCell.split(',').map(Number);
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([]);
-        ctx.strokeRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    }
-    
-    ctx.restore();
-}
-
-function updatePocketCache() {
-    try {
-        const myId = getMyCountryId();
-        const wars = window._wars || [];
-        if (!myId || !wars.length) { pocketCache = null; return; }
-        
-        import('./supply.js').then(m => {
-            const allPockets = [];
-            const countries = [...new Set(Object.values(getGridData()))];
-            for (const countryId of countries) {
-                const isEnemy = wars.some(w => (w.a === myId && w.b === countryId) || (w.b === myId && w.a === countryId));
-                if (!isEnemy && countryId !== myId) continue;
-                
-                const pockets = m.getPocketsForCountry(countryId);
-                for (const p of pockets) {
-                    allPockets.push({ ...p, isEnemy: countryId !== myId });
-                }
-            }
-            pocketCache = allPockets.length > 0 ? allPockets : null;
-        });
-    } catch(e) { pocketCache = null; }
-}
-
-export function updateCamera() {
-    const keys = window._keys || {};
-    const speed = 15 / camera.zoom;
+// ✅ ОБНОВЛЕНИЕ КАМЕРЫ КАЖДЫЙ КАДР (Инерция и Плавность)
+export function processCameraMovement() {
+    let speed = 12 / camera.zoom; // Скорость перемещения зависит от зума
     let moved = false;
-    if (keys['KeyW'] || keys['ArrowUp']) { camera.y -= speed; moved = true; }
-    if (keys['KeyS'] || keys['ArrowDown']) { camera.y += speed; moved = true; }
-    if (keys['KeyA'] || keys['ArrowLeft']) { camera.x -= speed; moved = true; }
-    if (keys['KeyD'] || keys['ArrowRight']) { camera.x += speed; moved = true; }
-    if (moved) renderMap();
+
+    // Первичная инициализация целевой позиции
+    if (isFirstFrame) {
+        targetCamera.x = camera.x;
+        targetCamera.y = camera.y;
+        isFirstFrame = false;
+    }
+
+    // Изменяем целевую позицию при нажатии клавиш
+    if (keys['KeyW'] || keys['ArrowUp'])    { targetCamera.y -= speed; moved = true; }
+    if (keys['KeyS'] || keys['ArrowDown'])  { targetCamera.y += speed; moved = true; }
+    if (keys['KeyA'] || keys['ArrowLeft'])  { targetCamera.x -= speed; moved = true; }
+    if (keys['KeyD'] || keys['ArrowRight']) { targetCamera.x += speed; moved = true; }
+
+    // Линейная интерполяция (LERP) для плавного дотягивания (0.15 — коэффициент мягкости)
+    const dx = targetCamera.x - camera.x;
+    const dy = targetCamera.y - camera.y;
+
+    if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+        camera.x += dx * 0.15;
+        camera.y += dy * 0.15;
+        tileCache.clear(); // Сбрасываем кэш, так как координаты сдвинулись
+    }
 }
 
+// ✅ НАСТРОЙКА СОБЫТИЙ КАРТЫ
 export function setupMapEvents() {
+    // Плавный зум к позиции курсора мыши
     canvas.addEventListener('wheel', e => {
         e.preventDefault();
         const before = screenToWorld(e.clientX, e.clientY);
+        
         camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.05), 10);
+        
         const after = screenToWorld(e.clientX, e.clientY);
+        
+        // Корректируем позицию, чтобы зум шёл в точку курсора
         camera.x += before.x - after.x;
         camera.y += before.y - after.y;
+        
+        // Синхронизируем целевую позицию, чтобы избежать рывков инерции после зума
+        targetCamera.x = camera.x;
+        targetCamera.y = camera.y;
+
         tileCache.clear();
-        renderMap();
     }, { passive: false });
 
     canvas.addEventListener('mousemove', e => {
@@ -454,21 +131,304 @@ export function setupMapEvents() {
         const nh = `${world.x},${world.y}`;
         if (getGridData()[nh] !== undefined && hoverCell !== nh) {
             hoverCell = nh;
-            renderMap();
         } else if (!getGridData()[nh] && hoverCell) {
             hoverCell = null;
-            renderMap();
         }
     });
 
-    canvas.addEventListener('mouseleave', () => { hoverCell = null; renderMap(); });
+    canvas.addEventListener('mouseleave', () => { 
+        hoverCell = null; 
+    });
 
-    window._keys = {};
-    window.addEventListener('keydown', e => { window._keys[e.code] = true; });
-    window.addEventListener('keyup', e => { window._keys[e.code] = false; });
+    // Фиксация нажатий клавиатуры
+    window.addEventListener('keydown', e => {
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        keys[e.code] = true;
+    });
 
-    setInterval(updateCamera, 1000/30);
+    window.addEventListener('keyup', e => {
+        keys[e.code] = false;
+    });
+
+    // Клик по карте
+    canvas.addEventListener('click', async (e) => {
+        const world = screenToWorld(e.clientX, e.clientY);
+        const key = `${world.x},${world.y}`;
+        const gridData = getGridData();
+        const myId = getMyCountryId();
+
+        if (window._recruitMode) {
+            if (gridData[key] !== myId) {
+                const { addNotification } = await import('./utils.js');
+                addNotification('Можно нанимать войска только на своей территории!', 'war');
+                return;
+            }
+            const { deployUnit } = await import('./military.js');
+            deployUnit(key, window._recruitMode);
+            window._recruitMode = null;
+            document.getElementById('recruit-hint')?.classList.add('hidden');
+            return;
+        }
+
+        const selId = getSelectedUnitId();
+        if (selId !== null) {
+            const units = getUnits();
+            const u = units.find(unit => unit.id === selId);
+            if (u && u.owner === myId) {
+                const targetUnit = units.find(unit => unit.pos === key && unit.id !== selId);
+                const { giveOrder } = await import('./military.js');
+                
+                if (targetUnit && isAtWar(myId, targetUnit.owner, window._wars || [])) {
+                    giveOrder(selId, key, 'attack');
+                } else {
+                    giveOrder(selId, key, 'move');
+                }
+                const { setSelectedUnitId } = await import('./game.js');
+                setSelectedUnitId(null);
+                document.getElementById('order-hint')?.classList.add('hidden');
+                return;
+            }
+        }
+
+        if (window._selectedArmy) {
+            if (gridData[key] && isAtWar(myId, gridData[key], window._wars || [])) {
+                const { getArmies } = await import('./commanders.js');
+                const army = getArmies().find(a => a.id === window._selectedArmy);
+                if (army) {
+                    const { giveOrder } = await import('./military.js');
+                    army.units.forEach(uid => giveOrder(uid, key, 'attack'));
+                    const { addNotification } = await import('./utils.js');
+                    addNotification(`Армия "${army.name}" начала наступление!`, 'info');
+                }
+            }
+            window._selectedArmy = null;
+            document.getElementById('order-hint')?.classList.add('hidden');
+            return;
+        }
+
+        const clickedUnit = getUnits().find(u => u.pos === key);
+        if (clickedUnit && clickedUnit.owner === myId && (clickedUnit.trainingDaysLeft || 0) <= 0) {
+            const { setSelectedUnitId } = await import('./game.js');
+            setSelectedUnitId(clickedUnit.id);
+            document.getElementById('info-sidebar')?.classList.add('hidden');
+            const { showHint } = await import('./ui.js');
+            showHint('⚔️ ЛКМ по врагу = атака | ЛКМ по клетке = движение');
+            return;
+        }
+        
+        if (gridData[key] && gridData[key] !== myId) {
+            const { showCountryInfo } = await import('./ui.js');
+            showCountryInfo(gridData[key], key);
+        }
+    });
 }
 
-resizeCanvas();
-window.addEventListener('resize', () => { resizeCanvas(); renderMap(); });
+// ✅ ОСНОВНОЙ РЕНДЕР КАРТЫ
+export function renderMap() {
+    if (!canvas.width || !canvas.height) return;
+
+    // Очистка экрана базовым цветом океана
+    ctx.fillStyle = '#1b3a4b'; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const gridData = getGridData();
+    const myCountryId = getMyCountryId();
+
+    // Расчет видимого диапазона тайлов
+    const startTileX = Math.floor(((0 - canvas.width / 2) / camera.zoom + camera.x) / TILE_SIZE);
+    const endTileX = Math.ceil(((canvas.width - canvas.width / 2) / camera.zoom + camera.x) / TILE_SIZE);
+    const startTileY = Math.floor(((0 - canvas.height / 2) / camera.zoom + camera.y) / TILE_SIZE);
+    const endTileY = Math.ceil(((canvas.height - canvas.height / 2) / camera.zoom + camera.y) / TILE_SIZE);
+
+    // Отрисовка видимых тайлов
+    for (let tx = startTileX; tx <= endTileX; tx++) {
+        for (let ty = startTileY; ty <= endTileY; ty++) {
+            renderTile(tx, ty);
+        }
+    }
+
+    // Отрисовка динамических объектов (Котлы, Бои, Юниты) поверх кэша тайлов
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(-camera.x, -camera.y);
+
+    // Отрисовка котлов логистической системы
+    const { drawPockets } = requireSupply();
+    if (drawPockets) {
+        drawPockets(ctx, CELL_SIZE, pocketCache, pocketFrame, POCKET_INTERVAL, (data) => pocketCache = data, (f) => pocketFrame = f);
+    }
+
+    // Подсветка клетки под курсором мыши
+    if (hoverCell) {
+        const [hx, hy] = hoverCell.split(',').map(Number);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+
+    // Визуализация текущих сражений
+    const battles = window._activeBattles || [];
+    battles.forEach(b => {
+        if (!b.attacker || !b.defender) return;
+        const [ax, ay] = b.attacker.pos.split(',').map(Number);
+        const [dx, dy] = b.defender.pos.split(',').map(Number);
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ax * CELL_SIZE + CELL_SIZE / 2, ay * CELL_SIZE + CELL_SIZE / 2);
+        ctx.lineTo(dx * CELL_SIZE + CELL_SIZE / 2, dy * CELL_SIZE + CELL_SIZE / 2);
+        ctx.stroke();
+
+        ctx.font = '10px serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.fillText('💥', dx * CELL_SIZE + CELL_SIZE / 2, dy * CELL_SIZE + CELL_SIZE / 2 - 2);
+    });
+
+    // Отрисовка армий и дивизий
+    const units = getUnits();
+    const selUnitId = getSelectedUnitId();
+
+    units.forEach(u => {
+        const [ux, uy] = u.pos.split(',').map(Number);
+        const isSelected = u.id === selUnitId;
+
+        // Коррекция смещения юнитов на одной клетке
+        let offsetX = 0, offsetY = 0;
+        const shared = units.filter(o => o.pos === u.pos);
+        if (shared.length > 1) {
+            const idx = shared.findIndex(o => o.id === u.id);
+            offsetX = (idx % 2) * 6 - 3;
+            offsetY = Math.floor(idx / 2) * 6 - 3;
+        }
+
+        const rx = ux * CELL_SIZE + CELL_SIZE / 2 + offsetX;
+        const ry = uy * CELL_SIZE + CELL_SIZE / 2 + offsetY;
+
+        // Отрисовка плашек юнитов
+        ctx.fillStyle = u.owner === myCountryId ? '#15803d' : '#ef4444';
+        if (isSelected) ctx.fillStyle = '#eab308';
+
+        ctx.beginPath();
+        ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Отображение типа юнита (Пехота / Танки)
+        ctx.fillStyle = 'white';
+        ctx.font = '7px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(u.type === 'tank' ? '♞' : '♟', rx, ry);
+
+        // Индикатор ХП дивизии под кружком
+        const hpPercent = (u.hp || 100) / 100;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(rx - 6, ry + 7, 12, 2);
+        ctx.fillStyle = hpPercent > 0.5 ? '#22c55e' : '#ef4444';
+        ctx.fillRect(rx - 6, ry + 7, 12 * hpPercent, 2);
+
+        // Метка снабжения (если отрезан от баз)
+        if (u.outOfSupply) {
+            ctx.fillStyle = '#f97316';
+            ctx.font = '8px sans-serif';
+            ctx.fillText('⚠️', rx + 6, ry - 6);
+        }
+    });
+
+    ctx.restore();
+}
+
+// ✅ ОТРИСОВКА И КЭШИРОВАНИЕ ТАЙЛОВ КАРТЫ
+function renderTile(tx, ty) {
+    const cacheKey = `${tx},${ty},${camera.zoom}`;
+    
+    if (tileCache.has(cacheKey)) {
+        const imgData = tileCache.get(cacheKey);
+        const sx = tx * TILE_SIZE - camera.x * camera.zoom + canvas.width / 2;
+        const sy = ty * TILE_SIZE - camera.y * camera.zoom + canvas.height / 2;
+        ctx.putImageData(imgData, sx, sy);
+        return;
+    }
+
+    if (!offscreenCanvas) {
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = TILE_SIZE;
+        offscreenCanvas.height = TILE_SIZE;
+        offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false });
+    }
+
+    // Заполнение фона океана на тайле
+    offscreenCtx.fillStyle = '#1b3a4b';
+    offscreenCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    offscreenCtx.save();
+    offscreenCtx.scale(camera.zoom, camera.zoom);
+    
+    const worldTileSize = TILE_SIZE / camera.zoom;
+    const wx0 = tx * worldTileSize;
+    const wy0 = ty * worldTileSize;
+    offscreenCtx.translate(-wx0, -wy0);
+
+    const gridData = getGridData();
+    const cellStats = getCellStats();
+    const myId = getMyCountryId();
+
+    const cx0 = Math.floor(wx0 / CELL_SIZE) - 1;
+    const cx1 = Math.ceil((wx0 + worldTileSize) / CELL_SIZE) + 1;
+    const cy0 = Math.floor(wy0 / CELL_SIZE) - 1;
+    const cy1 = Math.ceil((wy0 + worldTileSize) / CELL_SIZE) + 1;
+
+    // Отрисовка сухопутных ячеек провинций внутри тайла
+    for (let cx = cx0; cx <= cx1; cx++) {
+        for (let cy = cy0; cy <= cy1; cy++) {
+            const posKey = `${cx},${cy}`;
+            const countryId = gridData[posKey];
+            if (!countryId) continue;
+
+            const info = getCountryInfo(countryId);
+            offscreenCtx.fillStyle = info.color || '#4b5563';
+            offscreenCtx.fillRect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+            // Тонкая разметка границ
+            offscreenCtx.strokeStyle = 'rgba(0,0,0,0.15)';
+            offscreenCtx.lineWidth = 0.5;
+            offscreenCtx.strokeRect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+            // Отрисовка построенных фабрик / заводов
+            const cStat = cellStats[posKey];
+            if (cStat && cStat.factories > 0) {
+                offscreenCtx.fillStyle = 'rgba(255,255,255,0.25)';
+                offscreenCtx.font = '7px sans-serif';
+                offscreenCtx.fillText('🏭', cx * CELL_SIZE + 2, cy * CELL_SIZE + CELL_SIZE - 2);
+            }
+        }
+    }
+
+    offscreenCtx.restore();
+
+    // Сохранение готового изображения тайла в ОЗУ кэша
+    const imgData = offscreenCtx.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
+    if (tileCache.size >= MAX_TILES) {
+        const firstKey = tileCache.keys().next().value;
+        tileCache.delete(firstKey);
+    }
+    tileCache.set(cacheKey, imgData);
+
+    const sx = tx * TILE_SIZE - camera.x * camera.zoom + canvas.width / 2;
+    const sy = ty * TILE_SIZE - camera.y * camera.zoom + canvas.height / 2;
+    ctx.putImageData(imgData, sx, sy);
+}
+
+// Ленивый импорт логистики для разрыва циклических зависимостей
+let supplyModule = null;
+function requireSupply() {
+    if (!supplyModule && window._modules && window._modules.supply) {
+        supplyModule = window._modules.supply;
+    }
+    return supplyModule || {};
+}
