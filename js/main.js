@@ -1,4 +1,4 @@
-// main.js — ПОЛНЫЙ С КОМАНДУЮЩИМИ И ПЛАВНЫМ ИГРОВЫМ ЦИКЛОМ
+// main.js — ПОЛНЫЙ ИСПРАВЛЕННЫЙ ФАЙЛ ДЛЯ СЕРВЕРА GITHUB PAGES
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -38,16 +38,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', resizeCanvas);
     setupMapEvents();
 
-    // ✅ ИСПРАВЛЕНО: Изменен путь на относительный локальный для корректной работы fetch
+    // ✅ ТОЧНЫЙ ПУТЬ ДЛЯ GITHUB PAGES К ПАПКЕ maps
     try {
-        const res = await fetch('europe.json'); // Если файл лежит в корне проекта. Если в папке: 'js/europe.json'
+        const res = await fetch('./maps/europe.json'); 
         const data = await res.json();
         if (data && data.gridData) {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             markDirty();
             
-            // Генерируем список стран только после того, как карта загружена в память
+            // Генерируем список стран строго после успешной загрузки JSON
             renderCountrySelectionList();
         }
     } catch (e) {
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // ✅ ИСПРАВЛЕНО: Безопасное удаление экрана загрузки
+    // ✅ БЕЗОПАСНОЕ УДАЛЕНИЕ ЭКРАНА ЗАГРУЗКИ
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
-// ✅ Вынесено в отдельную функцию для безопасного вызова после fetch
+// ✅ ВЫНЕСЕНО В ОТДЕЛЬНУЮ ФУНКЦИЮ ДЛЯ БЕЗОПАСНОГО ВЫЗОВА ПОСЛЕ FETCH
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -243,6 +243,13 @@ function require(moduleName) {
             }
         };
     }
+    if (moduleName === './map.js') {
+        return {
+            setCamera: (c) => {
+                import('./map.js').then(m => m.setCamera(c));
+            }
+        };
+    }
     return {};
 }
 
@@ -252,3 +259,5 @@ window.recruitUnit = (type) => {
     showHint(`🎯 Выберите провинцию для развёртывания ${UNIT_STATS[type]?.icon || '🎖️'}`);
     document.getElementById('recruit-hint')?.classList.remove('hidden');
 };
+
+window.showSaveMenu = () => showSaveLoadMenu();
