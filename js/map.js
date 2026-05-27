@@ -54,7 +54,7 @@ export function setCamera(newCam) {
     markDirty();
 }
 
-// Преобразование экранных координат мыши в координаты игровой сетки (с учетом сдвига карты)
+// Преобразование экранных координат мыши в координаты игровой сетки
 export function screenToWorld(screenX, screenY) {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return { x: 0, y: 0 };
@@ -118,13 +118,12 @@ export function setupMapEvents() {
     });
 }
 
-// 🔥 ФИКС: АВТОМАТИЧЕСКИЙ РАСЧЕТ РАЗМЕРОВ И СДВИГА ДЛЯ КАРТ С ЦЕНТРОМ В 0,0
+// ГЕНЕРАЦИЯ СКРЫТОГО КЭША КАРТЫ С УЧЕТОМ СДВИГОВ СУШИ
 defineDrawCache();
 function drawBaseMapCache() {
     const gridData = getGridData();
     if (!gridData || Object.keys(gridData).length === 0) return;
 
-    // Находим экстремумы (минимумы и максимумы) координат, включая отрицательные
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
@@ -136,33 +135,26 @@ function drawBaseMapCache() {
         if (cy > maxY) maxY = cy;
     });
 
-    // Запоминаем сдвиг: если minX = -50, то нам нужно сдвинуть всё вправо на +50 клеток, чтобы войти в видимую зону холста
     mapOffset.x = minX < 0 ? Math.abs(minX) + 5 : 5;
     mapOffset.y = minY < 0 ? Math.abs(minY) + 5 : 5;
 
-    // Вычисляем полный физический размер карты от самого левого до самого правого края
     const totalWidthCells = (maxX - minX) + mapOffset.x + 10;
     const totalHeightCells = (maxY - minY) + mapOffset.y + 10;
 
-    if (!bgCanvas) {
-        bgCanvas = document.createElement('canvas');
-    }
+    if (!bgCanvas) bgCanvas = document.createElement('canvas');
     
     bgCanvas.width = totalWidthCells * CELL_SIZE;
     bgCanvas.height = totalHeightCells * CELL_SIZE;
     bgCtx = bgCanvas.getContext('2d');
 
-    // Заливаем всё пространство морем
     bgCtx.fillStyle = '#1a2b4c'; 
     bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 
-    // Отрисовка цветных провинций суши с учетом mapOffset
     for (const key in gridData) {
         const [cx, cy] = key.split(',').map(Number);
         const countryId = gridData[key];
         const info = COUNTRIES[countryId];
         
-        // Применяем сдвиг координат, перенося минусы в плюсы
         const drawX = (cx + mapOffset.x) * CELL_SIZE;
         const drawY = (cy + mapOffset.y) * CELL_SIZE;
 
@@ -170,7 +162,6 @@ function drawBaseMapCache() {
         bgCtx.fillRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
     }
 
-    // Наложение сетки и легких границ между клетками
     bgCtx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
     bgCtx.lineWidth = 1;
     for (const key in gridData) {
@@ -197,17 +188,11 @@ export function renderMap() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    
-    // Центрируем камеру
     ctx.translate(canvas.width / 2 + camera.x, canvas.height / 2 + camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    // Выводим сгенерированный кэш карты на экран
-    if (bgCanvas) {
-        ctx.drawImage(bgCanvas, 0, 0);
-    }
+    if (bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
 
-    // ОТРИСОВКА ЮНИТОВ (Тоже с учетом mapOffset)
     const units = getUnits();
     const selectedUnitId = getSelectedUnitId();
 
@@ -216,7 +201,6 @@ export function renderMap() {
             const unit = units[uid];
             if (!unit || unit.x === undefined || unit.y === undefined) continue;
 
-            // Сдвигаем координаты юнита на тот же офсет, что и карту
             const screenX = (unit.x + mapOffset.x) * CELL_SIZE + CELL_SIZE / 2;
             const screenY = (unit.y + mapOffset.y) * CELL_SIZE + CELL_SIZE / 2;
 
