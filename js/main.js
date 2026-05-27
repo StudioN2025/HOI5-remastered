@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
     document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
 
-    // Суточный цикл игры
+    // Игровой суточный цикл
     setInterval(() => {
         const speed = getGameSpeed();
         if (speed === 0 || !getMyCountryId()) return;
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
 
-    // 🔥 ФИКС ИНТЕРАКТИВНОСТИ: Вешаем клик непосредственно на холст карты
+    // 🔥 РЕГИСТРАЦИЯ КЛИКОВ НАПРЯМУЮ НА ХОЛСТЕ КАРТЫ
     const mapCanvasElement = document.getElementById('map-canvas');
     if (mapCanvasElement) {
         mapCanvasElement.addEventListener('mousedown', (e) => {
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             
-            if (e.button === 0) { // ЛКМ — выбор клетки
+            if (e.button === 0) { // ЛКМ — клик по ячейке
                 const coord = screenToWorld(e.clientX, e.clientY);
                 const gridData = getGridData();
                 const cellKey = `${coord.x},${coord.y}`;
@@ -286,7 +286,6 @@ function updateSpeedButtons(speed) {
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
 }
 
-// Глобальные методы дипломатии и строительства для инлайновых вызовов onclick
 window.declareWarOn = (targetCountryId) => {
     const myId = getMyCountryId();
     if (!myId || myId === targetCountryId) return;
