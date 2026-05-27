@@ -2,90 +2,86 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>HOI5 Remastered — Глобальная Стратегия</title>
-    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hearts of Iron V: Remastered</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body oncontextmenu="return false;">
+<body>
 
     <canvas id="map-canvas"></canvas>
 
-    <div id="main-menu">
-        <div class="hq-folder" id="menu-home">
-            <h1>HEARTS OF IRON V<br><span class="subtitle-main">REMASTERED</span></h1>
-            <p class="subtitle">Grand Strategy Command</p>
-            <button id="btn-play" class="hq-button">🗺️ НАЧАТЬ ИГРУ</button>
-            <p class="version-text">Oberkommando — Simulation Module v2.0</p>
+    <div id="loading-screen">
+        <div class="loader-content">
+            <h2>ЗАГРУЗКА СИМУЛЯЦИИ...</h2>
+            <div class="spinner"></div>
         </div>
     </div>
 
-    <div id="country-select" class="fullscreen-overlay hidden">
-        <div class="select-card">
-            <h2>ВЫБЕРИТЕ ДЕРЖАВУ</h2>
+    <div id="main-menu">
+        <div class="menu-box">
+            <h1>HOI5: REMASTERED</h1>
+            <p>Глобальная пошагово-временная стратегия</p>
+            <button id="btn-play" class="menu-btn">НОВАЯ ИГРА</button>
+            <button id="btn-menu-load" class="menu-btn" onclick="window.showSaveMenu()">ЗАГРУЗИТЬ СЕССИЮ</button>
+        </div>
+    </div>
+
+    <div id="country-select" class="hidden">
+        <div class="select-box">
+            <h2>ВЫБЕРИТЕ ДЕРЖАВУ ДЛЯ УПРАВЛЕНИЯ</h2>
             <div id="country-list"></div>
-            <button id="btn-cancel" class="cancel-btn">НАЗАД</button>
+            <button id="btn-cancel" class="hq-button cancel-btn">НАЗАД В МЕНЮ</button>
         </div>
     </div>
 
     <div id="hud" class="hidden">
         <div id="top-bar">
-            <span id="game-date">1 ЯНВ 1936</span>
-            <div class="resource-item">🔫 Снаряжение: <span id="val-equipment">1000</span></div>
-            <div class="resource-item">🏭 Заводы: <span id="val-factories">0</span></div>
-            <div class="resource-item">👥 Людские ресурсы: <span id="val-manpower">500k</span></div>
+            <div class="res-item" title="Военное снаряжение на складах">🪖 Снаряжение: <span id="val-equipment">0</span></div>
+            <div class="res-item" title="Гражданские и военные заводы">🏗️ Фабрики: <span id="val-factories">0</span></div>
+            <div class="res-item" title="Доступный людской ресурс">👤 Призывники: <span id="val-manpower">0</span></div>
+            <div class="res-item" id="game-date" style="margin-left: auto; font-weight: bold; color: #ffcc00;">01.01.1936</div>
         </div>
 
         <div id="speed-controls">
-            <button id="speed-pause" class="active">⏸</button>
-            <button id="speed-1">▶</button>
-            <button id="speed-2">▶▶</button>
-            <button id="speed-3">▶▶▶</button>
+            <button id="speed-pause" class="speed-btn active">⏸</button>
+            <button id="speed-1" class="speed-btn">▶</button>
+            <button id="speed-2" class="speed-btn">▶▶</button>
+            <button id="speed-3" class="speed-btn">⚡</button>
         </div>
-        
+
         <div id="game-navigation">
-            <button id="nav-focus">⚡ Фокусы</button>
-            <button id="nav-research">🔬 Технологии</button>
-            <button id="nav-commanders">👤 Генералы</button>
-            <button id="nav-save">💾 Меню</button>
+            <button id="nav-research" class="nav-btn">🔬 Наука</button>
+            <button id="nav-focus" class="nav-btn">⚡ Фокусы</button>
+            <button id="nav-commanders" class="nav-btn">👤 Штаб</button>
+            <button id="nav-save" class="nav-btn">💾 Меню</button>
+        </div>
+    </div>
+
+    <div id="info-sidebar" class="hidden">
+        <div class="sidebar-header">
+            <h3 id="sidebar-title">РЕГИОН</h3>
+            <button id="close-sidebar">✖</button>
+        </div>
+        <div class="sidebar-body">
+            <p>Лидер: <span id="sidebar-leader">-</span></p>
+            <p>Идеология: <span id="sidebar-ideology">-</span></p>
+            <p>Население: <span id="sidebar-pop">-</span></p>
+            <p>Пром. потенциал: <span id="sidebar-factories">0</span> заводы</p>
+            <p id="sidebar-buildings">Инфраструктура: 1/5</p>
+            <div id="sidebar-actions" class="hidden"></div>
         </div>
     </div>
 
     <div id="info-window" class="hidden">
         <div class="window-header">
-            <h3 id="window-title">Окно</h3>
-            <button onclick="closeWindow()" class="close-btn">✖</button>
+            <h2 id="window-title">ОКНО</h2>
+            <button class="close-btn" onclick="document.getElementById('info-window').classList.add('hidden')">✖</button>
         </div>
         <div id="window-content"></div>
     </div>
 
-    <div id="info-sidebar" class="hidden">
-        <div class="sidebar-header">
-            <h3 id="sidebar-title">—</h3>
-            <button id="close-sidebar" class="close-btn">✖</button>
-        </div>
-        <div class="sidebar-content">
-            <div class="sidebar-row"><span class="sidebar-label">👑 Лидер:</span><span id="sidebar-leader" class="sidebar-value">—</span></div>
-            <div class="sidebar-row"><span class="sidebar-label">⚡ Идеология:</span><span id="sidebar-ideology" class="sidebar-value">—</span></div>
-            <div class="sidebar-divider"></div>
-            <div class="sidebar-row"><span class="sidebar-label">👥 Население:</span><span id="sidebar-pop" class="sidebar-value value-green">—</span></div>
-            <div class="sidebar-row"><span class="sidebar-label">🏭 Заводы:</span><span id="sidebar-factories" class="sidebar-value value-blue">—</span></div>
-            <div class="sidebar-row"><span class="sidebar-label">🏗️ Постройки:</span><span id="sidebar-buildings" class="sidebar-value">—</span></div>
-            <div class="sidebar-divider"></div>
-            <div id="sidebar-actions" class="hidden"></div>
-        </div>
-    </div>
-
-    <div id="hint" class="hidden">💡...</div>
-    <div id="recruit-hint" class="hidden">🎯 Режим размещения юнитов активен</div>
-    <div id="order-hint" class="hidden">⚔️ Выберите цель для армии</div>
-    <div id="notifications"></div>
-
-    <div id="loading-screen">
-        <h2>ЗАГРУЗКА ИГРОВЫХ МОДУЛЕЙ И КАРТЫ...</h2>
-    </div>
+    <div id="hint" class="hidden">⚔️ ЛКМ по врагу = атака | ЛКМ по клетке = движение</div>
+    <div id="recruit-hint" class="hint-banner hidden">🎯 Кликните по своей провинции для размещения дивизии</div>
 
     <script type="module" src="js/main.js"></script>
 </body>
-</html>
