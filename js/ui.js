@@ -1,7 +1,7 @@
 // js/ui.js — ПОЛНАЯ ИСПРАВЛЕННАЯ СБОРКА ИНТЕРФЕЙСА И МОДАЛЬНЫХ ОКН
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
-import { getGridData, getMyCountryId, getCellStats, getUnits } from './game.js';
+import { getGridData, getMyCountryId, getCellStats, getUnits, getWars, getAlliances } from './game.js';
 import { getCountryInfo, addNotification } from './utils.js';
 
 // Закрытие любого активного модального окна
@@ -10,7 +10,7 @@ export function closeWindow() {
     if (win) win.classList.add('hidden');
 }
 
-// Открытие игровых вкладок (Фокусы, Исследования, Генералы, Меню)
+// Открытие игровых вкладок (Фокусы, Исследования, Генералы)
 export async function openWindow(type) {
     const win = document.getElementById('info-window');
     const title = document.getElementById('window-title');
@@ -73,6 +73,8 @@ export function showHint(text) {
 
 // ОТОБРАЖЕНИЕ БОКОВОЙ ПАНЕЛИ ИНФОРМАЦИИ О ПРОВИНЦИИ (КЛИК ПО КЛЕТКЕ)
 export function showCountryInfo(countryId, cellKey) {
+    window._lastSelectedCellKey = cellKey; // Сохраняем ключ для автообновлений панелей
+    
     const sidebar = document.getElementById('info-sidebar');
     const title = document.getElementById('sidebar-title');
     const leader = document.getElementById('sidebar-leader');
@@ -88,7 +90,6 @@ export function showCountryInfo(countryId, cellKey) {
     const stats = getCellStats(cellKey) || { pop: 1.2, factories: 0, infrastructure: 1 };
     const myId = getMyCountryId();
 
-    // Заполняем текстовые поля
     if (title) title.innerText = info.name.toUpperCase();
     if (leader) leader.innerText = info.leader;
     if (ideology) ideology.innerText = info.ideology || 'Нейтралитет';
@@ -99,34 +100,51 @@ export function showCountryInfo(countryId, cellKey) {
         buildings.innerText = `Инфраструктура: ${stats.infrastructure || 1}/5`;
     }
 
-    // Формируем кнопки доступных действий в провинции
     if (actions) {
         actions.innerHTML = '';
         actions.classList.remove('hidden');
 
         if (countryId === myId) {
-            // Действия на своей территории: строительство и наем дивизий
+            // Своя земля
             actions.innerHTML = `
                 <button class="action-btn build-btn" onclick="window.recruitUnit('infantry')">🪖 Сформировать пехоту</button>
-                <button class="action-btn build-btn" onclick="window.recruitUnit('tank')">🚜 Сформировать танковую дивизию</button>
+                <button class="action-btn build-btn" onclick="window.recruitUnit('tank')">🚜 Сформировать танки</button>
                 <div style="margin-top:8px; display:flex; gap:4px;">
                     <button class="action-btn" style="flex:1;" onclick="window.startBuilding('${cellKey}', 'factory')">🏗️ Фабрику</button>
                     <button class="action-btn" style="flex:1;" onclick="window.startBuilding('${cellKey}', 'infra')">🛣️ Инфраструктуру</button>
                 </div>
             `;
         } else {
-            // Действия на чужой территории (Дипломатия / Объявление войны)
-            actions.innerHTML = `
-                <button class="action-btn war-btn" onclick="window.declareWarOn('${countryId}')">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>
-                <button class="action-btn trade-btn" onclick="window.offerAlliance('${countryId}')">🤝 ПРЕДЛОЖИТЬ СОЮЗ</button>
-            `;
+            // Чужая земля — Дипломатия
+            const wars = getWars() || [];
+            const alliances = getAlliances() || [];
+
+            const currentlyAtWar = wars.some(w => 
+                (w.attacker === myId && w.defender === countryId) || 
+                (w.attacker === countryId && w.defender === myId)
+            );
+            const currentlyAllied = alliances.some(a => 
+                (a.countryA === myId && a.countryB === countryId) || 
+                (a.countryA === countryId && a.countryB === myId)
+            );
+
+            if (currentlyAtWar) {
+                actions.innerHTML = `<div style="color:#ff3333; font-weight:bold; text-align:center; padding:10px; border:1px dashed #ff3333;">⚔️ МЫ В СОСТОЯНИИ ВОЙНЫ</div>`;
+            } else if (currentlyAllied) {
+                actions.innerHTML = `<div style="color:#33ff33; font-weight:bold; text-align:center; padding:10px; border:1px dashed #33ff33;">🤝 НАШ СОЮЗНИК</div>`;
+            } else {
+                actions.innerHTML = `
+                    <button class="action-btn war-btn" onclick="window.declareWarOn('${countryId}')">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>
+                    <button class="action-btn trade-btn" onclick="window.offerAlliance('${countryId}')">🤝 ПРЕДЛОЖИТЬ СОЮЗ</button>
+                `;
+            }
         }
     }
 
     sidebar.classList.remove('hidden');
 }
 
-// Отображение меню сохранения и загрузки сейвов
+// Сохранения и загрузки сейвов
 export function showSaveLoadMenu() {
     const win = document.getElementById('info-window');
     const title = document.getElementById('window-title');
@@ -146,7 +164,6 @@ export function showSaveLoadMenu() {
 
     win.classList.remove('hidden');
 
-    // Навешиваем обработчики на экспорт/импорт JSON файлов сохранений
     document.getElementById('menu-save-btn')?.addEventListener('click', () => {
         const { exportSave } = window._modules.game || {};
         if (typeof exportSave === 'function') exportSave();
@@ -179,6 +196,5 @@ export function showSaveLoadMenu() {
     });
 }
 
-// Прокидываем интерфейс в глобальную шину модулей
 window._modules = window._modules || {};
 window._modules.ui = { closeWindow, openWindow, updateTopBar, showHint, showCountryInfo, showSaveLoadMenu };
