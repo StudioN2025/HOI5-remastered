@@ -4,10 +4,8 @@ import { COUNTRIES } from './data.js';
 import { getGridData, getMyCountryId, getUnits, getSelectedUnitId } from './game.js';
 import { getCountryInfo } from './utils.js';
 
-// Константы рендеринга
 export const CELL_SIZE = 20;
 
-// Состояние камеры
 export let camera = {
     x: 0,
     y: 0,
@@ -17,18 +15,13 @@ export let camera = {
     targetZoom: 0.5
 };
 
-// Сдвиг координат для компенсации отрицательных координат из JSON
 export let mapOffset = { x: 0, y: 0 };
 
-// Состояние мыши и перетаскивания
 let isDragging = false;
 let startX = 0;
 let startY = 0;
-
-// Флаг необходимости перерисовки кэша суши
 let isDirty = true;
 
-// Скрытый холст для оптимизации отрисовки базовой карты
 let bgCanvas = null;
 let bgCtx = null;
 
@@ -51,16 +44,14 @@ export function setCamera(newCam) {
     markDirty();
 }
 
-// 🔥 ФИКС КЛИКОВ: Преобразование экранных координат в координаты игровой сетки JSON
+// Перевод экранных пикселей мыши в координаты ячеек JSON
 export function screenToWorld(screenX, screenY) {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return { x: 0, y: 0 };
     
-    // Вычисляем точку относительно центра экрана, куда смещена камера
     const worldX = (screenX - canvas.width / 2 - camera.x) / camera.zoom;
     const worldY = (screenY - canvas.height / 2 - camera.y) / camera.zoom;
     
-    // Переводим пиксели в сетку и ВЫЧИТАЕМ mapOffset, чтобы вернуть исходные координаты JSON (включая минусовые)
     return {
         x: Math.floor(worldX / CELL_SIZE) - mapOffset.x,
         y: Math.floor(worldY / CELL_SIZE) - mapOffset.y
@@ -68,7 +59,7 @@ export function screenToWorld(screenX, screenY) {
 }
 
 export function processCameraMovement() {
-    const lerpFactor = 0.2; // Чуть быстрее сглаживание для отзывчивости
+    const lerpFactor = 0.2;
     
     if (Math.abs(camera.x - camera.targetX) > 0.1) {
         camera.x += (camera.targetX - camera.x) * lerpFactor;
@@ -81,7 +72,7 @@ export function processCameraMovement() {
     }
 }
 
-// 🔥 ФИКС ЗУМА ТУДА, ГДЕ МЫШЬ
+// Зум точно в курсор мыши
 export function setupMapEvents() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return;
@@ -101,11 +92,9 @@ export function setupMapEvents() {
 
         if (newZoom === oldZoom) return;
 
-        // Координаты мыши относительно центра экрана
         const mouseX = e.clientX - canvas.width / 2;
         const mouseY = e.clientY - canvas.height / 2;
 
-        // Корректируем положение камеры, чтобы точка под мышкой не смещалась при зуме
         camera.targetX = mouseX - (mouseX - camera.targetX) * (newZoom / oldZoom);
         camera.targetY = mouseY - (mouseY - camera.targetY) * (newZoom / oldZoom);
         camera.targetZoom = newZoom;
@@ -113,7 +102,6 @@ export function setupMapEvents() {
         markDirty();
     }, { passive: false });
 
-    // Начало перетаскивания (ЛКМ или колесико)
     canvas.addEventListener('mousedown', (e) => {
         if (e.button === 0 || e.button === 1) { 
             isDragging = true;
@@ -150,7 +138,6 @@ function drawBaseMapCache() {
         if (cy > maxY) maxY = cy;
     });
 
-    // Офсеты: добавляем запас
     mapOffset.x = minX < 0 ? Math.abs(minX) + 5 : 5;
     mapOffset.y = minY < 0 ? Math.abs(minY) + 5 : 5;
 
@@ -203,16 +190,11 @@ export function renderMap() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    
-    // Трансформируем холст относительно центра экрана игрока
     ctx.translate(canvas.width / 2 + camera.x, canvas.height / 2 + camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    if (bgCanvas) {
-        ctx.drawImage(bgCanvas, 0, 0);
-    }
+    if (bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
 
-    // Рендеринг юнитов
     const units = getUnits();
     const selectedUnitId = getSelectedUnitId();
 
