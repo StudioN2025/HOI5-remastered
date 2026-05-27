@@ -1,4 +1,4 @@
-// js/main.js — ПОЛНАЯ ИСПРАВЛЕННАЯ СБОРКА ПОД СТРУКТУРУ ПАПОК
+// js/main.js — ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ СБОРКА
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -26,10 +26,19 @@ import { getCommanderBonus } from './commanders.js';
 // Глобальная шина модулей для ленивых связей
 window._modules = { supply: { drawPockets: null } };
 
+// 🔥 ГЛОБАЛЬНОЕ ОПРЕДЕЛЕНИЕ БАЗОВОГО ПУТИ ДЛЯ СИТУАЦИЙ С GITHUB PAGES
+const isGitHubPages = window.location.hostname.includes('github.io');
+const repoName = window.location.pathname.split('/')[1];
+const BASE_URL = isGitHubPages ? `/${repoName}/` : '/';
+
 document.addEventListener('DOMContentLoaded', async () => {
-    // Подгружаем отрисовку котлов из supply.js в общую шину
-    const supplyMod = await import('./supply.js');
-    window._modules.supply.drawPockets = supplyMod.drawPockets;
+    // Подгружаем отрисовку котлов из supply.js динамически с правильным путем
+    try {
+        const supplyMod = await import(`./supply.js`);
+        window._modules.supply.drawPockets = supplyMod.drawPockets;
+    } catch (err) {
+        console.error('Ошибка импорта supply.js:', err);
+    }
 
     const ls = document.getElementById('loading-screen');
     
@@ -41,20 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setupMapEvents();
 
-    // 🔥 ФИКС ПУТИ К КАРТЕ: выходим из js/ и идем в maps/europe.json
-    // Загрузка карты с автоматическим определением базового пути репозитория
+    // Загрузка карты с автоматическим определением пути
     try {
-        // Определяем, запущены ли мы на GitHub Pages (в подпапке репозитория)
-        const isGitHubPages = window.location.hostname.includes('github.io');
-        const repoName = window.location.pathname.split('/')[1];
-        
-        // Формируем правильный путь к карте от корня сайта
-        const mapPath = isGitHubPages 
-            ? `/${repoName}/maps/europe.json` 
-            : '/maps/europe.json';
-
-        // Если предыдущий вариант не сработает (например, локально без сервера), 
-        // используем запасной относительный путь выхода из папки js/
+        const mapPath = `${BASE_URL}maps/europe.json`;
         const res = await fetch(mapPath).catch(() => fetch('../maps/europe.json'));
         
         if (!res.ok) throw new Error(`Сервер ответил со статусом ${res.status}`);
@@ -171,7 +169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => ls.remove(), 400);
     }
     
-    // 🔥 ФИКС КАМЕРЫ: Ставим дефолтные координаты на центр карты Европы, чтобы не смотреть в пустой угол океана
+    // Выставляем дефолтную камеру на центр карты Европы
     setCamera({ x: 400, y: 200, zoom: 0.6 });
     markDirty();
 
@@ -206,10 +204,10 @@ function renderCountrySelectionList() {
         btn.style.borderLeftColor = info.color;
         btn.style.borderLeftWidth = '4px';
         
-        // 🔥 ФИКС ПУТИ К ФЛАГАМ: выходим из папки js/ через ../
+        // 🔥 УМНЫЙ ФИКС ПУТИ К ФЛАГАМ с использованием BASE_URL
         btn.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
-                <img src="../assets/flags/${cid}.png" 
+                <img src="${BASE_URL}assets/flags/${cid}.png" 
                      onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'16\' viewBox=\'0 0 24 16\'><rect width=\'24\' height=\'16\' fill=\'%23555\'/></svg>'" 
                      style="width:28px; height:18px; object-fit:cover; border:1px solid #444; border-radius:2px;" 
                      alt="${info.name}"/>
@@ -231,7 +229,6 @@ function selectCountryAndStart(id) {
     
     document.getElementById('country-select')?.classList.add('hidden');
     
-    // Включение интерфейса под любую верстку
     const hud = document.getElementById('hud');
     if (hud) {
         hud.classList.remove('hidden');
@@ -241,14 +238,13 @@ function selectCountryAndStart(id) {
         document.getElementById('game-navigation')?.classList.remove('hidden');
     }
     
-    // Автоматическое центрирование и фокусировка камеры на границах выбранной игроком страны
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(k => gridData[k] === id);
     if (myCells.length > 0) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            sx += cx * 20; sy += cy * 20; // 20 — CELL_SIZE
+            sx += cx * 20; sy += cy * 20;
         });
         setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.8 });
     }
