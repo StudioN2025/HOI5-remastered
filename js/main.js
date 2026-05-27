@@ -23,10 +23,8 @@ import { openWindow, closeWindow, updateTopBar, showCountryInfo, showHint, showS
 import { getCountryInfo, addNotification, isAtWar } from './utils.js';
 import { getCommanderBonus } from './commanders.js';
 
-// Глобальная шина модулей для ленивых связей
 window._modules = { supply: { drawPockets: null } };
 
-// Автоматическое определение путей для корректной работы GitHub Pages
 const isGitHubPages = window.location.hostname.includes('github.io');
 const repoName = window.location.pathname.split('/')[1];
 const BASE_URL = isGitHubPages ? `/${repoName}/` : '/';
@@ -41,7 +39,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // Инициализируем размеры холста
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -61,11 +58,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Принудительно генерируем кэш в map.js, чтобы заполнился mapOffset
+            // Генерируем карту, чтобы посчитать mapOffset
             markDirty();
             renderMap(); 
 
-            // Фокусируем камеру главного меню на геометрический центр Европы
+            // Центрируем камеру меню на центр Европы
             const cells = Object.keys(data.gridData);
             if (cells.length > 0) {
                 let totalX = 0;
@@ -79,8 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const centerX = totalX / cells.length;
                 const centerY = totalY / cells.length;
                 
-                // Центрируем камеру в меню и отдаляем, чтобы было видно всю карту
-                setCamera({ x: -centerX * 0.35, y: -centerY * 0.35, zoom: 0.35 });
+                setCamera({ x: -centerX * 0.3, y: -centerY * 0.3, zoom: 0.3 });
             }
 
             markDirty();
@@ -90,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ КАРТЫ:', e);
     }
 
-    // Привязка UI кнопок управления главным меню
+    // UI главного меню
     document.getElementById('btn-play')?.addEventListener('click', () => {
         document.getElementById('main-menu')?.classList.add('hidden');
         document.getElementById('country-select')?.classList.remove('hidden');
@@ -101,7 +97,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('main-menu')?.classList.remove('hidden');
     });
 
-    // Навигация по игровым вкладкам верхнего меню
     document.getElementById('speed-pause')?.addEventListener('click', () => changeSpeedUI(0));
     document.getElementById('speed-1')?.addEventListener('click', () => changeSpeedUI(1));
     document.getElementById('speed-2')?.addEventListener('click', () => changeSpeedUI(2));
@@ -112,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
     document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
 
-    // Главный игровой таймер (суточный цикл симуляции)
+    // Игровой таймер
     setInterval(() => {
         const speed = getGameSpeed();
         if (speed === 0 || !getMyCountryId()) return;
@@ -142,33 +137,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         markDirty();
     }, 1000);
 
-    // Закрытие бокового меню информации о провинции
     document.getElementById('close-sidebar')?.addEventListener('click', () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
 
-    // Обработка кликов мыши по игровому полю
+    // 🔥 ФИКС ИНТЕРАКТИВНОСТИ: Клик по карте и открытие провинций
     window.addEventListener('mousedown', (e) => {
-        if (e.button === 2) { // ПКМ — сброс выделений
+        if (e.target.id !== 'map-canvas') return; // Кликаем только по холсту, а не по кнопкам UI
+
+        if (e.button === 2) { // ПКМ сбрасывает выделения
             setSelectedUnitId(null);
             window._recruitMode = null;
             window._selectedArmy = null;
             document.getElementById('recruit-hint')?.classList.add('hidden');
             document.getElementById('order-hint')?.classList.add('hidden');
             document.getElementById('info-sidebar')?.classList.add('hidden');
-            showHint('⚔️ ЛКМ по врагу = атака | ЛКМ по клетке = движение');
             return;
         }
         
-        const key = screenToWorld(e.clientX, e.clientY);
-        const gridData = getGridData();
-        const myId = getMyCountryId();
-        if (gridData[`${key.x},${key.y}`] && gridData[`${key.x},${key.y}`] !== myId) {
-            showCountryInfo(gridData[`${key.x},${key.y}`], `${key.x},${key.y}`);
+        if (e.button === 0) { // ЛКМ — выбор клетки
+            const coord = screenToWorld(e.clientX, e.clientY);
+            const gridData = getGridData();
+            const cellKey = `${coord.x},${coord.y}`;
+            const countryId = gridData[cellKey];
+
+            if (countryId) {
+                // Если мы кликнули в провинцию — открываем боковую панель управления
+                showCountryInfo(countryId, cellKey);
+            }
         }
     });
     
-    // Пробел для паузы времени
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
@@ -184,12 +183,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // Скрытие загрузочного экрана (Loader)
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
 
-    // Постоянный цикл рендеринга (RequestAnimationFrame)
     function animate() { 
         processCameraMovement(); 
         renderMap();             
@@ -198,7 +195,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
-// Генерация списка выбора держав в главном меню
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -237,7 +233,7 @@ function renderCountrySelectionList() {
     });
 }
 
-// ФУНКЦИЯ СТАРТА ИГРЫ С УЧЕТОМ СДВИГОВ И МИНУСОВЫХ КООРДИНАТ КАРТЫ
+// 🔥 ФИКС СТАРТА: Камера перемещается на страну без искажений зума
 function selectCountryAndStart(id) {
     setMyCountryId(id);
     setGameActive(true);
@@ -246,13 +242,7 @@ function selectCountryAndStart(id) {
     document.getElementById('country-select')?.classList.add('hidden');
     
     const hud = document.getElementById('hud');
-    if (hud) {
-        hud.classList.remove('hidden');
-    } else {
-        document.getElementById('top-bar')?.classList.remove('hidden');
-        document.getElementById('speed-controls')?.classList.remove('hidden');
-        document.getElementById('game-navigation')?.classList.remove('hidden');
-    }
+    if (hud) hud.classList.remove('hidden');
     
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(k => gridData[k] === id);
@@ -269,6 +259,7 @@ function selectCountryAndStart(id) {
         const avgY = sy / myCells.length;
         const targetGameZoom = 0.6; 
 
+        // Центрируем камеру ровно на выбранную страну относительно центра экрана
         setCamera({ 
             x: -avgX * targetGameZoom, 
             y: -avgY * targetGameZoom, 
@@ -298,8 +289,7 @@ function updateSpeedButtons(speed) {
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
 }
 
-// 🔥 ГЛОБАЛЬНЫЕ МЕТОДЫ ДИПЛОМАТИИ, СТРОИТЕЛЬСТВА И МОБИЛИЗАЦИИ
-
+// Глобальные методы дипломатии
 window.declareWarOn = (targetCountryId) => {
     const myId = getMyCountryId();
     if (!myId || myId === targetCountryId) return;
@@ -310,25 +300,13 @@ window.declareWarOn = (targetCountryId) => {
         (w.attacker === targetCountryId && w.defender === myId)
     );
 
-    if (alreadyAtWar) {
-        addNotification(`Вы уже воюете с этой страной!`, 'yellow');
-        return;
-    }
-
-    wars.push({
-        attacker: myId,
-        defender: targetCountryId,
-        startDate: getDateString()
-    });
-    
+    if (alreadyAtWar) return;
+    wars.push({ attacker: myId, defender: targetCountryId, startDate: getDateString() });
     setWars(wars);
 
     const targetInfo = getCountryInfo(targetCountryId);
     addNotification(`⚠️ ВОЙНА! Мы объявили войну государству ${targetInfo.name}!`, 'red');
-    
-    if (window._lastSelectedCellKey) {
-        showCountryInfo(targetCountryId, window._lastSelectedCellKey);
-    }
+    if (window._lastSelectedCellKey) showCountryInfo(targetCountryId, window._lastSelectedCellKey);
     markDirty();
 };
 
@@ -342,34 +320,21 @@ window.offerAlliance = (targetCountryId) => {
         (a.countryA === targetCountryId && a.countryB === myId)
     );
 
-    if (alreadyAllied) {
-        addNotification(`Союз уже заключен!`, 'yellow');
-        return;
-    }
-
+    if (alreadyAllied) return;
     alliances.push({ countryA: myId, countryB: targetCountryId });
     setAlliances(alliances);
 
     const targetInfo = getCountryInfo(targetCountryId);
     addNotification(`🤝 Заключен пакт о союзе с фракцией ${targetInfo.name}!`, 'green');
-    
-    if (window._lastSelectedCellKey) {
-        showCountryInfo(targetCountryId, window._lastSelectedCellKey);
-    }
+    if (window._lastSelectedCellKey) showCountryInfo(targetCountryId, window._lastSelectedCellKey);
     markDirty();
 };
 
 window.startBuilding = (cellKey, type) => {
     const queue = getBuildingQueue() || [];
-    queue.push({
-        cellKey: cellKey,
-        type: type,
-        progress: 0,
-        country: getMyCountryId()
-    });
+    queue.push({ cellKey: cellKey, type: type, progress: 0, country: getMyCountryId() });
     setBuildingQueue(queue);
-    
-    addNotification(`В провинцию ${cellKey} добавлена постройка: ${type === 'factory' ? 'Фабрика' : 'Инфраструктура'}`, 'cyan');
+    addNotification(`В провинцию ${cellKey} добавлена постройка`, 'cyan');
     showCountryInfo(getMyCountryId(), cellKey);
 };
 
