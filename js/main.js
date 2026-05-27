@@ -1,4 +1,4 @@
-// js/main.js — ФИНАЛЬНАЯ СБОРКА С СИНХРОНИЗАЦИЕЙ СДВИГА КАРТЫ
+// js/main.js — ПОЛНАЯ ИСПРАВЛЕННАЯ СБОРКА ИГРОВОГО ДВИЖКА HOI5-REMASTERED
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
+    // Инициализируем размеры холста
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setupMapEvents();
 
-    // Загрузка карты
+    // Загрузка карты из JSON
     try {
         const mapPath = `${BASE_URL}maps/europe.json`;
         const res = await fetch(mapPath).catch(() => fetch('../maps/europe.json'));
@@ -60,18 +61,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Сначала принудительно генерируем кэш в map.js, чтобы заполнился mapOffset
+            // Принудительно генерируем кэш в map.js, чтобы заполнился mapOffset
             markDirty();
             renderMap(); 
 
-            // 🔥 ФИКС: Фокусируем камеру на центр с учетом mapOffset
+            // Фокусируем камеру главного меню на геометрический центр Европы
             const cells = Object.keys(data.gridData);
             if (cells.length > 0) {
                 let totalX = 0;
                 let totalY = 0;
                 cells.forEach(key => {
                     const [cx, cy] = key.split(',').map(Number);
-                    // Считаем координаты уже перенесенные в плюсовую зону
                     totalX += (cx + mapOffset.x) * 20; 
                     totalY += (cy + mapOffset.y) * 20;
                 });
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const centerX = totalX / cells.length;
                 const centerY = totalY / cells.length;
                 
-                // Центрируем камеру ровно на середине Европы и слегка отдаляем
+                // Центрируем камеру в меню и отдаляем, чтобы было видно всю карту
                 setCamera({ x: -centerX * 0.35, y: -centerY * 0.35, zoom: 0.35 });
             }
 
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ КАРТЫ:', e);
     }
 
-    // Привязка UI кнопок управления
+    // Привязка UI кнопок управления главным меню
     document.getElementById('btn-play')?.addEventListener('click', () => {
         document.getElementById('main-menu')?.classList.add('hidden');
         document.getElementById('country-select')?.classList.remove('hidden');
@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('main-menu')?.classList.remove('hidden');
     });
 
+    // Навигация по игровым вкладкам верхнего меню
     document.getElementById('speed-pause')?.addEventListener('click', () => changeSpeedUI(0));
     document.getElementById('speed-1')?.addEventListener('click', () => changeSpeedUI(1));
     document.getElementById('speed-2')?.addEventListener('click', () => changeSpeedUI(2));
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
     document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
 
-    // Игровой таймер времени (сутки)
+    // Главный игровой таймер (суточный цикл симуляции)
     setInterval(() => {
         const speed = getGameSpeed();
         if (speed === 0 || !getMyCountryId()) return;
@@ -141,13 +142,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         markDirty();
     }, 1000);
 
+    // Закрытие бокового меню информации о провинции
     document.getElementById('close-sidebar')?.addEventListener('click', () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
 
-    // Обработка кликов (выделение/деактивация)
+    // Обработка кликов мыши по игровому полю
     window.addEventListener('mousedown', (e) => {
-        if (e.button === 2) { 
+        if (e.button === 2) { // ПКМ — сброс выделений
             setSelectedUnitId(null);
             window._recruitMode = null;
             window._selectedArmy = null;
@@ -166,6 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
+    // Пробел для паузы времени
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
@@ -181,10 +184,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
+    // Скрытие загрузочного экрана (Loader)
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
 
+    // Постоянный цикл рендеринга (RequestAnimationFrame)
     function animate() { 
         processCameraMovement(); 
         renderMap();             
@@ -193,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
-// Генерация списка выбора держав
+// Генерация списка выбора держав в главном меню
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -232,10 +237,11 @@ function renderCountrySelectionList() {
     });
 }
 
+// 🔥 ФИКСИРОВАННАЯ ФУНКЦИЯ СТАРТА ИГРЫ — ТЕПЕРЬ КАРТА НЕ ИСЧЕЗАЕТ
 function selectCountryAndStart(id) {
     setMyCountryId(id);
     setGameActive(true);
-    setGameSpeed(0);
+    setGameSpeed(0); // Начинаем на паузе
     
     document.getElementById('country-select')?.classList.add('hidden');
     
@@ -250,15 +256,27 @@ function selectCountryAndStart(id) {
     
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(k => gridData[k] === id);
+    
     if (myCells.length > 0) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            // При выборе страны камера центрируется тоже с учетом mapOffset
+            // Складываем координаты с учетом mapOffset (перенос из минусов в плюсы)
             sx += (cx + mapOffset.x) * 20; 
             sy += (cy + mapOffset.y) * 20;
         });
-        setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.8 });
+
+        // Находим точную среднюю точку выбранного государства
+        const avgX = sx / myCells.length;
+        const avgY = sy / myCells.length;
+        const targetGameZoom = 0.6; // Комфортный игровой зум для обзора страны
+
+        // Центрируем камеру строго на страну, применяя МИНУСЫ для сдвига матрицы к экрану
+        setCamera({ 
+            x: -avgX * targetGameZoom, 
+            y: -avgY * targetGameZoom, 
+            zoom: targetGameZoom 
+        });
     }
     
     updateTopBar(getPlayerResources());
