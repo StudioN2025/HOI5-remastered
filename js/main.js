@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Генерируем карту, чтобы посчитать mapOffset
             markDirty();
             renderMap(); 
 
@@ -86,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ КАРТЫ:', e);
     }
 
-    // UI главного меню
+    // Привязка кнопок главного меню
     document.getElementById('btn-play')?.addEventListener('click', () => {
         document.getElementById('main-menu')?.classList.add('hidden');
         document.getElementById('country-select')?.classList.remove('hidden');
@@ -107,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
     document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
 
-    // Игровой таймер
+    // Суточный цикл игры
     setInterval(() => {
         const speed = getGameSpeed();
         if (speed === 0 || !getMyCountryId()) return;
@@ -141,32 +140,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
 
-    // 🔥 ФИКС ИНТЕРАКТИВНОСТИ: Клик по карте и открытие провинций
-    window.addEventListener('mousedown', (e) => {
-        if (e.target.id !== 'map-canvas') return; // Кликаем только по холсту, а не по кнопкам UI
-
-        if (e.button === 2) { // ПКМ сбрасывает выделения
-            setSelectedUnitId(null);
-            window._recruitMode = null;
-            window._selectedArmy = null;
-            document.getElementById('recruit-hint')?.classList.add('hidden');
-            document.getElementById('order-hint')?.classList.add('hidden');
-            document.getElementById('info-sidebar')?.classList.add('hidden');
-            return;
-        }
-        
-        if (e.button === 0) { // ЛКМ — выбор клетки
-            const coord = screenToWorld(e.clientX, e.clientY);
-            const gridData = getGridData();
-            const cellKey = `${coord.x},${coord.y}`;
-            const countryId = gridData[cellKey];
-
-            if (countryId) {
-                // Если мы кликнули в провинцию — открываем боковую панель управления
-                showCountryInfo(countryId, cellKey);
+    // 🔥 ФИКС ИНТЕРАКТИВНОСТИ: Вешаем клик непосредственно на холст карты
+    const mapCanvasElement = document.getElementById('map-canvas');
+    if (mapCanvasElement) {
+        mapCanvasElement.addEventListener('mousedown', (e) => {
+            if (e.button === 2) { // ПКМ — сброс выделений
+                setSelectedUnitId(null);
+                window._recruitMode = null;
+                window._selectedArmy = null;
+                document.getElementById('recruit-hint')?.classList.add('hidden');
+                document.getElementById('order-hint')?.classList.add('hidden');
+                document.getElementById('info-sidebar')?.classList.add('hidden');
+                return;
             }
-        }
-    });
+            
+            if (e.button === 0) { // ЛКМ — выбор клетки
+                const coord = screenToWorld(e.clientX, e.clientY);
+                const gridData = getGridData();
+                const cellKey = `${coord.x},${coord.y}`;
+                const countryId = gridData[cellKey];
+
+                if (countryId) {
+                    showCountryInfo(countryId, cellKey);
+                }
+            }
+        });
+    }
     
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
@@ -233,7 +232,6 @@ function renderCountrySelectionList() {
     });
 }
 
-// 🔥 ФИКС СТАРТА: Камера перемещается на страну без искажений зума
 function selectCountryAndStart(id) {
     setMyCountryId(id);
     setGameActive(true);
@@ -259,7 +257,6 @@ function selectCountryAndStart(id) {
         const avgY = sy / myCells.length;
         const targetGameZoom = 0.6; 
 
-        // Центрируем камеру ровно на выбранную страну относительно центра экрана
         setCamera({ 
             x: -avgX * targetGameZoom, 
             y: -avgY * targetGameZoom, 
@@ -289,7 +286,7 @@ function updateSpeedButtons(speed) {
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
 }
 
-// Глобальные методы дипломатии
+// Глобальные методы дипломатии и строительства для инлайновых вызовов onclick
 window.declareWarOn = (targetCountryId) => {
     const myId = getMyCountryId();
     if (!myId || myId === targetCountryId) return;
