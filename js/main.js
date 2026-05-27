@@ -42,8 +42,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupMapEvents();
 
     // 🔥 ФИКС ПУТИ К КАРТЕ: выходим из js/ и идем в maps/europe.json
+    // Загрузка карты с автоматическим определением базового пути репозитория
     try {
-        const res = await fetch('../maps/europe.json'); 
+        // Определяем, запущены ли мы на GitHub Pages (в подпапке репозитория)
+        const isGitHubPages = window.location.hostname.includes('github.io');
+        const repoName = window.location.pathname.split('/')[1];
+        
+        // Формируем правильный путь к карте от корня сайта
+        const mapPath = isGitHubPages 
+            ? `/${repoName}/maps/europe.json` 
+            : '/maps/europe.json';
+
+        // Если предыдущий вариант не сработает (например, локально без сервера), 
+        // используем запасной относительный путь выхода из папки js/
+        const res = await fetch(mapPath).catch(() => fetch('../maps/europe.json'));
+        
         if (!res.ok) throw new Error(`Сервер ответил со статусом ${res.status}`);
         
         const data = await res.json();
