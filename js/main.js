@@ -237,11 +237,11 @@ function renderCountrySelectionList() {
     });
 }
 
-// 🔥 ФИКСИРОВАННАЯ ФУНКЦИЯ СТАРТА ИГРЫ — ТЕПЕРЬ КАРТА НЕ ИСЧЕЗАЕТ
+// ФУНКЦИЯ СТАРТА ИГРЫ С УЧЕТОМ СДВИГОВ И МИНУСОВЫХ КООРДИНАТ КАРТЫ
 function selectCountryAndStart(id) {
     setMyCountryId(id);
     setGameActive(true);
-    setGameSpeed(0); // Начинаем на паузе
+    setGameSpeed(0); 
     
     document.getElementById('country-select')?.classList.add('hidden');
     
@@ -261,17 +261,14 @@ function selectCountryAndStart(id) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            // Складываем координаты с учетом mapOffset (перенос из минусов в плюсы)
             sx += (cx + mapOffset.x) * 20; 
             sy += (cy + mapOffset.y) * 20;
         });
 
-        // Находим точную среднюю точку выбранного государства
         const avgX = sx / myCells.length;
         const avgY = sy / myCells.length;
-        const targetGameZoom = 0.6; // Комфортный игровой зум для обзора страны
+        const targetGameZoom = 0.6; 
 
-        // Центрируем камеру строго на страну, применяя МИНУСЫ для сдвига матрицы к экрану
         setCamera({ 
             x: -avgX * targetGameZoom, 
             y: -avgY * targetGameZoom, 
@@ -301,10 +298,85 @@ function updateSpeedButtons(speed) {
     if (speed === 3) document.getElementById('speed-3')?.classList.add('active');
 }
 
+// 🔥 ГЛОБАЛЬНЫЕ МЕТОДЫ ДИПЛОМАТИИ, СТРОИТЕЛЬСТВА И МОБИЛИЗАЦИИ
+
+window.declareWarOn = (targetCountryId) => {
+    const myId = getMyCountryId();
+    if (!myId || myId === targetCountryId) return;
+
+    const wars = getWars() || [];
+    const alreadyAtWar = wars.some(w => 
+        (w.attacker === myId && w.defender === targetCountryId) || 
+        (w.attacker === targetCountryId && w.defender === myId)
+    );
+
+    if (alreadyAtWar) {
+        addNotification(`Вы уже воюете с этой страной!`, 'yellow');
+        return;
+    }
+
+    wars.push({
+        attacker: myId,
+        defender: targetCountryId,
+        startDate: getDateString()
+    });
+    
+    setWars(wars);
+
+    const targetInfo = getCountryInfo(targetCountryId);
+    addNotification(`⚠️ ВОЙНА! Мы объявили войну государству ${targetInfo.name}!`, 'red');
+    
+    if (window._lastSelectedCellKey) {
+        showCountryInfo(targetCountryId, window._lastSelectedCellKey);
+    }
+    markDirty();
+};
+
+window.offerAlliance = (targetCountryId) => {
+    const myId = getMyCountryId();
+    if (!myId || myId === targetCountryId) return;
+
+    const alliances = getAlliances() || [];
+    const alreadyAllied = alliances.some(a => 
+        (a.countryA === myId && a.countryB === targetCountryId) || 
+        (a.countryA === targetCountryId && a.countryB === myId)
+    );
+
+    if (alreadyAllied) {
+        addNotification(`Союз уже заключен!`, 'yellow');
+        return;
+    }
+
+    alliances.push({ countryA: myId, countryB: targetCountryId });
+    setAlliances(alliances);
+
+    const targetInfo = getCountryInfo(targetCountryId);
+    addNotification(`🤝 Заключен пакт о союзе с фракцией ${targetInfo.name}!`, 'green');
+    
+    if (window._lastSelectedCellKey) {
+        showCountryInfo(targetCountryId, window._lastSelectedCellKey);
+    }
+    markDirty();
+};
+
+window.startBuilding = (cellKey, type) => {
+    const queue = getBuildingQueue() || [];
+    queue.push({
+        cellKey: cellKey,
+        type: type,
+        progress: 0,
+        country: getMyCountryId()
+    });
+    setBuildingQueue(queue);
+    
+    addNotification(`В провинцию ${cellKey} добавлена постройка: ${type === 'factory' ? 'Фабрика' : 'Инфраструктура'}`, 'cyan');
+    showCountryInfo(getMyCountryId(), cellKey);
+};
+
 window.recruitUnit = (type) => {
     document.getElementById('info-window')?.classList.add('hidden');
     window._recruitMode = type;
-    showHint(`🎯 Выберите провинцию для развёртывания ${UNIT_STATS[type]?.icon || '🎖️'}`);
+    showHint(`🎯 Выберите провинцию для развёртывания дивизии: ${UNIT_STATS[type]?.icon || '🎖'}`);
     document.getElementById('recruit-hint')?.classList.remove('hidden');
 };
 
