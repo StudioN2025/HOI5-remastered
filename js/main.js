@@ -1,4 +1,4 @@
-// main.js — ПОЛНАЯ ФИНАЛЬНАЯ СБОРКА С ФИКСOM КАРТЫ
+// main.js — ФИНАЛЬНАЯ НЕУБИВАЕМАЯ СБОРКА С ИСПРАВЛЕНИЕМ HUD И КАРТЫ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // Инициализация размеров экрана, холста и событий перед загрузкой карты
+    // 🔥 ФИКС КАРТЫ: Сначала разворачиваем холст на весь экран и вешаем события, чтобы он не был нулевым
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -44,14 +44,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Загрузка карты из подпапки maps
     try {
         const res = await fetch('./maps/europe.json'); 
-        if (!res.ok) throw new Error(`Сервер ответил со статусом ${res.status}`);
+        if (!res.ok) throw new Error(`Статус ответа: ${res.status}`);
         
         const data = await res.json();
         if (data && data.gridData) {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Заставляем рендерер перерисовать кэш карты
+            // Сбрасываем кэш тайлов карты, чтобы они перерисовались под новые данные
             markDirty();
             
             // Генерируем список стран строго после успешной загрузки JSON
@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
-// Генерация списка стран на чистом JS без импорта ui.js костылей
+// Генерация списка стран с интеграцией твоих флагов из assets/flags/
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -189,7 +189,6 @@ function renderCountrySelectionList() {
         const btn = document.createElement('button');
         btn.style.borderLeftColor = info.color;
         btn.style.borderLeftWidth = '4px';
-        btn.className = 'country-select-btn'; // Можно стилизовать в CSS
         
         btn.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
@@ -214,7 +213,17 @@ function selectCountryAndStart(id) {
     setGameSpeed(0);
     
     document.getElementById('country-select')?.classList.add('hidden');
-    document.getElementById('hud')?.classList.remove('hidden');
+    
+    // 🔥 ФИКС ДЛЯ ДВУХ ВАРЯНТОВ ВЕРСТКИ: 
+    // Включаем #hud, если он есть. Если его нет — включаем элементы напрямую по их ID из твоего index.html
+    const hud = document.getElementById('hud');
+    if (hud) {
+        hud.classList.remove('hidden');
+    } else {
+        document.getElementById('top-bar')?.classList.remove('hidden');
+        document.getElementById('speed-controls')?.classList.remove('hidden');
+        document.getElementById('game-navigation')?.classList.remove('hidden');
+    }
     
     // Центрирование камеры на провинциях выбранного игрока
     const gridData = getGridData();
@@ -223,7 +232,7 @@ function selectCountryAndStart(id) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            sx += cx * 20; sy += cy * 20; // 20 — размер ячейки CELL_SIZE
+            sx += cx * 20; sy += cy * 20; // 20 — CELL_SIZE
         });
         setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.8 });
     }
