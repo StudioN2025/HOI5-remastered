@@ -1,4 +1,4 @@
-// js/main.js — ФИНАЛЬНАЯ СБОРКА С АВТОЦЕНТРИРОВАНИЕМ ВСЕЙ КАРТЫ
+// js/main.js — ФИНАЛЬНАЯ СБОРКА С СИНХРОНИЗАЦИЕЙ СДВИГА КАРТЫ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -12,7 +12,7 @@ import {
     getActiveBattles, setActiveBattles, initializeFactories,
     autoSave
 } from './game.js';
-import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty, processCameraMovement, setCamera } from './map.js';
+import { renderMap, resizeCanvas, setupMapEvents, screenToWorld, markDirty, processCameraMovement, setCamera, mapOffset } from './map.js';
 import { deployUnit, giveOrder, processMovement, processCombat } from './military.js';
 import { processConstruction, updateEconomy } from './economy.js';
 import { processSupply } from './supply.js';
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // Инициализируем холст на весь экран
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -49,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setupMapEvents();
 
-    // Загрузка карты с автоматическим расчетом центра масс суши
+    // Загрузка карты
     try {
         const mapPath = `${BASE_URL}maps/europe.json`;
         const res = await fetch(mapPath).catch(() => fetch('../maps/europe.json'));
@@ -61,28 +60,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // 🔥 ФИКС: Считаем геометрический центр карты, чтобы сфокусировать камеру точно на Европу
+            // Сначала принудительно генерируем кэш в map.js, чтобы заполнился mapOffset
+            markDirty();
+            renderMap(); 
+
+            // 🔥 ФИКС: Фокусируем камеру на центр с учетом mapOffset
             const cells = Object.keys(data.gridData);
             if (cells.length > 0) {
                 let totalX = 0;
                 let totalY = 0;
                 cells.forEach(key => {
                     const [cx, cy] = key.split(',').map(Number);
-                    totalX += cx * 20; // 20 — CELL_SIZE
-                    totalY += cy * 20;
+                    // Считаем координаты уже перенесенные в плюсовую зону
+                    totalX += (cx + mapOffset.x) * 20; 
+                    totalY += (cy + mapOffset.y) * 20;
                 });
                 
                 const centerX = totalX / cells.length;
                 const centerY = totalY / cells.length;
                 
-                // Перемещаем камеру в центр суши и немного отдаляем зум (0.35), чтобы влезла вся карта целиком
+                // Центрируем камеру ровно на середине Европы и слегка отдаляем
                 setCamera({ x: -centerX * 0.35, y: -centerY * 0.35, zoom: 0.35 });
             }
 
-            // Перерисовываем графический кэш под новые динамические размеры холста
             markDirty();
-            
-            // Генерируем список стран строго после успешной загрузки JSON
             renderCountrySelectionList();
         }
     } catch (e) {
@@ -140,7 +141,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         markDirty();
     }, 1000);
 
-    // Закрытие бокового меню информации о провинции
     document.getElementById('close-sidebar')?.addEventListener('click', () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
@@ -166,7 +166,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // Пробел для паузы
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
@@ -186,7 +185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => ls.remove(), 400);
     }
 
-    // Цикл непрерывной отрисовки карты
     function animate() { 
         processCameraMovement(); 
         renderMap();             
@@ -256,7 +254,9 @@ function selectCountryAndStart(id) {
         let sx = 0, sy = 0;
         myCells.forEach(c => {
             const [cx, cy] = c.split(',').map(Number);
-            sx += cx * 20; sy += cy * 20;
+            // При выборе страны камера центрируется тоже с учетом mapOffset
+            sx += (cx + mapOffset.x) * 20; 
+            sy += (cy + mapOffset.y) * 20;
         });
         setCamera({ x: sx / myCells.length, y: sy / myCells.length, zoom: 0.8 });
     }
