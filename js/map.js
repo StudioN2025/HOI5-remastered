@@ -1,4 +1,4 @@
-// js/map.js — ПОЛНАЯ ИСПРАВЛЕННАЯ СБОРКА ГРАФИЧЕСКОГО ДВИЖКА
+// js/map.js — ДИНАМИЧЕСКИЙ ГРАФИЧЕСКИЙ ДВИЖК БЕЗ ОГРАНИЧЕНИЙ НА РАЗМЕР КАРТЫ
 
 import { COUNTRIES } from './data.js';
 import { getGridData, getMyCountryId, getUnits, getSelectedUnitId } from './game.js';
@@ -6,17 +6,15 @@ import { getCountryInfo } from './utils.js';
 
 // Константы рендеринга
 export const CELL_SIZE = 20;
-const MAP_WIDTH = 3000;  // Максимальный логический размер карты
-const MAP_HEIGHT = 2000;
 
-// Состояние камеры
+// Состояние камеры (динамические координаты)
 export let camera = {
-    x: 400,
-    y: 200,
-    zoom: 0.6,
-    targetX: 400,
-    targetY: 200,
-    targetZoom: 0.6
+    x: 0,
+    y: 0,
+    zoom: 0.5,
+    targetX: 0,
+    targetY: 0,
+    targetZoom: 0.5
 };
 
 // Состояние мыши и перетаскивания
@@ -31,18 +29,7 @@ let isDirty = true;
 let bgCanvas = null;
 let bgCtx = null;
 
-// Инициализация скрытого холста
-function initBgCanvas() {
-    if (!bgCanvas) {
-        bgCanvas = document.createElement('canvas');
-    }
-    bgCanvas.width = MAP_WIDTH;
-    bgCanvas.height = MAP_HEIGHT;
-    bgCtx = bgCanvas.getContext('2d');
-    isDirty = true;
-}
-
-// Принудительный сброс графического кэша (вызывается из main.js после загрузки JSON)
+// Принудительный сброс графического кэша
 export function markDirty() {
     isDirty = true;
 }
@@ -64,12 +51,11 @@ export function setCamera(newCam) {
     markDirty();
 }
 
-// Преобразование экранных координат мыши в координаты игровой сетки (X, Y клетки)
+// Преобразование экранных координат мыши в координаты игровой сетки
 export function screenToWorld(screenX, screenY) {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return { x: 0, y: 0 };
     
-    // Вычисляем координаты относительно центра холста с учетом зума
     const worldX = (screenX - canvas.width / 2 - camera.x) / camera.zoom;
     const worldY = (screenY - canvas.height / 2 - camera.y) / camera.zoom;
     
@@ -79,7 +65,7 @@ export function screenToWorld(screenX, screenY) {
     };
 }
 
-// Плавное перемещение камеры (интерполяция)
+// Плавное перемещение и зум камеры (интерполяция кадров)
 export function processCameraMovement() {
     const lerpFactor = 0.15;
     
@@ -99,20 +85,20 @@ export function setupMapEvents() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return;
 
-    // Скролл (зум) относительно курсора мыши
+    // Скролл (зум) относительно центра экрана
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const zoomSpeed = 1.1;
+        const zoomSpeed = 1.15;
         if (e.deltaY < 0) {
-            if (camera.targetZoom < 2.5) camera.targetZoom *= zoomSpeed;
+            if (camera.targetZoom < 3.0) camera.targetZoom *= zoomSpeed;
         } else {
-            if (camera.targetZoom > 0.2) camera.targetZoom /= zoomSpeed;
+            if (camera.targetZoom > 0.1) camera.targetZoom /= zoomSpeed;
         }
     }, { passive: false });
 
     // Нажатие мыши (начало перетаскивания карты)
     canvas.addEventListener('mousedown', (e) => {
-        if (e.button === 0 || e.button === 1) { // ЛКМ или СРКМ
+        if (e.button === 0 || e.button === 1) { 
             isDragging = true;
             startX = e.clientX - camera.targetX;
             startY = e.clientY - camera.targetY;
@@ -133,18 +119,42 @@ export function setupMapEvents() {
     });
 }
 
-// РЕНДЕРИНГ БАЗОВОЙ СУШИ И СЕТКИ НА СКРЫТЫЙ ХОЛСТ
+// 🔥 ФИКС: АВТОМАТИЧЕСКИЙ РАСЧЕТ РАЗМЕРОВ СКРЫТОГО ХОЛСТА ПОД РЕАЛЬНЫЙ JSON
+defineDrawCache();
 function drawBaseMapCache() {
-    if (!bgCtx) initBgCanvas();
-
-    // Заливаем весь скрытый холст цветом глубокого моря
-    bgCtx.fillStyle = '#1a2b4c'; 
-    bgCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-
     const gridData = getGridData();
     if (!gridData || Object.keys(gridData).length === 0) return;
 
-    // Шаг 1: Отрисовка цветных провинций суши
+    // Находим максимальные границы X и Y среди всех клеток в europe.json
+    let maxX = 0;
+    let maxY = 0;
+    Object.keys(gridData).forEach(key => {
+        const [cx, cy] = key.split(',').map(Number);
+        if (cx > maxX) maxX = cx;
+        if (cy > maxY) maxY = cy;
+    });
+
+    // Создаем или пересоздаем холст строго под размеры карты (+ запас в 10 клеток)
+    if (!bgCanvas) {
+        bgCanvas = document.createElement('canvas');
+    }
+    
+    const requiredWidth = (maxX + 10) * CELL_SIZE;
+    const requiredHeight = (maxY + 10) * CELL_SIZE;
+
+    // Задаем размеры, только если они изменились, чтобы не сбрасывать контекст зря
+    if (bgCanvas.width !== requiredWidth || bgCanvas.height !== requiredHeight) {
+        bgCanvas.width = requiredWidth;
+        bgCanvas.height = requiredHeight;
+    }
+
+    bgCtx = bgCanvas.getContext('2d');
+
+    // Заливаем море под размер получившейся карты
+    bgCtx.fillStyle = '#1a2b4c'; 
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+    // Отрисовка цветных провинций суши
     for (const key in gridData) {
         const [cx, cy] = key.split(',').map(Number);
         const countryId = gridData[key];
@@ -154,8 +164,8 @@ function drawBaseMapCache() {
         bgCtx.fillRect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
 
-    // Шаг 2: Наложение сетки и легких границ между клетками
-    bgCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+    // Наложение сетки и легких границ между клетками
+    bgCtx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
     bgCtx.lineWidth = 1;
     for (const key in gridData) {
         const [cx, cy] = key.split(',').map(Number);
@@ -171,28 +181,29 @@ export function renderMap() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Если данные карты обновились, перерисовываем базовый скрытый кэш суши
+    // Если данные карты обновились, генерируем заново весь кэш суши
     if (isDirty || !bgCanvas) {
         drawBaseMapCache();
     }
 
-    // Очищаем основной экран цветом моря перед выводом камеры
+    // Очищаем основной экран цветом моря
     ctx.fillStyle = '#1a2b4c';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
     
-    // Центрируем систему координат холста и применяем матрицу камеры
+    // Сдвигаем матрицу к центру экрана и применяем координаты камеры
     ctx.translate(canvas.width / 2 + camera.x, canvas.height / 2 + camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    // Выводим готовую базовую карту из кэша (мгновенно)
-    ctx.drawImage(bgCanvas, 0, 0);
+    // Отрисовываем готовую карту из кэша (теперь она гарантированно целая)
+    if (bgCanvas) {
+        ctx.drawImage(bgCanvas, 0, 0);
+    }
 
     // ОТРИСОВКА ДИНАМИЧЕСКИХ ОБЪЕКТОВ (ЮНИТЫ И АРМИИ)
     const units = getUnits();
     const selectedUnitId = getSelectedUnitId();
-    const myCountryId = getMyCountryId();
 
     if (units && Object.keys(units).length > 0) {
         for (const uid in units) {
@@ -202,7 +213,6 @@ export function renderMap() {
             const screenX = unit.x * CELL_SIZE + CELL_SIZE / 2;
             const screenY = unit.y * CELL_SIZE + CELL_SIZE / 2;
 
-            // Подложка под иконку юнита (круг цвета его фракции)
             const countryInfo = COUNTRIES[unit.country];
             ctx.beginPath();
             ctx.arc(screenX, screenY, CELL_SIZE * 0.4, 0, Math.PI * 2);
@@ -212,25 +222,21 @@ export function renderMap() {
             ctx.fill();
             ctx.stroke();
 
-            // Иконка типа войск (пехота, танки и т.д.)
             ctx.fillStyle = '#ffffff';
             ctx.font = '11px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            let icon = ' infantry' === unit.type || 'inf' === unit.type ? '🪖' : '🎖️';
+            let icon = '🪖';
             if (unit.type === 'tank' || unit.type === 'armor') icon = '🚜';
-            
             ctx.fillText(icon, screenX, screenY);
 
-            // Отображение численности дивизии (например, "10")
             ctx.fillStyle = '#000000';
             ctx.font = 'bold 9px monospace';
             ctx.fillText(Math.ceil(unit.strength || 10), screenX + 6, screenY + 7);
         }
     }
 
-    // Дополнительная отрисовка фронтовых котлов (если модуль supply подключен)
     if (window._modules && window._modules.supply && typeof window._modules.supply.drawPockets === 'function') {
         window._modules.supply.drawPockets(ctx, CELL_SIZE);
     }
@@ -238,6 +244,4 @@ export function renderMap() {
     ctx.restore();
 }
 
-// Экспортируем функции в глобальную область видимости для отладки в консоли браузера
-window._modules = window._modules || {};
-window._modules.map = { markDirty, setCamera, screenToWorld, renderMap };
+function defineDrawCache() { window._modules = window._modules || {}; window._modules.map = { markDirty, setCamera, screenToWorld, renderMap }; }
