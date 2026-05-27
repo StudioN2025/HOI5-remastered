@@ -1,4 +1,4 @@
-// js/main.js — ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ СБОРКА
+// js/main.js — ФИНАЛЬНАЯ СБОРКА С АВТОЦЕНТРИРОВАНИЕМ ВСЕЙ КАРТЫ
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -26,13 +26,12 @@ import { getCommanderBonus } from './commanders.js';
 // Глобальная шина модулей для ленивых связей
 window._modules = { supply: { drawPockets: null } };
 
-// 🔥 ГЛОБАЛЬНОЕ ОПРЕДЕЛЕНИЕ БАЗОВОГО ПУТИ ДЛЯ СИТУАЦИЙ С GITHUB PAGES
+// Автоматическое определение путей для корректной работы GitHub Pages
 const isGitHubPages = window.location.hostname.includes('github.io');
 const repoName = window.location.pathname.split('/')[1];
 const BASE_URL = isGitHubPages ? `/${repoName}/` : '/';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Подгружаем отрисовку котлов из supply.js динамически с правильным путем
     try {
         const supplyMod = await import(`./supply.js`);
         window._modules.supply.drawPockets = supplyMod.drawPockets;
@@ -42,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // Инициализируем холст на весь экран до загрузки данных
+    // Инициализируем холст на весь экран
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -50,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setupMapEvents();
 
-    // Загрузка карты с автоматическим определением пути
+    // Загрузка карты с автоматическим расчетом центра масс суши
     try {
         const mapPath = `${BASE_URL}maps/europe.json`;
         const res = await fetch(mapPath).catch(() => fetch('../maps/europe.json'));
@@ -62,7 +61,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Сбрасываем кэш тайлов карты для перерисовки суши
+            // 🔥 ФИКС: Считаем геометрический центр карты, чтобы сфокусировать камеру точно на Европу
+            const cells = Object.keys(data.gridData);
+            if (cells.length > 0) {
+                let totalX = 0;
+                let totalY = 0;
+                cells.forEach(key => {
+                    const [cx, cy] = key.split(',').map(Number);
+                    totalX += cx * 20; // 20 — CELL_SIZE
+                    totalY += cy * 20;
+                });
+                
+                const centerX = totalX / cells.length;
+                const centerY = totalY / cells.length;
+                
+                // Перемещаем камеру в центр суши и немного отдаляем зум (0.35), чтобы влезла вся карта целиком
+                setCamera({ x: -centerX * 0.35, y: -centerY * 0.35, zoom: 0.35 });
+            }
+
+            // Перерисовываем графический кэш под новые динамические размеры холста
             markDirty();
             
             // Генерируем список стран строго после успешной загрузки JSON
@@ -168,10 +185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
-    
-    // Выставляем дефолтную камеру на центр карты Европы
-    setCamera({ x: 400, y: 200, zoom: 0.6 });
-    markDirty();
 
     // Цикл непрерывной отрисовки карты
     function animate() { 
@@ -204,7 +217,6 @@ function renderCountrySelectionList() {
         btn.style.borderLeftColor = info.color;
         btn.style.borderLeftWidth = '4px';
         
-        // 🔥 УМНЫЙ ФИКС ПУТИ К ФЛАГАМ с использованием BASE_URL
         btn.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
                 <img src="${BASE_URL}assets/flags/${cid}.png" 
