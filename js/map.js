@@ -1,4 +1,4 @@
-// js/map.js — ГРАФИЧЕСКИЙ ДВИЖК С ПОДДЕРЖКОЙ ОТРИЦАТЕЛЬНЫХ КООРДИНАТ (ЦЕНТР В 0,0)
+// js/map.js — ГРАФИЧЕСКИЙ ДВИЖК С ИСПРАВЛЕННЫМ ЗУМОМ И КЛИКАМИ
 
 import { COUNTRIES } from './data.js';
 import { getGridData, getMyCountryId, getUnits, getSelectedUnitId } from './game.js';
@@ -17,7 +17,7 @@ export let camera = {
     targetZoom: 0.5
 };
 
-// Сдвиг координат (офсет) для компенсации отрицательных координат из JSON
+// Сдвиг координат для компенсации отрицательных координат из JSON
 export let mapOffset = { x: 0, y: 0 };
 
 // Состояние мыши и перетаскивания
@@ -32,12 +32,10 @@ let isDirty = true;
 let bgCanvas = null;
 let bgCtx = null;
 
-// Принудительный сброс графического кэша
 export function markDirty() {
     isDirty = true;
 }
 
-// Изменение размеров основного холста под окно браузера
 export function resizeCanvas() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return;
@@ -46,7 +44,6 @@ export function resizeCanvas() {
     markDirty();
 }
 
-// Установка параметров камеры
 export function setCamera(newCam) {
     if (newCam.x !== undefined) { camera.x = camera.targetX = newCam.x; }
     if (newCam.y !== undefined) { camera.y = camera.targetY = newCam.y; }
@@ -54,23 +51,24 @@ export function setCamera(newCam) {
     markDirty();
 }
 
-// Преобразование экранных координат мыши в координаты игровой сетки
+// 🔥 ФИКС КЛИКОВ: Преобразование экранных координат в координаты игровой сетки JSON
 export function screenToWorld(screenX, screenY) {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return { x: 0, y: 0 };
     
+    // Вычисляем точку относительно центра экрана, куда смещена камера
     const worldX = (screenX - canvas.width / 2 - camera.x) / camera.zoom;
     const worldY = (screenY - canvas.height / 2 - camera.y) / camera.zoom;
     
+    // Переводим пиксели в сетку и ВЫЧИТАЕМ mapOffset, чтобы вернуть исходные координаты JSON (включая минусовые)
     return {
         x: Math.floor(worldX / CELL_SIZE) - mapOffset.x,
         y: Math.floor(worldY / CELL_SIZE) - mapOffset.y
     };
 }
 
-// Плавное перемещение и зум камеры (интерполяция кадров)
 export function processCameraMovement() {
-    const lerpFactor = 0.15;
+    const lerpFactor = 0.2; // Чуть быстрее сглаживание для отзывчивости
     
     if (Math.abs(camera.x - camera.targetX) > 0.1) {
         camera.x += (camera.targetX - camera.x) * lerpFactor;
@@ -83,21 +81,39 @@ export function processCameraMovement() {
     }
 }
 
-// Настройка обработчиков событий мыши и колесика
+// 🔥 ФИКС ЗУМА ТУДА, ГДЕ МЫШЬ
 export function setupMapEvents() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return;
 
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const zoomSpeed = 1.15;
+        
+        const zoomSpeed = 1.2;
+        const oldZoom = camera.targetZoom;
+        let newZoom = oldZoom;
+
         if (e.deltaY < 0) {
-            if (camera.targetZoom < 3.0) camera.targetZoom *= zoomSpeed;
+            if (oldZoom < 3.0) newZoom = oldZoom * zoomSpeed;
         } else {
-            if (camera.targetZoom > 0.1) camera.targetZoom /= zoomSpeed;
+            if (oldZoom > 0.08) newZoom = oldZoom / zoomSpeed;
         }
+
+        if (newZoom === oldZoom) return;
+
+        // Координаты мыши относительно центра экрана
+        const mouseX = e.clientX - canvas.width / 2;
+        const mouseY = e.clientY - canvas.height / 2;
+
+        // Корректируем положение камеры, чтобы точка под мышкой не смещалась при зуме
+        camera.targetX = mouseX - (mouseX - camera.targetX) * (newZoom / oldZoom);
+        camera.targetY = mouseY - (mouseY - camera.targetY) * (newZoom / oldZoom);
+        camera.targetZoom = newZoom;
+        
+        markDirty();
     }, { passive: false });
 
+    // Начало перетаскивания (ЛКМ или колесико)
     canvas.addEventListener('mousedown', (e) => {
         if (e.button === 0 || e.button === 1) { 
             isDragging = true;
@@ -118,7 +134,6 @@ export function setupMapEvents() {
     });
 }
 
-// ГЕНЕРАЦИЯ СКРЫТОГО КЭША КАРТЫ С УЧЕТОМ СДВИГОВ СУШИ
 defineDrawCache();
 function drawBaseMapCache() {
     const gridData = getGridData();
@@ -135,6 +150,7 @@ function drawBaseMapCache() {
         if (cy > maxY) maxY = cy;
     });
 
+    // Офсеты: добавляем запас
     mapOffset.x = minX < 0 ? Math.abs(minX) + 5 : 5;
     mapOffset.y = minY < 0 ? Math.abs(minY) + 5 : 5;
 
@@ -174,7 +190,6 @@ function drawBaseMapCache() {
     isDirty = false;
 }
 
-// ОСНОВНАЯ ФУНКЦИЯ ОТРИСОВКИ
 export function renderMap() {
     const canvas = document.getElementById('map-canvas');
     if (!canvas) return;
@@ -188,11 +203,16 @@ export function renderMap() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
+    
+    // Трансформируем холст относительно центра экрана игрока
     ctx.translate(canvas.width / 2 + camera.x, canvas.height / 2 + camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    if (bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
+    if (bgCanvas) {
+        ctx.drawImage(bgCanvas, 0, 0);
+    }
 
+    // Рендеринг юнитов
     const units = getUnits();
     const selectedUnitId = getSelectedUnitId();
 
