@@ -1,4 +1,4 @@
-// main.js — ФИНАЛЬНАЯ НЕУБИВАЕМАЯ СБОРКА С ИСПРАВЛЕНИЕМ HUD И КАРТЫ
+// js/main.js — ПОЛНАЯ ИСПРАВЛЕННАЯ СБОРКА ПОД СТРУКТУРУ ПАПОК
 
 import { COUNTRIES, UNIT_STATS, BUILDING_STATS } from './data.js';
 import { 
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ls = document.getElementById('loading-screen');
     
-    // 🔥 ФИКС КАРТЫ: Сначала разворачиваем холст на весь экран и вешаем события, чтобы он не был нулевым
+    // Инициализируем холст на весь экран до загрузки данных
     resizeCanvas();
     window.addEventListener('resize', () => {
         resizeCanvas();
@@ -41,17 +41,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setupMapEvents();
 
-    // Загрузка карты из подпапки maps
+    // 🔥 ФИКС ПУТИ К КАРТЕ: выходим из js/ и идем в maps/europe.json
     try {
-        const res = await fetch('./maps/europe.json'); 
-        if (!res.ok) throw new Error(`Статус ответа: ${res.status}`);
+        const res = await fetch('../maps/europe.json'); 
+        if (!res.ok) throw new Error(`Сервер ответил со статусом ${res.status}`);
         
         const data = await res.json();
         if (data && data.gridData) {
             setGridData(data.gridData);
             initializeFactories(data.gridData);
             
-            // Сбрасываем кэш тайлов карты, чтобы они перерисовались под новые данные
+            // Сбрасываем кэш тайлов карты для перерисовки суши
             markDirty();
             
             // Генерируем список стран строго после успешной загрузки JSON
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ КАРТЫ:', e);
     }
 
-    // Привязка UI кнопок управления скоростью и меню
+    // Привязка UI кнопок управления
     document.getElementById('btn-play')?.addEventListener('click', () => {
         document.getElementById('main-menu')?.classList.add('hidden');
         document.getElementById('country-select')?.classList.remove('hidden');
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('nav-commanders')?.addEventListener('click', () => openWindow('commanders'));
     document.getElementById('nav-save')?.addEventListener('click', () => showSaveLoadMenu());
 
-    // Сердце игрового времени (Таймер суток)
+    // Игровой таймер времени (сутки)
     setInterval(() => {
         const speed = getGameSpeed();
         if (speed === 0 || !getMyCountryId()) return;
@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('info-sidebar')?.classList.add('hidden');
     });
 
-    // Деактивация выделения юнитов по клику на правую кнопку мыши (ПКМ)
+    // Обработка кликов (выделение/деактивация)
     window.addEventListener('mousedown', (e) => {
         if (e.button === 2) { 
             setSelectedUnitId(null);
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // ========== ГЛОБАЛЬНЫЙ ХОТКЕЙ: ПРОБЕЛ ДЛЯ ПАУЗЫ ==========
+    // Пробел для паузы
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && getMyCountryId()) {
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
@@ -154,12 +154,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // Безопасное удаление экрана загрузки
     if (ls) {
         setTimeout(() => ls.remove(), 400);
     }
     
-    // Игровой цикл непрерывного рендеринга
+    // 🔥 ФИКС КАМЕРЫ: Ставим дефолтные координаты на центр карты Европы, чтобы не смотреть в пустой угол океана
+    setCamera({ x: 400, y: 200, zoom: 0.6 });
+    markDirty();
+
+    // Цикл непрерывной отрисовки карты
     function animate() { 
         processCameraMovement(); 
         renderMap();             
@@ -168,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     animate();
 });
 
-// Генерация списка стран с интеграцией твоих флагов из assets/flags/
+// Генерация списка выбора держав
 function renderCountrySelectionList() {
     const listContainer = document.getElementById('country-list');
     if (!listContainer) return;
@@ -190,9 +193,10 @@ function renderCountrySelectionList() {
         btn.style.borderLeftColor = info.color;
         btn.style.borderLeftWidth = '4px';
         
+        // 🔥 ФИКС ПУТИ К ФЛАГАМ: выходим из папки js/ через ../
         btn.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
-                <img src="./assets/flags/${cid}.png" 
+                <img src="../assets/flags/${cid}.png" 
                      onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'16\' viewBox=\'0 0 24 16\'><rect width=\'24\' height=\'16\' fill=\'%23555\'/></svg>'" 
                      style="width:28px; height:18px; object-fit:cover; border:1px solid #444; border-radius:2px;" 
                      alt="${info.name}"/>
@@ -214,8 +218,7 @@ function selectCountryAndStart(id) {
     
     document.getElementById('country-select')?.classList.add('hidden');
     
-    // 🔥 ФИКС ДЛЯ ДВУХ ВАРЯНТОВ ВЕРСТКИ: 
-    // Включаем #hud, если он есть. Если его нет — включаем элементы напрямую по их ID из твоего index.html
+    // Включение интерфейса под любую верстку
     const hud = document.getElementById('hud');
     if (hud) {
         hud.classList.remove('hidden');
@@ -225,7 +228,7 @@ function selectCountryAndStart(id) {
         document.getElementById('game-navigation')?.classList.remove('hidden');
     }
     
-    // Центрирование камеры на провинциях выбранного игрока
+    // Автоматическое центрирование и фокусировка камеры на границах выбранной игроком страны
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(k => gridData[k] === id);
     if (myCells.length > 0) {
