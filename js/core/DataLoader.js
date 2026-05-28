@@ -1,4 +1,4 @@
-// DataLoader.js — убедитесь, что bounds обновляются
+// DataLoader.js — Загрузчик с отладкой
 
 export class DataLoader {
     async loadMap(url, world) {
@@ -11,16 +11,24 @@ export class DataLoader {
         const total = Object.keys(gridData).length;
         let loaded = 0;
         
-        // ОБНОВЛЯЕМ ГРАНИЦЫ ВРУЧНУЮ
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         
+        // Сначала проходим по всем клеткам для определения границ
         for (const [pos, owner] of Object.entries(gridData)) {
             const [x, y] = pos.split(',').map(Number);
             minX = Math.min(minX, x);
             maxX = Math.max(maxX, x);
             minY = Math.min(minY, y);
             maxY = Math.max(maxY, y);
-            
+        }
+        
+        // Устанавливаем границы ДО загрузки
+        world.bounds = { minX, maxX, minY, maxY };
+        console.log(`📐 Границы: X[${minX}..${maxX}], Y[${minY}..${maxY}]`);
+        
+        // Загружаем клетки
+        for (const [pos, owner] of Object.entries(gridData)) {
+            const [x, y] = pos.split(',').map(Number);
             world.setCell(x, y, owner);
             
             loaded++;
@@ -29,9 +37,6 @@ export class DataLoader {
                 await this.delay(0);
             }
         }
-        
-        // Устанавливаем границы в world
-        world.bounds = { minX, maxX, minY, maxY };
         
         // Загружаем постройки
         const cellStats = data.cellStats || {};
@@ -48,7 +53,10 @@ export class DataLoader {
             }
         }
         
-        console.log(`✅ Карта загружена: ${total} клеток, границы X[${minX}..${maxX}], Y[${minY}..${maxY}]`);
+        // Проверка загрузки
+        const totalCells = world.debugCheckCells();
+        console.log(`✅ Карта загружена: ${total} клеток в JSON, ${totalCells} клеток в чанках`);
+        
         return world;
     }
     
