@@ -1,4 +1,4 @@
-// DataLoader.js — Загрузчик карты
+// DataLoader.js — Загрузчик карты с фабриками и портами
 
 export class DataLoader {
     async loadMap(url, world) {
@@ -35,20 +35,30 @@ export class DataLoader {
             }
         }
         
-        // Загружаем постройки
+        // Загружаем фабрики и порты из cellStats
         const cellStats = data.cellStats || {};
+        let factoriesLoaded = 0;
+        let portsLoaded = 0;
+        
         for (const [pos, stats] of Object.entries(cellStats)) {
             const [x, y] = pos.split(',').map(Number);
             
-            if (stats.factories > 0) {
+            // Заводы
+            if (stats.factories && stats.factories > 0) {
                 for (let i = 0; i < stats.factories; i++) {
                     world.addBuilding(x, y, 'factory');
+                    factoriesLoaded++;
                 }
             }
-            if (stats.buildings?.includes('port')) {
+            
+            // Порты
+            if (stats.buildings && stats.buildings.includes('port')) {
                 world.addBuilding(x, y, 'port');
+                portsLoaded++;
             }
         }
+        
+        console.log(`✅ Загружено построек: ${factoriesLoaded} заводов, ${portsLoaded} портов`);
         
         const totalCells = world.debugCheckCells();
         console.log(`✅ Карта загружена: ${total} клеток в JSON, ${totalCells} клеток в мире`);
