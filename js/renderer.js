@@ -135,7 +135,7 @@ export function renderDirtyCells() {
         offscreenCtx.lineWidth = 0.5;
         offscreenCtx.strokeRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
         
-        offscreenCtx.font = `${Math.max(8, Math.min(14, CELL_SIZE * 0.6))}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+        offscreenCtx.font = `${Math.max(12, Math.min(18, CELL_SIZE * 0.8))}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
         offscreenCtx.textAlign = 'left';
         offscreenCtx.textBaseline = 'top';
         
