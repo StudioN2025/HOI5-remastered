@@ -1,4 +1,4 @@
-// map.js — исправленная версия
+// map.js — ПОЛНАЯ ВЕРСИЯ СО ВСЕМИ ЭКСПОРТАМИ
 
 import { getCountryInfo } from './utils.js';
 import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId, getCellStats } from './game.js';
@@ -23,24 +23,48 @@ let camera = { x: 0, y: 0, zoom: 0.6 };
 let hoverCell = null;
 let cameraInitialized = false;
 
-// ... (остальные функции)
+// Кэш котлов
+let pocketCache = null;
+let pocketFrame = 0;
+const POCKET_INTERVAL = 60;
 
-// Инициализация камеры ПО ЦЕНТРУ КАРТЫ (учитывая отрицательные координаты)
+// ========== ЭКСПОРТИРУЕМЫЕ ФУНКЦИИ ==========
+export function getCamera() { return camera; }
+export function getHoverCell() { return hoverCell; }
+export function setHoverCell(cell) { hoverCell = cell; }
+export function getCellSize() { return CELL_SIZE; }
+export { canvas, ctx };
+
+export function markDirty() {
+    markAllDirty();
+    pocketCache = null;
+}
+
+export function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    markAllDirty();
+    if (cameraInitialized) renderMap();
+}
+
+export function screenToWorld(sx, sy) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: Math.floor(((sx - rect.left - canvas.width/2) / camera.zoom + camera.x) / CELL_SIZE),
+        y: Math.floor(((sy - rect.top - canvas.height/2) / camera.zoom + camera.y) / CELL_SIZE)
+    };
+}
+
+// Инициализация камеры по центру карты
 function initCamera() {
     const bounds = getWorldBounds();
     
-    // Центр в МИРОВЫХ координатах (клетках)
     const centerCellX = (bounds.minX + bounds.maxX) / 2;
     const centerCellY = (bounds.minY + bounds.maxY) / 2;
     
-    // Центр в пикселях
-    const centerX = centerCellX * CELL_SIZE;
-    const centerY = centerCellY * CELL_SIZE;
+    camera.x = centerCellX * CELL_SIZE;
+    camera.y = centerCellY * CELL_SIZE;
     
-    camera.x = centerX;
-    camera.y = centerY;
-    
-    // Автоматический зум, чтобы вся карта помещалась на экране
     const worldWidth = (bounds.maxX - bounds.minX + 2) * CELL_SIZE;
     const worldHeight = (bounds.maxY - bounds.minY + 2) * CELL_SIZE;
     
@@ -49,7 +73,7 @@ function initCamera() {
     camera.zoom = Math.min(zoomX, zoomY, 1.5) * 0.95;
     
     cameraInitialized = true;
-    console.log(`🎥 Камера: центр клетка (${centerCellX.toFixed(1)}, ${centerCellY.toFixed(1)}), зум ${camera.zoom.toFixed(2)}`);
+    console.log(`🎥 Камера инициализирована, зум: ${camera.zoom.toFixed(2)}`);
 }
 
 // Основной рендер
@@ -65,7 +89,6 @@ export function renderMap() {
     
     renderDirtyCells();
     
-    // Очищаем экран
     ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -73,28 +96,22 @@ export function renderMap() {
     
     if (srcRect.sw > 0 && srcRect.sh > 0 && srcRect.dw > 0 && srcRect.dh > 0) {
         try {
-            // Включаем сглаживание для лучшего качества
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
-            
             ctx.drawImage(
                 offscreen,
                 srcRect.sx, srcRect.sy, srcRect.sw, srcRect.sh,
                 srcRect.dx, srcRect.dy, srcRect.dw, srcRect.dh
             );
         } catch(e) {
-            console.warn('Ошибка копирования:', e);
+            console.warn('Ошибка копирования канваса:', e);
         }
     }
     
     renderDynamicLayer();
 }
 
-// ... (остальной код без изменений)
-
-// ... остальной код renderDynamicLayer, updatePocketCache, updateCamera, setupMapEvents остаётся без изменений
-
-// Динамический слой (оставляем как было)
+// Динамический слой
 function renderDynamicLayer() {
     const units = getUnits();
     const myId = getMyCountryId();
@@ -134,7 +151,6 @@ function renderDynamicLayer() {
         if (u.id === selectedUnitId) {
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
-            ctx.setLineDash([]);
             ctx.strokeRect(screenX - 1, screenY - 1, size + 2, size + 2);
         }
         
@@ -168,6 +184,7 @@ function renderDynamicLayer() {
         }
     }
     
+    // Стройка
     if (buildingQueue.length > 0 && buildingQueue[0]?.pos) {
         const [bx, by] = buildingQueue[0].pos.split(',').map(Number);
         const stats = BUILDING_STATS[buildingQueue[0].type];
@@ -184,6 +201,7 @@ function renderDynamicLayer() {
         }
     }
     
+    // Котлы
     pocketFrame++;
     if (pocketFrame >= POCKET_INTERVAL) {
         pocketFrame = 0;
@@ -208,6 +226,7 @@ function renderDynamicLayer() {
         }
     }
     
+    // Ховер
     if (hoverCell && gridData[hoverCell]) {
         const [hx, hy] = hoverCell.split(',').map(Number);
         const screenX = (hx * CELL_SIZE - camera.x) * camera.zoom + canvas.width/2;
