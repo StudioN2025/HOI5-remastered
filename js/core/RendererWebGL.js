@@ -1,4 +1,4 @@
-// RendererWebGL.js — ПОЛНЫЙ РАБОЧИЙ РЕНДЕР
+// RendererWebGL.js — Полный рендер с юнитами
 
 export class RendererWebGL {
     constructor(canvasId) {
@@ -95,7 +95,7 @@ export class RendererWebGL {
                 ctx.lineWidth = 0.5;
                 ctx.strokeRect(screenX, screenY, size, size);
                 
-                // Иконки
+                // Иконки построек
                 if (size > 12) {
                     const hasPort = world.hasBuilding(x, y, 'port');
                     const hasFactory = world.hasBuilding(x, y, 'factory');
@@ -139,9 +139,10 @@ export class RendererWebGL {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
+            // Цвет юнита в зависимости от владельца
             if (entities.owner[i] === gameState.myCountryId) {
                 ctx.fillStyle = '#ffffff';
-            } else if (gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
+            } else if (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
                 ctx.fillStyle = '#ff6666';
             } else {
                 ctx.fillStyle = '#cccccc';
@@ -181,11 +182,11 @@ export class RendererWebGL {
             ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
         }
         
-        // Лог
+        // Лог производительности
         this.frameCount++;
         if (this.frameCount >= 60) {
             this.frameCount = 0;
-            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов`);
+            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов, всего юнитов: ${entities.nextId - 1}`);
         }
     }
     
