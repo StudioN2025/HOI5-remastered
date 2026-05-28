@@ -34,14 +34,15 @@ body {
 
 /* ========== ГЛАВНОЕ МЕНЮ ========== */
 #main-menu {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: radial-gradient(circle, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.95) 100%),
-                url('../assets/hoi5-backend.png') center/cover;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 1000 !important;
+    background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.95) 100%);
+    background-color: #0c1526 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: auto !important;
 }
 
 .hq-folder {
@@ -113,14 +114,15 @@ body {
 
 /* ========== ВЫБОР СТРАНЫ ========== */
 #country-select {
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle, rgba(0,0,0,0.4), rgba(0,0,0,0.9)),
-                url('../assets/uploading-screan.png') center/cover;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 2000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: radial-gradient(circle, rgba(0,0,0,0.6), rgba(0,0,0,0.95));
+    background-color: #0a111f !important;
+    pointer-events: auto !important;
 }
 
 .select-card {
@@ -219,6 +221,7 @@ body {
     font-size: 12px;
     flex-wrap: nowrap;
     overflow-x: auto;
+    pointer-events: auto !important;
 }
 
 .country-name {
@@ -305,6 +308,14 @@ body {
     white-space: nowrap;
 }
 
+/* ========== ИГРОВОЙ ИНТЕРФЕЙС HUD ========== */
+#hud {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 10 !important;
+    pointer-events: none !important; /* Пропускает клики сквозь пустоту */
+}
+
 /* ========== ВКЛАДКИ ========== */
 #game-tabs {
     position: fixed;
@@ -314,6 +325,7 @@ body {
     gap: 2px;
     z-index: 100;
     flex-wrap: wrap;
+    pointer-events: auto !important;
 }
 
 .tab-btn {
@@ -353,6 +365,7 @@ body {
     border-radius: 12px;
     z-index: 200;
     box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    pointer-events: auto !important;
 }
 
 .window-header {
@@ -393,11 +406,11 @@ body {
 
 /* ========== КАНВАС ========== */
 #map-canvas {
-    position: fixed;
-    inset: 0;
+    position: fixed !important;
+    inset: 0 !important;
     background: var(--sea-blue);
     cursor: crosshair;
-    z-index: 1;
+    z-index: 1 !important; /* Строго под всеми меню */
     touch-action: none;
 }
 
@@ -415,6 +428,7 @@ body {
     border-radius: 12px;
     padding: 16px;
     z-index: 150;
+    pointer-events: auto !important;
 }
 
 .sidebar-header {
@@ -1005,7 +1019,6 @@ body {
     #game-tabs {
         left: 8px;
         right: 8px;
-        top: auto;
         top: 48px;
     }
     
@@ -1055,21 +1068,23 @@ body {
         font-size: 10px;
         padding: 8px;
     }
+    
     /* ========== ЭКРАН ЗАГРУЗКИ ========== */
-#loading-screen {
-    animation: fadeIn 0.3s ease;
+    #loading-screen {
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    #loading-bar-fill {
+        transition: width 0.3s ease;
+        box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+    }
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-#loading-bar-fill {
-    transition: width 0.3s ease;
-    box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
-}
-}
 /* Флаги */
 .flag-icon {
     width: 32px;
@@ -1093,76 +1108,4 @@ body {
     display: inline-block;
     vertical-align: middle;
     margin-right: 4px;
-}
-/* ==========================================================================
-   🔥 КРИТИЧЕСКИЙ ВОЗВРАТ ИНТЕРФЕЙСА И МЕНЮ (ДОПИСАТЬ В КОНЕЦ CSS-ФАЙЛА)
-   ========================================================================== */
-
-/* 1. Карту принудительно отправляем на задний план, чтобы она не перекрывала UI */
-#map-canvas {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 1 !important; /* Самый нижний слой */
-    display: block !important;
-    cursor: grab !important;
-}
-#map-canvas:active { 
-    cursor: grabbing !important; 
-}
-
-/* 2. HUD растягиваем на весь экран, но делаем «прозрачным» для кликов */
-#hud {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 10 !important; /* Поверх карты */
-    pointer-events: none !important; /* Клики летят сквозь пустоту на карту */
-}
-
-/* 3. Принудительно включаем видимость главного меню и экрана выбора стран поверх карты */
-#main-menu, #country-select {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    display: flex !important; /* Проявляем меню по центру экрана */
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 100 !important; /* Самый верхний слой — выше карты */
-    pointer-events: auto !important;
-}
-
-/* Если у какого-то окна есть класс hidden — оно должно скрываться */
-#main-menu.hidden, #country-select.hidden, #hud.hidden, #info-sidebar.hidden, #info-window.hidden {
-    display: none !important;
-}
-
-/* 4. Возвращаем кликабельность всем твоим красивым кнопкам, меню и панелям */
-#top-bar, 
-#speed-controls, 
-#game-navigation, 
-#info-sidebar, 
-#info-window, 
-.menu-box,
-.select-box,
-.action-btn,
-button {
-    pointer-events: auto !important; /* Эти элементы снова ловят клики мыши */
-}
-
-#info-sidebar {
-    z-index: 11 !important; /* Поверх HUD, но под главными меню */
-}
-
-#info-window {
-    z-index: 50 !important; /* Поверх боковой панели */
-}
-#info-window {
-    z-index: 50 !important; /* Поверх боковой панели */
 }
