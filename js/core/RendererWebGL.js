@@ -1,216 +1,67 @@
-// RendererWebGL.js — WebGL рендер для 60 FPS
+// RendererWebGL.js — ТОЛЬКО CANVAS 2D (работает 100%)
 
 export class RendererWebGL {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
-        this.gl = this.canvas.getContext('webgl2', { alpha: false, antialias: true });
-        
-        if (!this.gl) {
-            console.warn('WebGL2 не поддерживается, падаем на Canvas2D');
-            this.useFallback = true;
-            this.ctx = this.canvas.getContext('2d');
-        } else {
-            this.useFallback = false;
-            this.initWebGL();
-        }
+        // Принудительно используем Canvas 2D
+        this.ctx = this.canvas.getContext('2d');
+        this.useFallback = true;
         
         this.camera = { x: 0, y: 0, zoom: 0.6 };
-        this.resize();
+        this.cameraInitialized = false;
         
+        this.resize();
         window.addEventListener('resize', () => this.resize());
     }
     
-    initWebGL() {
-        const gl = this.gl;
-        
-        // Вершинный шейдер
-        const vsSource = `
-            attribute vec2 a_position;
-            attribute vec2 a_texCoord;
-            uniform vec2 u_resolution;
-            uniform vec2 u_camera;
-            uniform float u_zoom;
-            varying vec2 v_texCoord;
-            
-            void main() {
-                vec2 screenPos = (a_position - u_camera) * u_zoom + u_resolution / 2.0;
-                vec2 clipSpace = screenPos / u_resolution * 2.0 - 1.0;
-                gl_Position = vec4(clipSpace, 0, 1);
-                v_texCoord = a_texCoord;
-            }
-        `;
-        
-        // Фрагментный шейдер
-        const fsSource = `
-            precision highp float;
-            uniform sampler2D u_texture;
-            varying vec2 v_texCoord;
-            
-            void main() {
-                gl_FragColor = texture2D(u_texture, v_texCoord);
-            }
-        `;
-        
-        const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
-        const fs = this.compileShader(gl.FRAGMENT_SHADER, fsSource);
-        
-        this.program = gl.createProgram();
-        gl.attachShader(this.program, vs);
-        gl.attachShader(this.program, fs);
-        gl.linkProgram(this.program);
-        
-        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-            console.error('Shader link failed');
-        }
-        
-        gl.useProgram(this.program);
-        
-        // Аттрибуты
-        this.positionLoc = gl.getAttribLocation(this.program, 'a_position');
-        this.texCoordLoc = gl.getAttribLocation(this.program, 'a_texCoord');
-        
-        // Юниформы
-        this.resolutionLoc = gl.getUniformLocation(this.program, 'u_resolution');
-        this.cameraLoc = gl.getUniformLocation(this.program, 'u_camera');
-        this.zoomLoc = gl.getUniformLocation(this.program, 'u_zoom');
-        
-        // Буферы
-        this.positionBuffer = gl.createBuffer();
-        this.texCoordBuffer = gl.createBuffer();
-        
-        // Текстурный атлас
-        this.createTextureAtlas();
-        
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    }
-    
-    compileShader(type, source) {
-        const gl = this.gl;
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error('Shader compile error:', gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
-        }
-        
-        return shader;
-    }
-    
-    createTextureAtlas() {
-        const gl = this.gl;
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        
-        // Заливка фона
-        ctx.fillStyle = '#1a3a4a';
-        ctx.fillRect(0, 0, size, size);
-        
-        // Рисуем тайлы для разных типов клеток
-        const tileSize = 32;
-        const colors = {
-            germany: '#3a3a3a',
-            ussr: '#990000',
-            poland: '#ffc0cb',
-            france: '#3b82f6',
-            uk: '#ef4444',
-            italy: '#166534',
-            default: '#666666'
-        };
-        
-        let x = 0, y = 0;
-        for (const [country, color] of Object.entries(colors)) {
-            ctx.fillStyle = color;
-            ctx.fillRect(x, y, tileSize, tileSize);
-            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-            ctx.strokeRect(x, y, tileSize, tileSize);
-            
-            x += tileSize;
-            if (x >= size) {
-                x = 0;
-                y += tileSize;
-            }
-        }
-        
-        // Иконки
-        ctx.font = '24px "Segoe UI Emoji"';
-        ctx.fillStyle = '#fff';
-        ctx.fillText('💂', 0, 100);
-        ctx.fillText('🚜', 32, 100);
-        ctx.fillText('⚓', 64, 100);
-        ctx.fillText('🏭', 96, 100);
-        
-        this.texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    }
-    
     render(world, entities, gameState) {
-        if (this.useFallback) {
-            this.renderFallback(world, entities, gameState);
+        if (!this.ctx) return;
+        
+        const ctx = this.ctx;
+        const bounds = world.bounds;
+        
+        // Если границы не определены, выходим
+        if (bounds.minX === Infinity || !world.chunks.size) {
+            // Рисуем сообщение о загрузке
+            ctx.fillStyle = '#1a3a4a';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Загрузка карты...', this.canvas.width/2, this.canvas.height/2);
             return;
         }
         
-        const gl = this.gl;
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        gl.clearColor(0.1, 0.2, 0.25, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        
-        gl.useProgram(this.program);
-        
-        // Устанавливаем юниформы
-        gl.uniform2f(this.resolutionLoc, this.canvas.width, this.canvas.height);
-        gl.uniform2f(this.cameraLoc, this.camera.x, this.camera.y);
-        gl.uniform1f(this.zoomLoc, this.camera.zoom);
-        
-        // Рисуем клетки
-        this.renderCells(world);
-        
-        // Рисуем юниты
-        this.renderUnits(entities);
-    }
-    
-    renderCells(world) {
-        // В реальной реализации здесь будет отрисовка видимых чанков
-        // Для краткости пока заглушка
-    }
-    
-    renderUnits(entities) {
-        // Отрисовка юнитов
-        for (let i = 1; i < entities.nextId; i++) {
-            if (!entities.active[i]) continue;
+        // Инициализируем камеру если нужно
+        if (!this.cameraInitialized) {
+            const centerX = (bounds.minX + bounds.maxX) / 2 * 20;
+            const centerY = (bounds.minY + bounds.maxY) / 2 * 20;
+            this.camera.x = centerX;
+            this.camera.y = centerY;
             
-            const x = entities.x[i];
-            const y = entities.y[i];
-            const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
-            const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
-            const size = 20 * this.camera.zoom;
+            const worldWidth = (bounds.maxX - bounds.minX + 2) * 20;
+            const worldHeight = (bounds.maxY - bounds.minY + 2) * 20;
+            const zoomX = this.canvas.width / worldWidth;
+            const zoomY = this.canvas.height / worldHeight;
+            this.camera.zoom = Math.min(zoomX, zoomY, 1.5) * 0.95;
+            this.cameraInitialized = true;
             
-            // Заглушка: рисуем прямоугольник вместо иконки
-            // В полной версии тут будет вызов WebGL для отрисовки спрайта
+            console.log(`🎥 Камера: центр (${centerX}, ${centerY}), зум ${this.camera.zoom.toFixed(2)}`);
+            console.log(`📐 Мир: X[${bounds.minX}..${bounds.maxX}], Y[${bounds.minY}..${bounds.maxY}]`);
         }
-    }
-    
-    renderFallback(world, entities, gameState) {
-        // Canvas 2D fallback
-        this.ctx.fillStyle = '#1a3a4a';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Рисуем видимые клетки
-        const bounds = world.bounds;
+        // Очищаем экран
+        ctx.fillStyle = '#1a3a4a';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Вычисляем видимые клетки
         const startX = Math.max(bounds.minX, Math.floor((this.camera.x - this.canvas.width / 2 / this.camera.zoom) / 20));
         const endX = Math.min(bounds.maxX, Math.ceil((this.camera.x + this.canvas.width / 2 / this.camera.zoom) / 20));
         const startY = Math.max(bounds.minY, Math.floor((this.camera.y - this.canvas.height / 2 / this.camera.zoom) / 20));
         const endY = Math.min(bounds.maxY, Math.ceil((this.camera.y + this.canvas.height / 2 / this.camera.zoom) / 20));
         
+        // Рисуем клетки
+        let cellsDrawn = 0;
         for (let x = startX; x <= endX; x++) {
             for (let y = startY; y <= endY; y++) {
                 const owner = world.getCell(x, y);
@@ -220,28 +71,76 @@ export class RendererWebGL {
                 const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
                 const size = 20 * this.camera.zoom;
                 
-                this.ctx.fillStyle = this.getCountryColor(owner);
-                this.ctx.fillRect(screenX, screenY, size, size);
-                this.ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                this.ctx.strokeRect(screenX, screenY, size, size);
+                if (screenX + size < 0 || screenX > this.canvas.width || 
+                    screenY + size < 0 || screenY > this.canvas.height) continue;
+                
+                // Цвет страны
+                ctx.fillStyle = this.getCountryColor(owner);
+                ctx.fillRect(screenX, screenY, size, size);
+                
+                // Граница
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(screenX, screenY, size, size);
+                
+                cellsDrawn++;
             }
         }
         
-        // Рисуем юниты
+        // Рисуем юнитов
         for (let i = 1; i < entities.nextId; i++) {
             if (!entities.active[i]) continue;
             
             const x = entities.x[i];
             const y = entities.y[i];
+            
             const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
             const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
             const size = 20 * this.camera.zoom;
             
-            this.ctx.font = `${size * 0.7}px "Segoe UI Emoji"`;
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            this.ctx.fillStyle = '#fff';
-            this.ctx.fillText(entities.type[i] === 0 ? '💂' : '🚜', screenX + size / 2, screenY + size / 2);
+            if (screenX + size < 0 || screenX > this.canvas.width || 
+                screenY + size < 0 || screenY > this.canvas.height) continue;
+            
+            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            
+            const icon = entities.type[i] === 0 ? '💂' : '🚜';
+            ctx.fillText(icon, screenX + size / 2, screenY + size / 2);
+            
+            // HP бар
+            if (size > 15) {
+                const hpPercent = entities.hp[i] / entities.maxHp[i];
+                const barWidth = size * 0.6;
+                const barX = screenX + (size - barWidth) / 2;
+                const barY = screenY + size - 3;
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(barX, barY, barWidth, 3);
+                ctx.fillStyle = hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444';
+                ctx.fillRect(barX, barY, barWidth * hpPercent, 3);
+            }
+        }
+        
+        // Рисуем выделенного юнита
+        const selectedId = gameState.selectedUnitId;
+        if (selectedId && entities.active[selectedId]) {
+            const x = entities.x[selectedId];
+            const y = entities.y[selectedId];
+            
+            const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
+            const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
+            const size = 20 * this.camera.zoom;
+            
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
+        }
+        
+        // Лог количества отрисованных клеток (раз в 60 кадров)
+        if (Math.random() < 0.02) {
+            console.log(`🎨 Отрисовано клеток: ${cellsDrawn}, юнитов: ${entities.nextId - 1}`);
         }
     }
     
@@ -252,7 +151,27 @@ export class RendererWebGL {
             poland: '#ffc0cb',
             france: '#3b82f6',
             uk: '#ef4444',
-            italy: '#166534'
+            italy: '#166534',
+            spain: '#fbbf24',
+            portugal: '#105d10',
+            netherlands: '#f97316',
+            belgium: '#eab308',
+            luxembourg: '#67e8f9',
+            switzerland: '#dc2626',
+            romania: '#eab308',
+            hungary: '#166534',
+            bulgaria: '#105d10',
+            finland: '#ffffff',
+            czechoslovakia: '#3b82f6',
+            austria: '#ef4444',
+            denmark: '#ef4444',
+            greece: '#60a5fa',
+            yugoslavia: '#1e3a8a',
+            lithuania: '#065f46',
+            latvia: '#8b0000',
+            estonia: '#4682b4',
+            slovakia: '#60a5fa',
+            turkey: '#c8102e'
         };
         return colors[countryId] || '#666666';
     }
@@ -267,10 +186,6 @@ export class RendererWebGL {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-        
-        if (this.gl) {
-            this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        }
     }
     
     setCamera(x, y) {
