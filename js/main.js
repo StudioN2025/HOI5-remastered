@@ -1,4 +1,4 @@
-// main.js — НОВАЯ ТОЧКА ВХОДА (полностью рабочий)
+// main.js — НОВАЯ ТОЧКА ВХОДА (исправлен дубликат gameLoopId)
 
 import { World } from './core/World.js';
 import { EntityManager } from './core/EntityManager.js';
@@ -37,7 +37,7 @@ let diplomacy = null;
 let tech = null;
 let focus = null;
 
-let gameLoopId = null;
+let animationFrameId = null;
 let lastTimestamp = 0;
 
 async function init() {
@@ -77,13 +77,10 @@ async function init() {
     // Настройка событий
     setupEvents();
     
-    // Старт игрового цикла
-    startGameLoop();
-    
     // Скрываем загрузку
     hideLoadingScreen();
     
-    // Показываем выбор страны
+    // Показываем выбор страны (рендер ещё не запущен)
     showCountrySelection();
 }
 
@@ -125,7 +122,6 @@ function setupEvents() {
         canvas.addEventListener('click', handleCanvasClick);
         canvas.addEventListener('contextmenu', handleCanvasRightClick);
         canvas.addEventListener('wheel', handleCanvasWheel);
-        canvas.addEventListener('mousemove', handleCanvasMouseMove);
     }
     
     // Клавиши
@@ -216,9 +212,6 @@ function setupEvents() {
 function handleCanvasClick(e) {
     if (!gameState.isGameActive) return;
     
-    const rect = renderer.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
     
@@ -261,11 +254,10 @@ function handleCanvasClick(e) {
     if (gameState.selectedUnitId !== null) {
         const unitId = gameState.selectedUnitId;
         
-        // Атака или движение
         if (cellOwner !== 0 && gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
             const targetUnit = entities.getUnitAt(worldPos.x, worldPos.y);
             if (targetUnit && entities.owner[targetUnit] === cellOwner) {
-                combat.startCombat(unitId, targetUnit);
+                if (combat.startCombat) combat.startCombat(unitId, targetUnit);
             } else {
                 movement.giveOrder(unitId, worldPos.x, worldPos.y);
             }
@@ -298,7 +290,6 @@ function handleCanvasRightClick(e) {
     
     if (!gameState.isGameActive) return;
     
-    // Отмена выбора юнита
     if (gameState.selectedUnitId !== null) {
         gameState.selectedUnitId = null;
         document.getElementById('order-hint')?.classList.add('hidden');
@@ -306,7 +297,6 @@ function handleCanvasRightClick(e) {
         return;
     }
     
-    // Показ информации о клетке
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
     if (cellOwner !== 0) {
@@ -319,14 +309,9 @@ function handleCanvasWheel(e) {
     renderer.zoom(e.deltaY, e.clientX, e.clientY);
 }
 
-function handleCanvasMouseMove(e) {
-    // Для ховера можно добавить позже
-}
-
 function handleKeyDown(e) {
     if (!gameState.isGameActive) return;
     
-    // Пробел - пауза
     if (e.code === 'Space') {
         e.preventDefault();
         const newSpeed = gameState.gameSpeed === 0 ? 1 : 0;
@@ -334,7 +319,6 @@ function handleKeyDown(e) {
         updateSpeedButtons(newSpeed);
     }
     
-    // WASD для движения камеры
     const speed = 20 / renderer.camera.zoom;
     let moved = false;
     
@@ -355,35 +339,60 @@ function handleKeyDown(e) {
         moved = true;
     }
     
-    if (moved) {
-        e.preventDefault();
-    }
+    if (moved) e.preventDefault();
 }
 
-function handleKeyUp(e) {
-    // Можно добавить логику при отпускании клавиш
-}
-
-let gameLoopId = null;
-let isRendering = false;
+function handleKeyUp(e) {}
 
 function startGameLoop() {
-    if (gameLoopId) return;
+    if (animationFrameId) return;
     
-    function loop() {
-        // Рендерим ТОЛЬКО если игра активна
-        if (gameState.isGameActive && renderer) {
-            renderer.render(world, entities, gameState);
-            if (topBar) topBar.update();
+    let lastTick = performance.now();
+    let accumulator = 0;
+    const TICK_DURATION = 1000 / 60;
+    let dayAccumulator = 0;
+    const DAY_DURATION = 1000;
+    
+    function loop(now) {
+        let delta = Math.min(100, now - lastTick);
+        lastTick = now;
+        accumulator += delta;
+        dayAccumulator += delta;
+        
+        while (accumulator >= TICK_DURATION) {
+            if (gameState.isGameActive) {
+                updateGame();
+            }
+            accumulator -= TICK_DURATION;
         }
         
-        gameLoopId = requestAnimationFrame(loop);
+        if (dayAccumulator >= DAY_DURATION && gameState.gameSpeed > 0 && gameState.isGameActive) {
+            dayAccumulator = 0;
+            gameState.advanceDay();
+            if (topBar) topBar.update();
+            
+            if (economy) economy.update();
+            if (supply) supply.update();
+            if (combat) combat.update();
+            if (movement) movement.update();
+            
+            if (gameState.days % 30 === 0 && gameState.days > 0) {
+                saveGame();
+            }
+        }
+        
+        // Рендерим только если игра активна
+        if (gameState.isGameActive && renderer) {
+            renderer.render(world, entities, gameState);
+        }
+        
+        if (topBar) topBar.update();
+        
+        animationFrameId = requestAnimationFrame(loop);
     }
     
-    gameLoopId = requestAnimationFrame(loop);
+    animationFrameId = requestAnimationFrame(loop);
 }
-
-// И не вызывайте startGameLoop в init() — вызывайте её после выбора страны
 
 function updateGame() {
     if (movement) movement.updatePositions();
@@ -476,34 +485,28 @@ function startGame(countryId) {
     gameState.days = 0;
     gameState.gameDate = new Date(1936, 0, 1);
     
-    // СОЗДАЁМ ЮНИТЫ ДЛЯ ИГРОКА
+    // Создаём юниты для игрока
     const cells = Array.from(world.getCountryCells(countryId));
     console.log(`📋 Клетки страны ${countryId}: ${cells.length}`);
     
     if (cells.length > 0) {
         const sortedCells = cells.sort();
         const capital = sortedCells[0].split(',').map(Number);
-        console.log(`🏰 Столица: (${capital[0]}, ${capital[1]})`);
+        console.log(`🏰 Первая клетка: (${capital[0]}, ${capital[1]})`);
         
-        const offsets = [[0,0], [1,0], [0,1]];
-        for (let i = 0; i < offsets.length; i++) {
-            const [dx, dy] = offsets[i];
-            const x = capital[0] + dx;
-            const y = capital[1] + dy;
+        // Создаём 3 пехотные дивизии
+        for (let i = 0; i < 3; i++) {
+            const x = capital[0] + (i % 2);
+            const y = capital[1] + Math.floor(i / 2);
             
             if (world.getCell(x, y) === countryId) {
                 const unitId = entities.createEntity(countryId, 0, x, y);
                 console.log(`✅ Создан юнит ${unitId} в (${x},${y})`);
             }
         }
-        
-        const hasFactory = world.hasBuilding(capital[0], capital[1], 'factory');
-        if (hasFactory) {
-            const unitId = entities.createEntity(countryId, 1, capital[0] + 2, capital[1]);
-            console.log(`✅ Создан танк ${unitId} в (${capital[0] + 2},${capital[1]})`);
-        }
     }
     
+    // Закрываем меню и показываем игру
     document.getElementById('country-select').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     document.getElementById('game-tabs').classList.remove('hidden');
@@ -516,6 +519,9 @@ function startGame(countryId) {
     addNotification(`⌨️ WASD — камера | Пробел — пауза`, 'info');
     
     if (renderer) renderer.cameraInitialized = false;
+    
+    // Запускаем игровой цикл ТОЛЬКО ПОСЛЕ выбора страны
+    startGameLoop();
 }
 
 function saveGame() {
