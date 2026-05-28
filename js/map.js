@@ -1,9 +1,16 @@
-// map.js — РЕНДЕР С ИСПОЛЬЗОВАНИЕМ OFFSCREEN CANVAS
+// map.js — ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 import { getCountryInfo } from './utils.js';
 import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId, getCellStats } from './game.js';
 import { BUILDING_STATS } from './data.js';
-import { getOffscreenCanvas, renderDirtyCells, getVisibleSourceRect, getWorldBounds, markAllDirty } from './renderer.js';
+import { 
+    getOffscreenCanvas, 
+    renderDirtyCells, 
+    getVisibleSourceRect, 
+    getWorldBounds, 
+    markAllDirty,
+    CELL_SIZE 
+} from './renderer.js';
 
 const canvas = document.getElementById('map-canvas');
 let ctx = canvas.getContext('2d', { 
@@ -11,8 +18,6 @@ let ctx = canvas.getContext('2d', {
     desynchronized: true,
     willReadFrequently: false
 });
-
-const CELL_SIZE = 20;
 
 // Камера
 let camera = { x: 0, y: 0, zoom: 0.8 };
@@ -53,23 +58,31 @@ export function renderMap() {
     if (!ctx) return;
     
     const offscreen = getOffscreenCanvas();
-    if (!offscreen) return;
+    if (!offscreen) {
+        console.warn('Offscreen canvas не готов');
+        return;
+    }
     
     // Обновляем только грязные клетки
     renderDirtyCells();
     
-    // Очищаем экран
+    // Очищаем экран (море)
     ctx.fillStyle = '#1b3a4b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Копируем видимую часть оффскрин-канваса
     const srcRect = getVisibleSourceRect(camera, canvas.width, canvas.height);
-    if (srcRect.sw > 0 && srcRect.sh > 0) {
-        ctx.drawImage(
-            offscreen,
-            srcRect.sx, srcRect.sy, srcRect.sw, srcRect.sh,
-            srcRect.dx, srcRect.dy, srcRect.dw, srcRect.dh
-        );
+    
+    if (srcRect.sw > 0 && srcRect.sh > 0 && srcRect.dw > 0 && srcRect.dh > 0) {
+        try {
+            ctx.drawImage(
+                offscreen,
+                srcRect.sx, srcRect.sy, srcRect.sw, srcRect.sh,
+                srcRect.dx, srcRect.dy, srcRect.dw, srcRect.dh
+            );
+        } catch(e) {
+            console.warn('Ошибка копирования канваса:', e);
+        }
     }
     
     // Динамический слой: юниты, стройка, котлы, ховер
@@ -83,7 +96,6 @@ function renderDynamicLayer() {
     const selectedUnitId = getSelectedUnitId();
     const gridData = getGridData();
     const buildingQueue = getBuildingQueue();
-    const worldBounds = getWorldBounds();
     const now = Date.now();
     
     ctx.save();
@@ -282,5 +294,6 @@ export function setupMapEvents() {
     setInterval(updateCamera, 1000/30);
 }
 
+// Инициализация
 resizeCanvas();
 window.addEventListener('resize', () => { resizeCanvas(); renderMap(); });
