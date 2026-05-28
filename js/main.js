@@ -496,20 +496,44 @@ function startGame(countryId) {
     gameState.myCountryId = countryId;
     gameState.isGameActive = true;
     gameState.setGameSpeed(1);
-    gameState.equipment = 1000;
+    gameState.equipment = 5000;
     gameState.manpower = 500000;
     gameState.days = 0;
     gameState.gameDate = new Date(1936, 0, 1);
     
-    // Начальные юниты (несколько дивизий в столице)
+    // СОЗДАЁМ ЮНИТЫ ДЛЯ ИГРОКА
     const cells = Array.from(world.getCountryCells(countryId));
+    console.log(`📋 Клетки страны ${countryId}: ${cells.length}`);
+    
     if (cells.length > 0) {
-        const capital = cells[0].split(',').map(Number);
-        for (let i = 0; i < 3; i++) {
-            entities.createEntity(countryId, 0, capital[0] + i, capital[1]);
+        // Сортируем клетки и берём "столицу" (первую попавшуюся)
+        const sortedCells = cells.sort();
+        const capital = sortedCells[0].split(',').map(Number);
+        console.log(`🏰 Столица: (${capital[0]}, ${capital[1]})`);
+        
+        // Создаём 3 пехотные дивизии вокруг столицы
+        const offsets = [[0,0], [1,0], [0,1]];
+        for (let i = 0; i < offsets.length; i++) {
+            const [dx, dy] = offsets[i];
+            const x = capital[0] + dx;
+            const y = capital[1] + dy;
+            
+            // Проверяем, что клетка принадлежит стране
+            if (world.getCell(x, y) === countryId) {
+                const unitId = entities.createEntity(countryId, 0, x, y);
+                console.log(`✅ Создан юнит ${unitId} в (${x},${y})`);
+            }
+        }
+        
+        // Добавим танк если есть заводы
+        const hasFactory = world.hasBuilding(capital[0], capital[1], 'factory');
+        if (hasFactory) {
+            const unitId = entities.createEntity(countryId, 1, capital[0] + 2, capital[1]);
+            console.log(`✅ Создан танк ${unitId} в (${capital[0] + 2},${capital[1]})`);
         }
     }
     
+    // Закрываем меню и показываем игру
     document.getElementById('country-select').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     document.getElementById('game-tabs').classList.remove('hidden');
@@ -520,17 +544,9 @@ function startGame(countryId) {
     addNotification(`🎌 Вы играете за ${countryId.toUpperCase()}`, 'info');
     addNotification(`🖱️ Клик по юниту → ЛКМ по врагу = АТАКА`, 'info');
     addNotification(`⌨️ WASD — камера | Пробел — пауза`, 'info');
-}
-
-function updateSpeedButtons(speed) {
-    document.querySelectorAll('.speed-btn').forEach(btn => {
-        const btnSpeed = parseInt(btn.dataset.speed);
-        if (btnSpeed === speed) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    
+    // Принудительный рендер
+    renderer.cameraInitialized = false;
 }
 
 function saveGame() {
