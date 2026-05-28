@@ -364,47 +364,26 @@ function handleKeyUp(e) {
     // Можно добавить логику при отпускании клавиш
 }
 
+let gameLoopId = null;
+let isRendering = false;
+
 function startGameLoop() {
-    let lastTick = performance.now();
-    let accumulator = 0;
-    const TICK_DURATION = 1000 / 60;
-    let dayAccumulator = 0;
-    const DAY_DURATION = 1000;
+    if (gameLoopId) return;
     
-    function loop(now) {
-        let delta = Math.min(100, now - lastTick);
-        lastTick = now;
-        accumulator += delta;
-        dayAccumulator += delta;
-        
-        while (accumulator >= TICK_DURATION) {
-            updateGame();
-            accumulator -= TICK_DURATION;
-        }
-        
-        if (dayAccumulator >= DAY_DURATION && gameState.gameSpeed > 0) {
-            dayAccumulator = 0;
-            gameState.advanceDay();
+    function loop() {
+        // Рендерим ТОЛЬКО если игра активна
+        if (gameState.isGameActive && renderer) {
+            renderer.render(world, entities, gameState);
             if (topBar) topBar.update();
-            
-            if (economy) economy.update();
-            if (supply) supply.update();
-            if (combat) combat.update();
-            if (movement) movement.update();
-            
-            if (gameState.days % 30 === 0 && gameState.days > 0) {
-                saveGame();
-            }
         }
-        
-        if (renderer) renderer.render(world, entities, gameState);
-        if (topBar) topBar.update();
         
         gameLoopId = requestAnimationFrame(loop);
     }
     
     gameLoopId = requestAnimationFrame(loop);
 }
+
+// И не вызывайте startGameLoop в init() — вызывайте её после выбора страны
 
 function updateGame() {
     if (movement) movement.updatePositions();
