@@ -1,4 +1,4 @@
-// ai.js — ПОЛНЫЙ С addPorts
+// ai.js — ОПТИМИЗИРОВАННАЯ ВЕРСИЯ С КЭШЕМ
 
 import { 
     getMyCountryId, getGridData, getWars, getUnits, getGameSpeed, 
@@ -10,6 +10,7 @@ import {
 import { NATIONAL_FOCUSES, UNIT_STATS } from './data.js';
 import { isAtWar, getEnemiesOf, calculateCountryStats } from './utils.js';
 import { getPocketsForCountry } from './supply.js';
+import { getCachedFrontLine, getCachedBordersWithEnemy, clearAICache } from './ai-cache.js';
 
 const RESEARCH_DURATION = 100;
 const CONSTRUCTION_TIME = 135;
@@ -45,31 +46,14 @@ function getAIMemory(countryId) {
     return aiMemory[countryId];
 }
 
+// ОПТИМИЗИРОВАННЫЕ ФУНКЦИИ с использованием кэша
 function getBorderCells(countryId, targetId) {
-    const gridData = getGridData();
-    const borders = [];
-    for (const [pos, owner] of Object.entries(gridData)) {
-        if (owner !== countryId) continue;
-        const [x, y] = pos.split(',').map(Number);
-        if ([[0,1],[0,-1],[1,0],[-1,0]].some(([dx, dy]) => gridData[`${x+dx},${y+dy}`] === targetId)) {
-            borders.push(pos);
-        }
-    }
-    return borders;
+    return getCachedBordersWithEnemy(countryId, targetId);
 }
 
 function getFrontLine(countryId) {
-    const enemies = getEnemiesOf(countryId, getWars());
-    const gridData = getGridData();
-    const frontLine = [];
-    for (const [pos, owner] of Object.entries(gridData)) {
-        if (owner !== countryId) continue;
-        const [x, y] = pos.split(',').map(Number);
-        if ([[0,1],[0,-1],[1,0],[-1,0]].some(([dx, dy]) => enemies.includes(gridData[`${x+dx},${y+dy}`]))) {
-            frontLine.push(pos);
-        }
-    }
-    return frontLine;
+    const frontLine = getCachedFrontLine(countryId);
+    return Array.from(frontLine);
 }
 
 function getWeakestEnemy(countryId) {
@@ -142,6 +126,7 @@ function areAlliesCheck(c1, c2) {
     return alliances.some(a => a.has && a.has(c1) && a.has(c2));
 }
 
+// ОПТИМИЗИРОВАННЫЙ ПОИСК ПУТИ
 function calculatePath(startPos, endPos, owner) {
     const gridData = getGridData();
     const units = getUnits();
@@ -150,27 +135,77 @@ function calculatePath(startPos, endPos, owner) {
     const [sx, sy] = startPos.split(',').map(Number);
     const [tx, ty] = endPos.split(',').map(Number);
     
-    const queue = [{ x: sx, y: sy, path: [] }];
-    const visited = new Set([`${sx},${sy}`]);
+    // A* с эвристикой
+    const openSet = new Map();
+    const closedSet = new Set();
     
-    while (queue.length > 0) {
-        const { x, y, path } = queue.shift();
-        if (x === tx && y === ty) return path;
-        if (path.length > 80) continue;
+    function heuristic(x, y) {
+        return Math.abs(x - tx) + Math.abs(y - ty);
+    }
+    
+    const startKey = `${sx},${sy}`;
+    openSet.set(startKey, {
+        g: 0,
+        f: heuristic(sx, sy),
+        parent: null,
+        x: sx, y: sy
+    });
+    
+    while (openSet.size > 0) {
+        let current = null;
+        let currentKey = null;
+        for (const [key, node] of openSet) {
+            if (!current || node.f < current.f) {
+                current = node;
+                currentKey = key;
+            }
+        }
+        
+        if (current.x === tx && current.y === ty) {
+            const path = [];
+            let node = current;
+            while (node.parent) {
+                path.unshift(`${node.x},${node.y}`);
+                node = node.parent;
+            }
+            return path;
+        }
+        
+        openSet.delete(currentKey);
+        closedSet.add(currentKey);
+        
+        if (current.g > 80) continue;
         
         for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const nx = x + dx, ny = y + dy, key = `${nx},${ny}`;
-            if (visited.has(key)) continue;
-            const cellOwner = gridData[key];
-            if (!cellOwner) continue;
-            if (units.find(u => u.pos === key && u.owner !== owner && isAtWar(owner, u.owner, wars))) continue;
-            const isEnemy = enemies.includes(cellOwner);
+            const nx = current.x + dx;
+            const ny = current.y + dy;
+            const nKey = `${nx},${ny}`;
+            
+            if (closedSet.has(nKey)) continue;
+            if (!gridData[nKey]) continue;
+            
+            const enemyUnit = units.find(u => u.pos === nKey && u.owner !== owner && isAtWar(owner, u.owner, wars));
+            if (enemyUnit) continue;
+            
+            const cellOwner = gridData[nKey];
+            const isEnemyCountry = enemies.includes(cellOwner);
             const isAlly = cellOwner === owner || areAlliesCheck(owner, cellOwner);
-            if (!isEnemy && !isAlly) continue;
-            visited.add(key);
-            queue.push({ x: nx, y: ny, path: [...path, key] });
+            if (!isEnemyCountry && !isAlly) continue;
+            
+            const tentativeG = current.g + 1;
+            const existing = openSet.get(nKey);
+            
+            if (!existing || tentativeG < existing.g) {
+                openSet.set(nKey, {
+                    g: tentativeG,
+                    f: tentativeG + heuristic(nx, ny),
+                    parent: current,
+                    x: nx, y: ny
+                });
+            }
         }
     }
+    
     return null;
 }
 
@@ -206,7 +241,7 @@ export function runCountryAI(countryId) {
         }
     }
     
-    // Фокусы
+    // Фокусы (оставляем без изменений)
     const aiActiveFocus = getAIActiveFocus(countryId);
     const aiCompleted = getAICompletedFocuses(countryId);
     const countryFocuses = NATIONAL_FOCUSES[countryId] || [];
@@ -407,3 +442,6 @@ export function runAllAI() {
     const allCountries = [...new Set(Object.values(gridData))];
     allCountries.forEach(countryId => runCountryAI(countryId));
 }
+
+// Экспортируем функцию очистки кэша для использования при загрузке игры
+export { clearAICache } from './ai-cache.js';
