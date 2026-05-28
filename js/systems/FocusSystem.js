@@ -103,7 +103,6 @@ export class FocusSystem {
                 this.gameState.addWar(myId, 'finland');
                 break;
             case 'ussr_baltic':
-                // Аннексия Прибалтики
                 const balticStates = ['lithuania', 'latvia', 'estonia'];
                 for (const baltic of balticStates) {
                     const cells = this.world.getCountryCells(baltic);
