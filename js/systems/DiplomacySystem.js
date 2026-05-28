@@ -1,5 +1,7 @@
 // DiplomacySystem.js — Дипломатическая система
 
+import { addNotification } from '../utils/helpers.js';
+
 export class DiplomacySystem {
     constructor(gameState, world, entities) {
         this.gameState = gameState;
@@ -93,7 +95,6 @@ export class DiplomacySystem {
         const cells = this.world.getCountryCells(countryId);
         
         if (cells.size === 0) {
-            // Страна полностью захвачена
             this.handleCapitulation(countryId);
             return true;
         }
