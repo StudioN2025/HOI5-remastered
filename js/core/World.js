@@ -1,4 +1,4 @@
-// World.js — Чанковая система для 100k+ клеток
+// World.js — Чанковая система с поддержкой отрицательных координат
 
 const CHUNK_SIZE = 16;
 const CHUNK_SIZE_SQ = CHUNK_SIZE * CHUNK_SIZE;
@@ -9,7 +9,7 @@ export class WorldChunk {
         this.cy = cy;
         this.cells = new Uint16Array(CHUNK_SIZE_SQ);
         this.dirty = true;
-        this.buildings = new Map(); // cellIndex -> Set(buildings)
+        this.buildings = new Map();
     }
     
     getIndex(lx, ly) {
@@ -39,28 +39,12 @@ export class WorldChunk {
         const idx = this.getIndex(lx, ly);
         return this.buildings.has(idx) && this.buildings.get(idx).has(buildingType);
     }
-    
-    serialize() {
-        return {
-            cx: this.cx,
-            cy: this.cy,
-            cells: Array.from(this.cells),
-            buildings: Array.from(this.buildings.entries()).map(([k, v]) => [k, Array.from(v)])
-        };
-    }
-    
-    static deserialize(data) {
-        const chunk = new WorldChunk(data.cx, data.cy);
-        chunk.cells = new Uint16Array(data.cells);
-        chunk.buildings = new Map(data.buildings.map(([k, v]) => [k, new Set(v)]));
-        return chunk;
-    }
 }
 
 export class World {
     constructor() {
         this.chunks = new Map();
-        this.countryCache = new Map(); // countryId -> Set(cellKeys)
+        this.countryCache = new Map();
         this.bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
     }
     
@@ -76,13 +60,25 @@ export class World {
         return this.chunks.get(key);
     }
     
+    // Преобразование мировых координат в чанк и локальные
     worldToChunk(x, y) {
-        return {
-            cx: Math.floor(x / CHUNK_SIZE),
-            cy: Math.floor(y / CHUNK_SIZE),
-            lx: ((x % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE,
-            ly: ((y % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE
-        };
+        // Для отрицательных координат: -1 // 16 = -1, но нам нужно -1
+        let cx = Math.floor(x / CHUNK_SIZE);
+        let cy = Math.floor(y / CHUNK_SIZE);
+        let lx = x - cx * CHUNK_SIZE;
+        let ly = y - cy * CHUNK_SIZE;
+        
+        // Корректировка для отрицательных координат
+        if (lx < 0) {
+            lx += CHUNK_SIZE;
+            cx -= 1;
+        }
+        if (ly < 0) {
+            ly += CHUNK_SIZE;
+            cy -= 1;
+        }
+        
+        return { cx, cy, lx, ly };
     }
     
     setCell(x, y, countryId) {
@@ -100,17 +96,16 @@ export class World {
             this.bounds.maxY = Math.max(this.bounds.maxY, y);
             
             // Обновляем кэш стран
+            const cellKey = `${x},${y}`;
             if (oldId !== 0) {
-                const key = `${x},${y}`;
                 const oldSet = this.countryCache.get(oldId);
-                if (oldSet) oldSet.delete(key);
+                if (oldSet) oldSet.delete(cellKey);
             }
             if (countryId !== 0) {
-                const key = `${x},${y}`;
                 if (!this.countryCache.has(countryId)) {
                     this.countryCache.set(countryId, new Set());
                 }
-                this.countryCache.get(countryId).add(key);
+                this.countryCache.get(countryId).add(cellKey);
             }
         }
     }
@@ -119,7 +114,8 @@ export class World {
         const { cx, cy, lx, ly } = this.worldToChunk(x, y);
         const key = this.getChunkKey(cx, cy);
         const chunk = this.chunks.get(key);
-        return chunk ? chunk.getCell(lx, ly) : 0;
+        if (!chunk) return 0;
+        return chunk.getCell(lx, ly);
     }
     
     addBuilding(x, y, buildingType) {
@@ -132,7 +128,8 @@ export class World {
         const { cx, cy, lx, ly } = this.worldToChunk(x, y);
         const key = this.getChunkKey(cx, cy);
         const chunk = this.chunks.get(key);
-        return chunk ? chunk.hasBuilding(lx, ly, buildingType) : false;
+        if (!chunk) return false;
+        return chunk.hasBuilding(lx, ly, buildingType);
     }
     
     getCountryCells(countryId) {
@@ -152,7 +149,6 @@ export class World {
         ];
     }
     
-    // Получить границы с врагом
     getBorderWith(countryId, enemyId) {
         const cells = this.getCountryCells(countryId);
         const borders = [];
@@ -168,42 +164,15 @@ export class World {
         return borders;
     }
     
-    // Сериализация
-    serialize() {
-        return {
-            chunks: Array.from(this.chunks.entries()).map(([k, v]) => [k, v.serialize()]),
-            bounds: this.bounds,
-            version: '3.0'
-        };
-    }
-    
-    // Десериализация
-    static deserialize(data) {
-        const world = new World();
-        for (const [key, chunkData] of data.chunks) {
-            world.chunks.set(key, WorldChunk.deserialize(chunkData));
-        }
-        world.bounds = data.bounds;
-        
-        // Восстанавливаем кэш стран
-        for (const [key, chunk] of world.chunks) {
+    // Отладка: проверить все клетки
+    debugCheckCells() {
+        let totalCells = 0;
+        for (const [key, chunk] of this.chunks) {
             for (let i = 0; i < chunk.cells.length; i++) {
-                const countryId = chunk.cells[i];
-                if (countryId !== 0) {
-                    const lx = i % CHUNK_SIZE;
-                    const ly = Math.floor(i / CHUNK_SIZE);
-                    const x = chunk.cx * CHUNK_SIZE + lx;
-                    const y = chunk.cy * CHUNK_SIZE + ly;
-                    const cellKey = `${x},${y}`;
-                    
-                    if (!world.countryCache.has(countryId)) {
-                        world.countryCache.set(countryId, new Set());
-                    }
-                    world.countryCache.get(countryId).add(cellKey);
-                }
+                if (chunk.cells[i] !== 0) totalCells++;
             }
         }
-        
-        return world;
+        console.log(`📊 Всего клеток в чанках: ${totalCells}, в кэше стран: ${this.countryCache.size}`);
+        return totalCells;
     }
 }
