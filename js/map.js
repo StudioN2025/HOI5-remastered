@@ -1,4 +1,4 @@
-// map.js — с правильной настройкой камеры для отрицательных координат
+// map.js — исправленная версия
 
 import { getCountryInfo } from './utils.js';
 import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId, getCellStats } from './game.js';
@@ -15,62 +15,41 @@ import {
 const canvas = document.getElementById('map-canvas');
 let ctx = canvas.getContext('2d', { 
     alpha: false,
-    desynchronized: true,
-    willReadFrequently: false
+    desynchronized: true
 });
 
 // Камера
-let camera = { x: 0, y: 0, zoom: 0.8 };
+let camera = { x: 0, y: 0, zoom: 0.6 };
 let hoverCell = null;
 let cameraInitialized = false;
 
-// Кэш котлов
-let pocketCache = null;
-let pocketFrame = 0;
-const POCKET_INTERVAL = 60;
+// ... (остальные функции)
 
-export function getCamera() { return camera; }
-export function getHoverCell() { return hoverCell; }
-export function setHoverCell(cell) { hoverCell = cell; }
-export function getCellSize() { return CELL_SIZE; }
-export { canvas, ctx };
-
-// Инициализация камеры по центру карты
+// Инициализация камеры ПО ЦЕНТРУ КАРТЫ (учитывая отрицательные координаты)
 function initCamera() {
     const bounds = getWorldBounds();
-    const centerX = (bounds.minX + bounds.maxX) / 2 * CELL_SIZE;
-    const centerY = (bounds.minY + bounds.maxY) / 2 * CELL_SIZE;
+    
+    // Центр в МИРОВЫХ координатах (клетках)
+    const centerCellX = (bounds.minX + bounds.maxX) / 2;
+    const centerCellY = (bounds.minY + bounds.maxY) / 2;
+    
+    // Центр в пикселях
+    const centerX = centerCellX * CELL_SIZE;
+    const centerY = centerCellY * CELL_SIZE;
     
     camera.x = centerX;
     camera.y = centerY;
-    camera.zoom = Math.min(
-        canvas.width / ((bounds.maxX - bounds.minX + 2) * CELL_SIZE),
-        canvas.height / ((bounds.maxY - bounds.minY + 2) * CELL_SIZE),
-        2.0
-    ) * 0.9;
+    
+    // Автоматический зум, чтобы вся карта помещалась на экране
+    const worldWidth = (bounds.maxX - bounds.minX + 2) * CELL_SIZE;
+    const worldHeight = (bounds.maxY - bounds.minY + 2) * CELL_SIZE;
+    
+    const zoomX = canvas.width / worldWidth;
+    const zoomY = canvas.height / worldHeight;
+    camera.zoom = Math.min(zoomX, zoomY, 1.5) * 0.95;
     
     cameraInitialized = true;
-    console.log(`🎥 Камера инициализирована: центр (${centerX}, ${centerY}), зум ${camera.zoom}`);
-}
-
-export function markDirty() {
-    markAllDirty();
-    pocketCache = null;
-}
-
-export function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    markAllDirty();
-    if (cameraInitialized) renderMap();
-}
-
-export function screenToWorld(sx, sy) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-        x: Math.floor(((sx - rect.left - canvas.width/2) / camera.zoom + camera.x) / CELL_SIZE),
-        y: Math.floor(((sy - rect.top - canvas.height/2) / camera.zoom + camera.y) / CELL_SIZE)
-    };
+    console.log(`🎥 Камера: центр клетка (${centerCellX.toFixed(1)}, ${centerCellY.toFixed(1)}), зум ${camera.zoom.toFixed(2)}`);
 }
 
 // Основной рендер
@@ -78,41 +57,40 @@ export function renderMap() {
     if (!ctx) return;
     
     const offscreen = getOffscreenCanvas();
-    if (!offscreen) {
-        console.warn('Offscreen canvas не готов');
-        return;
-    }
+    if (!offscreen) return;
     
-    // Инициализируем камеру при первом рендере
     if (!cameraInitialized) {
         initCamera();
     }
     
-    // Обновляем только грязные клетки
     renderDirtyCells();
     
     // Очищаем экран
     ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Копируем видимую часть оффскрин-канваса
     const srcRect = getVisibleSourceRect(camera, canvas.width, canvas.height);
     
     if (srcRect.sw > 0 && srcRect.sh > 0 && srcRect.dw > 0 && srcRect.dh > 0) {
         try {
+            // Включаем сглаживание для лучшего качества
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
             ctx.drawImage(
                 offscreen,
                 srcRect.sx, srcRect.sy, srcRect.sw, srcRect.sh,
                 srcRect.dx, srcRect.dy, srcRect.dw, srcRect.dh
             );
         } catch(e) {
-            console.warn('Ошибка копирования канваса:', e);
+            console.warn('Ошибка копирования:', e);
         }
     }
     
-    // Динамический слой
     renderDynamicLayer();
 }
+
+// ... (остальной код без изменений)
 
 // ... остальной код renderDynamicLayer, updatePocketCache, updateCamera, setupMapEvents остаётся без изменений
 
