@@ -40,21 +40,57 @@ export class DataLoader {
         let factoriesLoaded = 0;
         let portsLoaded = 0;
         
-        for (const [pos, stats] of Object.entries(cellStats)) {
-            const [x, y] = pos.split(',').map(Number);
+        // Если в JSON нет cellStats, создаём тестовые фабрики для крупных стран
+        const hasCellStats = Object.keys(cellStats).length > 0;
+        
+        if (hasCellStats) {
+            for (const [pos, stats] of Object.entries(cellStats)) {
+                const [x, y] = pos.split(',').map(Number);
+                
+                if (stats.factories && stats.factories > 0) {
+                    for (let i = 0; i < stats.factories; i++) {
+                        world.addBuilding(x, y, 'factory');
+                        factoriesLoaded++;
+                    }
+                }
+                
+                if (stats.buildings && stats.buildings.includes('port')) {
+                    world.addBuilding(x, y, 'port');
+                    portsLoaded++;
+                }
+            }
+        } else {
+            // ТЕСТОВЫЕ ФАБРИКИ: добавляем фабрики в столицы крупных стран
+            console.log('⚠️ Нет cellStats в JSON, создаём тестовые фабрики...');
             
-            // Заводы
-            if (stats.factories && stats.factories > 0) {
-                for (let i = 0; i < stats.factories; i++) {
+            // Собираем все страны и их клетки
+            const countryCells = new Map();
+            for (const [pos, owner] of Object.entries(gridData)) {
+                if (!countryCells.has(owner)) countryCells.set(owner, []);
+                countryCells.get(owner).push(pos);
+            }
+            
+            // Для каждой крупной страны добавляем фабрики в первые 3 клетки
+            for (const [countryId, cells] of countryCells.entries()) {
+                if (cells.length >= 30) { // Крупные страны
+                    const addCount = Math.min(5, Math.floor(cells.length / 20));
+                    for (let i = 0; i < addCount && i < cells.length; i++) {
+                        const [x, y] = cells[i].split(',').map(Number);
+                        world.addBuilding(x, y, 'factory');
+                        factoriesLoaded++;
+                        
+                        // Добавляем порт если клетка у воды
+                        const isCoastal = this.isCoastal(x, y, gridData);
+                        if (isCoastal && i < 2) {
+                            world.addBuilding(x, y, 'port');
+                            portsLoaded++;
+                        }
+                    }
+                } else if (cells.length >= 10) { // Средние страны
+                    const [x, y] = cells[0].split(',').map(Number);
                     world.addBuilding(x, y, 'factory');
                     factoriesLoaded++;
                 }
-            }
-            
-            // Порты
-            if (stats.buildings && stats.buildings.includes('port')) {
-                world.addBuilding(x, y, 'port');
-                portsLoaded++;
             }
         }
         
@@ -64,6 +100,14 @@ export class DataLoader {
         console.log(`✅ Карта загружена: ${total} клеток в JSON, ${totalCells} клеток в мире`);
         
         return world;
+    }
+    
+    isCoastal(x, y, gridData) {
+        const neighbors = [[0,1],[0,-1],[1,0],[-1,0]];
+        for (const [dx, dy] of neighbors) {
+            if (!gridData[`${x+dx},${y+dy}`]) return true;
+        }
+        return false;
     }
     
     delay(ms) {
