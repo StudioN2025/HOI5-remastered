@@ -1,4 +1,4 @@
-// CombatSystem.js — Боевая система (исправлена)
+// CombatSystem.js — Боевая система (полностью исправлена)
 
 import { addNotification } from '../utils/helpers.js';
 
@@ -104,21 +104,25 @@ export class CombatSystem {
                 let bAttack = bType === 0 ? 10 : 45;
                 let bDefense = bType === 0 ? 25 : 15;
                 
-                // Бонус от технологий
-                const techBonus = (this.gameState.tech?.infantry || 1) * 0.05;
+                // Бонус от технологий для каждой страны отдельно
+                const aTech = this.gameState.countryTech?.get(units.owner[attacker]) || { infantry: 1, tank: 1 };
+                const bTech = this.gameState.countryTech?.get(units.owner[defender]) || { infantry: 1, tank: 1 };
+                
                 if (aType === 0) {
-                    aAttack = Math.floor(aAttack * (1 + techBonus));
-                    aDefense = Math.floor(aDefense * (1 + techBonus));
+                    const bonus = 1 + (aTech.infantry - 1) * 0.05;
+                    aAttack = Math.floor(aAttack * bonus);
+                    aDefense = Math.floor(aDefense * bonus);
                 } else {
-                    const tankBonus = (this.gameState.tech?.tank || 1) * 0.05;
-                    aAttack = Math.floor(aAttack * (1 + tankBonus));
+                    const bonus = 1 + (aTech.tank - 1) * 0.05;
+                    aAttack = Math.floor(aAttack * bonus);
                 }
                 if (bType === 0) {
-                    bAttack = Math.floor(bAttack * (1 + techBonus));
-                    bDefense = Math.floor(bDefense * (1 + techBonus));
+                    const bonus = 1 + (bTech.infantry - 1) * 0.05;
+                    bAttack = Math.floor(bAttack * bonus);
+                    bDefense = Math.floor(bDefense * bonus);
                 } else {
-                    const tankBonus = (this.gameState.tech?.tank || 1) * 0.05;
-                    bAttack = Math.floor(bAttack * (1 + tankBonus));
+                    const bonus = 1 + (bTech.tank - 1) * 0.05;
+                    bAttack = Math.floor(bAttack * bonus);
                 }
                 
                 // Броня
