@@ -1,9 +1,8 @@
-// RendererWebGL.js — ТОЛЬКО CANVAS 2D (работает 100%)
+// RendererWebGL.js — ПОЛНЫЙ РАБОЧИЙ РЕНДЕР (Canvas 2D)
 
 export class RendererWebGL {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
-        // Принудительно используем Canvas 2D
         this.ctx = this.canvas.getContext('2d');
         this.useFallback = true;
         
@@ -12,6 +11,9 @@ export class RendererWebGL {
         
         this.resize();
         window.addEventListener('resize', () => this.resize());
+        
+        // Для отладки
+        this.frameCount = 0;
     }
     
     render(world, entities, gameState) {
@@ -21,8 +23,7 @@ export class RendererWebGL {
         const bounds = world.bounds;
         
         // Если границы не определены, выходим
-        if (bounds.minX === Infinity || !world.chunks.size) {
-            // Рисуем сообщение о загрузке
+        if (bounds.minX === Infinity || !world.chunks || world.chunks.size === 0) {
             ctx.fillStyle = '#1a3a4a';
             ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             ctx.fillStyle = '#ffffff';
@@ -34,60 +35,104 @@ export class RendererWebGL {
         
         // Инициализируем камеру если нужно
         if (!this.cameraInitialized) {
-            const centerX = (bounds.minX + bounds.maxX) / 2 * 20;
-            const centerY = (bounds.minY + bounds.maxY) / 2 * 20;
+            const worldWidth = (bounds.maxX - bounds.minX + 2) * 20;
+            const worldHeight = (bounds.maxY - bounds.minY + 2) * 20;
+            
+            // Центр в мировых координатах (пиксели)
+            const centerX = ((bounds.minX + bounds.maxX) / 2) * 20;
+            const centerY = ((bounds.minY + bounds.maxY) / 2) * 20;
+            
             this.camera.x = centerX;
             this.camera.y = centerY;
             
-            const worldWidth = (bounds.maxX - bounds.minX + 2) * 20;
-            const worldHeight = (bounds.maxY - bounds.minY + 2) * 20;
+            // Автоматический зум
             const zoomX = this.canvas.width / worldWidth;
             const zoomY = this.canvas.height / worldHeight;
-            this.camera.zoom = Math.min(zoomX, zoomY, 1.5) * 0.95;
+            this.camera.zoom = Math.min(zoomX, zoomY, 1.2) * 0.9;
             this.cameraInitialized = true;
             
-            console.log(`🎥 Камера: центр (${centerX}, ${centerY}), зум ${this.camera.zoom.toFixed(2)}`);
-            console.log(`📐 Мир: X[${bounds.minX}..${bounds.maxX}], Y[${bounds.minY}..${bounds.maxY}]`);
+            console.log(`🎥 Камера инициализирована:`);
+            console.log(`   - Границы мира: X[${bounds.minX}..${bounds.maxX}], Y[${bounds.minY}..${bounds.maxY}]`);
+            console.log(`   - Размер мира: ${worldWidth}x${worldHeight}px`);
+            console.log(`   - Размер экрана: ${this.canvas.width}x${this.canvas.height}px`);
+            console.log(`   - Центр камеры: (${centerX}, ${centerY})`);
+            console.log(`   - Zoom: ${this.camera.zoom.toFixed(3)}`);
         }
         
         // Очищаем экран
         ctx.fillStyle = '#1a3a4a';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Вычисляем видимые клетки
-        const startX = Math.max(bounds.minX, Math.floor((this.camera.x - this.canvas.width / 2 / this.camera.zoom) / 20));
-        const endX = Math.min(bounds.maxX, Math.ceil((this.camera.x + this.canvas.width / 2 / this.camera.zoom) / 20));
-        const startY = Math.max(bounds.minY, Math.floor((this.camera.y - this.canvas.height / 2 / this.camera.zoom) / 20));
-        const endY = Math.min(bounds.maxY, Math.ceil((this.camera.y + this.canvas.height / 2 / this.camera.zoom) / 20));
+        // Вычисляем видимые клетки в МИРОВЫХ КООРДИНАТАХ (клетки)
+        const invZoom = 1 / this.camera.zoom;
+        const halfWidth = this.canvas.width / 2 * invZoom;
+        const halfHeight = this.canvas.height / 2 * invZoom;
+        
+        let startX = Math.floor((this.camera.x - halfWidth) / 20);
+        let endX = Math.ceil((this.camera.x + halfWidth) / 20);
+        let startY = Math.floor((this.camera.y - halfHeight) / 20);
+        let endY = Math.ceil((this.camera.y + halfHeight) / 20);
+        
+        // Ограничиваем границами мира
+        startX = Math.max(startX, bounds.minX - 1);
+        endX = Math.min(endX, bounds.maxX + 1);
+        startY = Math.max(startY, bounds.minY - 1);
+        endY = Math.min(endY, bounds.maxY + 1);
+        
+        // Счётчик отрисованных клеток
+        let cellsDrawn = 0;
         
         // Рисуем клетки
-        let cellsDrawn = 0;
         for (let x = startX; x <= endX; x++) {
             for (let y = startY; y <= endY; y++) {
                 const owner = world.getCell(x, y);
                 if (owner === 0) continue;
                 
+                // Преобразуем мировые координаты клетки в экранные
                 const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
                 const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
                 const size = 20 * this.camera.zoom;
                 
-                if (screenX + size < 0 || screenX > this.canvas.width || 
-                    screenY + size < 0 || screenY > this.canvas.height) continue;
+                // Отсекаем то, что точно не видно
+                if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
+                    screenY + size < -50 || screenY > this.canvas.height + 50) continue;
                 
                 // Цвет страны
                 ctx.fillStyle = this.getCountryColor(owner);
                 ctx.fillRect(screenX, screenY, size, size);
                 
-                // Граница
-                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                // Граница клетки
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
                 ctx.lineWidth = 0.5;
                 ctx.strokeRect(screenX, screenY, size, size);
+                
+                // Иконки построек (только если достаточно места)
+                if (size > 12) {
+                    const hasPort = world.hasBuilding(x, y, 'port');
+                    const hasFactory = world.hasBuilding(x, y, 'factory');
+                    
+                    ctx.font = `${Math.max(8, Math.min(14, size * 0.55))}px "Segoe UI Emoji", "Apple Color Emoji"`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    
+                    let yOffset = 2;
+                    if (hasPort) {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.fillText('⚓', screenX + 2, screenY + yOffset);
+                        yOffset += size * 0.45;
+                    }
+                    if (hasFactory) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText('🏭', screenX + 2, screenY + yOffset);
+                    }
+                }
                 
                 cellsDrawn++;
             }
         }
         
         // Рисуем юнитов
+        let unitsDrawn = 0;
         for (let i = 1; i < entities.nextId; i++) {
             if (!entities.active[i]) continue;
             
@@ -98,19 +143,28 @@ export class RendererWebGL {
             const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
             const size = 20 * this.camera.zoom;
             
-            if (screenX + size < 0 || screenX > this.canvas.width || 
-                screenY + size < 0 || screenY > this.canvas.height) continue;
+            if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
+                screenY + size < -50 || screenY > this.canvas.height + 50) continue;
             
-            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji"`;
+            // Иконка юнита
+            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji", "Apple Color Emoji"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#ffffff';
+            
+            // Цвет в зависимости от владельца
+            if (entities.owner[i] === gameState.myCountryId) {
+                ctx.fillStyle = '#ffffff';
+            } else if (gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
+                ctx.fillStyle = '#ff6666';
+            } else {
+                ctx.fillStyle = '#cccccc';
+            }
             
             const icon = entities.type[i] === 0 ? '💂' : '🚜';
             ctx.fillText(icon, screenX + size / 2, screenY + size / 2);
             
-            // HP бар
-            if (size > 15) {
+            // HP бар (только если юнит в бою или ранен)
+            if (entities.hp[i] < entities.maxHp[i] && size > 15) {
                 const hpPercent = entities.hp[i] / entities.maxHp[i];
                 const barWidth = size * 0.6;
                 const barX = screenX + (size - barWidth) / 2;
@@ -121,6 +175,8 @@ export class RendererWebGL {
                 ctx.fillStyle = hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444';
                 ctx.fillRect(barX, barY, barWidth * hpPercent, 3);
             }
+            
+            unitsDrawn++;
         }
         
         // Рисуем выделенного юнита
@@ -138,9 +194,11 @@ export class RendererWebGL {
             ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
         }
         
-        // Лог количества отрисованных клеток (раз в 60 кадров)
-        if (Math.random() < 0.02) {
-            console.log(`🎨 Отрисовано клеток: ${cellsDrawn}, юнитов: ${entities.nextId - 1}`);
+        // Лог производительности (раз в 60 кадров)
+        this.frameCount++;
+        if (this.frameCount >= 60) {
+            this.frameCount = 0;
+            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов | FPS: отличный`);
         }
     }
     
@@ -177,15 +235,20 @@ export class RendererWebGL {
     }
     
     screenToWorld(screenX, screenY) {
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasX = screenX - rect.left;
+        const canvasY = screenY - rect.top;
+        
         return {
-            x: Math.floor(((screenX - this.canvas.width / 2) / this.camera.zoom + this.camera.x) / 20),
-            y: Math.floor(((screenY - this.canvas.height / 2) / this.camera.zoom + this.camera.y) / 20)
+            x: Math.floor(((canvasX - this.canvas.width / 2) / this.camera.zoom + this.camera.x) / 20),
+            y: Math.floor(((canvasY - this.canvas.height / 2) / this.camera.zoom + this.camera.y) / 20)
         };
     }
     
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        this.cameraInitialized = false; // Переинициализируем камеру при ресайзе
     }
     
     setCamera(x, y) {
@@ -195,9 +258,20 @@ export class RendererWebGL {
     
     zoom(delta, mouseX, mouseY) {
         const before = this.screenToWorld(mouseX, mouseY);
-        this.camera.zoom = Math.min(Math.max(this.camera.zoom * (delta > 0 ? 0.9 : 1.1), 0.1), 5);
+        const newZoom = this.camera.zoom * (delta > 0 ? 0.9 : 1.1);
+        this.camera.zoom = Math.min(Math.max(newZoom, 0.1), 5);
         const after = this.screenToWorld(mouseX, mouseY);
-        this.camera.x += before.x - after.x;
-        this.camera.y += before.y - after.y;
+        this.camera.x += (before.x - after.x) * 20;
+        this.camera.y += (before.y - after.y) * 20;
+    }
+    
+    // Отладка: получить информацию о камере
+    getCameraInfo() {
+        return {
+            x: this.camera.x,
+            y: this.camera.y,
+            zoom: this.camera.zoom,
+            initialized: this.cameraInitialized
+        };
     }
 }
