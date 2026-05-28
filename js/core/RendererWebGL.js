@@ -1,10 +1,9 @@
-// RendererWebGL.js — ПОЛНЫЙ РАБОЧИЙ РЕНДЕР (Canvas 2D)
+// RendererWebGL.js — ПОЛНЫЙ РАБОЧИЙ РЕНДЕР
 
 export class RendererWebGL {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-        this.useFallback = true;
         
         this.camera = { x: 0, y: 0, zoom: 0.6 };
         this.cameraInitialized = false;
@@ -12,7 +11,6 @@ export class RendererWebGL {
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
-        // Для отладки
         this.frameCount = 0;
     }
     
@@ -22,48 +20,43 @@ export class RendererWebGL {
         const ctx = this.ctx;
         const bounds = world.bounds;
         
-        // Если границы не определены, выходим
-        if (bounds.minX === Infinity || !world.chunks || world.chunks.size === 0) {
+        // Если нет данных, показываем загрузку
+        if (bounds.minX === Infinity || world.cells.size === 0) {
             ctx.fillStyle = '#1a3a4a';
             ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             ctx.fillStyle = '#ffffff';
             ctx.font = '16px monospace';
             ctx.textAlign = 'center';
             ctx.fillText('Загрузка карты...', this.canvas.width/2, this.canvas.height/2);
+            ctx.fillStyle = '#888888';
+            ctx.font = '12px monospace';
+            ctx.fillText(`Клеток: ${world.cells.size}`, this.canvas.width/2, this.canvas.height/2 + 30);
             return;
         }
         
-        // Инициализируем камеру если нужно
+        // Инициализация камеры
         if (!this.cameraInitialized) {
             const worldWidth = (bounds.maxX - bounds.minX + 2) * 20;
             const worldHeight = (bounds.maxY - bounds.minY + 2) * 20;
-            
-            // Центр в мировых координатах (пиксели)
             const centerX = ((bounds.minX + bounds.maxX) / 2) * 20;
             const centerY = ((bounds.minY + bounds.maxY) / 2) * 20;
             
             this.camera.x = centerX;
             this.camera.y = centerY;
             
-            // Автоматический зум
             const zoomX = this.canvas.width / worldWidth;
             const zoomY = this.canvas.height / worldHeight;
             this.camera.zoom = Math.min(zoomX, zoomY, 1.2) * 0.9;
             this.cameraInitialized = true;
             
-            console.log(`🎥 Камера инициализирована:`);
-            console.log(`   - Границы мира: X[${bounds.minX}..${bounds.maxX}], Y[${bounds.minY}..${bounds.maxY}]`);
-            console.log(`   - Размер мира: ${worldWidth}x${worldHeight}px`);
-            console.log(`   - Размер экрана: ${this.canvas.width}x${this.canvas.height}px`);
-            console.log(`   - Центр камеры: (${centerX}, ${centerY})`);
-            console.log(`   - Zoom: ${this.camera.zoom.toFixed(3)}`);
+            console.log(`🎥 Камера: центр (${centerX}, ${centerY}), зум ${this.camera.zoom.toFixed(3)}`);
         }
         
-        // Очищаем экран
+        // Очистка экрана
         ctx.fillStyle = '#1a3a4a';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Вычисляем видимые клетки в МИРОВЫХ КООРДИНАТАХ (клетки)
+        // Вычисляем видимые клетки
         const invZoom = 1 / this.camera.zoom;
         const halfWidth = this.canvas.width / 2 * invZoom;
         const halfHeight = this.canvas.height / 2 * invZoom;
@@ -73,13 +66,11 @@ export class RendererWebGL {
         let startY = Math.floor((this.camera.y - halfHeight) / 20);
         let endY = Math.ceil((this.camera.y + halfHeight) / 20);
         
-        // Ограничиваем границами мира
         startX = Math.max(startX, bounds.minX - 1);
         endX = Math.min(endX, bounds.maxX + 1);
         startY = Math.max(startY, bounds.minY - 1);
         endY = Math.min(endY, bounds.maxY + 1);
         
-        // Счётчик отрисованных клеток
         let cellsDrawn = 0;
         
         // Рисуем клетки
@@ -88,12 +79,10 @@ export class RendererWebGL {
                 const owner = world.getCell(x, y);
                 if (owner === 0) continue;
                 
-                // Преобразуем мировые координаты клетки в экранные
                 const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
                 const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
                 const size = 20 * this.camera.zoom;
                 
-                // Отсекаем то, что точно не видно
                 if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
                     screenY + size < -50 || screenY > this.canvas.height + 50) continue;
                 
@@ -101,17 +90,17 @@ export class RendererWebGL {
                 ctx.fillStyle = this.getCountryColor(owner);
                 ctx.fillRect(screenX, screenY, size, size);
                 
-                // Граница клетки
+                // Граница
                 ctx.strokeStyle = 'rgba(0,0,0,0.2)';
                 ctx.lineWidth = 0.5;
                 ctx.strokeRect(screenX, screenY, size, size);
                 
-                // Иконки построек (только если достаточно места)
+                // Иконки
                 if (size > 12) {
                     const hasPort = world.hasBuilding(x, y, 'port');
                     const hasFactory = world.hasBuilding(x, y, 'factory');
                     
-                    ctx.font = `${Math.max(8, Math.min(14, size * 0.55))}px "Segoe UI Emoji", "Apple Color Emoji"`;
+                    ctx.font = `${Math.max(8, Math.min(14, size * 0.55))}px "Segoe UI Emoji"`;
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'top';
                     
@@ -146,12 +135,10 @@ export class RendererWebGL {
             if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
                 screenY + size < -50 || screenY > this.canvas.height + 50) continue;
             
-            // Иконка юнита
-            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji", "Apple Color Emoji"`;
+            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Цвет в зависимости от владельца
             if (entities.owner[i] === gameState.myCountryId) {
                 ctx.fillStyle = '#ffffff';
             } else if (gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
@@ -163,7 +150,7 @@ export class RendererWebGL {
             const icon = entities.type[i] === 0 ? '💂' : '🚜';
             ctx.fillText(icon, screenX + size / 2, screenY + size / 2);
             
-            // HP бар (только если юнит в бою или ранен)
+            // HP бар
             if (entities.hp[i] < entities.maxHp[i] && size > 15) {
                 const hpPercent = entities.hp[i] / entities.maxHp[i];
                 const barWidth = size * 0.6;
@@ -179,7 +166,7 @@ export class RendererWebGL {
             unitsDrawn++;
         }
         
-        // Рисуем выделенного юнита
+        // Выделенный юнит
         const selectedId = gameState.selectedUnitId;
         if (selectedId && entities.active[selectedId]) {
             const x = entities.x[selectedId];
@@ -194,11 +181,11 @@ export class RendererWebGL {
             ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
         }
         
-        // Лог производительности (раз в 60 кадров)
+        // Лог
         this.frameCount++;
         if (this.frameCount >= 60) {
             this.frameCount = 0;
-            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов | FPS: отличный`);
+            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов`);
         }
     }
     
@@ -248,7 +235,7 @@ export class RendererWebGL {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-        this.cameraInitialized = false; // Переинициализируем камеру при ресайзе
+        this.cameraInitialized = false;
     }
     
     setCamera(x, y) {
@@ -263,15 +250,5 @@ export class RendererWebGL {
         const after = this.screenToWorld(mouseX, mouseY);
         this.camera.x += (before.x - after.x) * 20;
         this.camera.y += (before.y - after.y) * 20;
-    }
-    
-    // Отладка: получить информацию о камере
-    getCameraInfo() {
-        return {
-            x: this.camera.x,
-            y: this.camera.y,
-            zoom: this.camera.zoom,
-            initialized: this.cameraInitialized
-        };
     }
 }
