@@ -7,7 +7,7 @@ export class TechSystem {
         this.gameState = gameState;
         this.RESEARCH_DURATION = 100;
         
-        // Технологии для разных стран (если нет своих, копируем из глобальных)
+        // Технологии для разных стран
         if (!this.gameState.countryTech) {
             this.gameState.countryTech = new Map();
         }
@@ -18,7 +18,6 @@ export class TechSystem {
     
     getTechForCountry(countryId) {
         if (!this.gameState.countryTech.has(countryId)) {
-            // Копируем базовые технологии
             this.gameState.countryTech.set(countryId, {
                 industry: 1,
                 infantry: 1,
@@ -66,7 +65,7 @@ export class TechSystem {
     
     update() {
         // Обновляем исследования для всех стран
-        const allCountries = this.gameState.countryTech.keys();
+        const allCountries = Array.from(this.gameState.countryTech.keys());
         
         for (const countryId of allCountries) {
             const active = this.getResearchForCountry(countryId);
@@ -87,7 +86,7 @@ export class TechSystem {
         }
     }
     
-    // Для UI игрока — показывает технологии игрока
+    // Для UI игрока
     getPlayerTech() {
         return this.getTechForCountry(this.gameState.myCountryId);
     }
