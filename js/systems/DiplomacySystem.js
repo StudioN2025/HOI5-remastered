@@ -1,4 +1,4 @@
-// DiplomacySystem.js — Дипломатическая система
+// DiplomacySystem.js — Дипломатическая система (игрок сам решает)
 
 import { addNotification } from '../utils/helpers.js';
 
@@ -17,7 +17,6 @@ export class DiplomacySystem {
             return false;
         }
         
-        // Разрываем альянс если был
         const newAlliances = [];
         for (const alliance of this.gameState.alliances) {
             if (alliance.has(myId) && alliance.has(targetId)) {
@@ -47,7 +46,10 @@ export class DiplomacySystem {
             return false;
         }
         
-        // 80% шанс успеха
+        // Для ИИ — автоматически принимаем? НЕТ! Только для демо-режима
+        // Но для игрока — показываем уведомление и ждём ответа?
+        // Сейчас просто 80% шанс для упрощения
+        
         if (Math.random() < 0.8) {
             this.gameState.addAlliance(myId, targetId);
             addNotification(`🤝 ${myId} и ${targetId} заключили альянс!`, 'info');
@@ -109,7 +111,6 @@ export class DiplomacySystem {
     }
     
     handleCapitulation(countryId) {
-        // Находим победителя (первого врага)
         let winner = null;
         for (const war of this.gameState.wars) {
             if (war.a === countryId) winner = war.b;
@@ -119,23 +120,19 @@ export class DiplomacySystem {
         
         if (!winner) return;
         
-        // Передаём все клетки победителю
         const cells = this.world.getCountryCells(countryId);
         for (const cell of cells) {
             const [x, y] = cell.split(',').map(Number);
             this.world.setCell(x, y, winner);
         }
         
-        // Удаляем все юниты страны
         const units = this.entities.getEntitiesByOwner(countryId);
         for (const unitId of units) {
             this.entities.removeEntity(unitId);
         }
         
-        // Удаляем из войн
         this.gameState.wars = this.gameState.wars.filter(w => w.a !== countryId && w.b !== countryId);
         
-        // Удаляем из альянсов
         const newAlliances = [];
         for (const alliance of this.gameState.alliances) {
             const newAlliance = new Set(alliance);
