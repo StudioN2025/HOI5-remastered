@@ -1,4 +1,4 @@
-// World.js — УПРОЩЁННАЯ ВЕРСИЯ (без чанков, пока не починим)
+// World.js — Упрощённая версия с Map
 
 export class World {
     constructor() {
