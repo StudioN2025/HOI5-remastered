@@ -228,8 +228,10 @@ function handleCanvasClick(e) {
             const typeNum = window._recruitMode === 'infantry' ? 0 : 1;
             const unitId = entities.createEntity(gameState.myCountryId, typeNum, worldPos.x, worldPos.y);
             if (unitId) {
-                gameState.equipment -= window._recruitMode === 'infantry' ? 100 : 800;
-                gameState.manpower -= window._recruitMode === 'infantry' ? 1000 : 500;
+                const cost = window._recruitMode === 'infantry' ? 100 : 800;
+                const manpower = window._recruitMode === 'infantry' ? 1000 : 500;
+                gameState.equipment -= cost;
+                gameState.manpower -= manpower;
                 addNotification(`Юнит нанят!`, 'info');
             }
         } else {
@@ -260,18 +262,14 @@ function handleCanvasClick(e) {
         const unitId = gameState.selectedUnitId;
         
         // Атака или движение
-        if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
-            // Атака на врага
+        if (cellOwner !== 0 && gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
             const targetUnit = entities.getUnitAt(worldPos.x, worldPos.y);
             if (targetUnit && entities.owner[targetUnit] === cellOwner) {
-                // Начинаем бой
                 combat.startCombat(unitId, targetUnit);
             } else {
-                // Движение на вражескую территорию
                 movement.giveOrder(unitId, worldPos.x, worldPos.y);
             }
-        } else if (cellOwner === gameState.myCountryId || gameState.areAllies(gameState.myCountryId, cellOwner)) {
-            // Движение на свою/союзную территорию
+        } else if (cellOwner === gameState.myCountryId || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
         }
         
@@ -369,9 +367,9 @@ function handleKeyUp(e) {
 function startGameLoop() {
     let lastTick = performance.now();
     let accumulator = 0;
-    const TICK_DURATION = 1000 / 60; // 60 FPS
+    const TICK_DURATION = 1000 / 60;
     let dayAccumulator = 0;
-    const DAY_DURATION = 1000; // 1 секунда = 1 игровой день
+    const DAY_DURATION = 1000;
     
     function loop(now) {
         let delta = Math.min(100, now - lastTick);
@@ -379,37 +377,28 @@ function startGameLoop() {
         accumulator += delta;
         dayAccumulator += delta;
         
-        // Обновление игровой логики (60 раз в секунду)
         while (accumulator >= TICK_DURATION) {
             updateGame();
             accumulator -= TICK_DURATION;
         }
         
-        // Обработка дней
         if (dayAccumulator >= DAY_DURATION && gameState.gameSpeed > 0) {
             dayAccumulator = 0;
             gameState.advanceDay();
-            topBar.update();
+            if (topBar) topBar.update();
             
-            // Экономика и снабжение раз в день
-            economy.update();
-            supply.update();
+            if (economy) economy.update();
+            if (supply) supply.update();
+            if (combat) combat.update();
+            if (movement) movement.update();
             
-            // Бои и движение (могут быть чаще)
-            combat.update();
-            movement.update();
-            
-            // Автосохранение каждые 30 дней
             if (gameState.days % 30 === 0 && gameState.days > 0) {
                 saveGame();
             }
         }
         
-        // Рендер КАЖДЫЙ КАДР
-        renderer.render(world, entities, gameState);
-        
-        // Обновление UI
-        topBar.update();
+        if (renderer) renderer.render(world, entities, gameState);
+        if (topBar) topBar.update();
         
         gameLoopId = requestAnimationFrame(loop);
     }
@@ -418,17 +407,25 @@ function startGameLoop() {
 }
 
 function updateGame() {
-    // Движение юнитов (плавное)
-    movement.updatePositions();
+    if (movement) movement.updatePositions();
     
-    // ИИ (раз в несколько тиков)
-    if (gameState.gameSpeed > 0 && Math.random() < 0.1) {
+    if (gameState.gameSpeed > 0 && Math.random() < 0.1 && aiController) {
         aiController.update();
     }
     
-    // Технологии и фокусы
-    tech.update();
-    focus.update();
+    if (tech) tech.update();
+    if (focus) focus.update();
+}
+
+function updateSpeedButtons(speed) {
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        const btnSpeed = parseInt(btn.dataset.speed);
+        if (btnSpeed === speed) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
 }
 
 function showCountrySelection() {
@@ -438,7 +435,6 @@ function showCountrySelection() {
     
     list.innerHTML = '';
     
-    // Сортируем по размеру
     const countriesWithSize = countries.map(c => ({
         id: c,
         size: world.getCountryCells(c).size
@@ -506,26 +502,22 @@ function startGame(countryId) {
     console.log(`📋 Клетки страны ${countryId}: ${cells.length}`);
     
     if (cells.length > 0) {
-        // Сортируем клетки и берём "столицу" (первую попавшуюся)
         const sortedCells = cells.sort();
         const capital = sortedCells[0].split(',').map(Number);
         console.log(`🏰 Столица: (${capital[0]}, ${capital[1]})`);
         
-        // Создаём 3 пехотные дивизии вокруг столицы
         const offsets = [[0,0], [1,0], [0,1]];
         for (let i = 0; i < offsets.length; i++) {
             const [dx, dy] = offsets[i];
             const x = capital[0] + dx;
             const y = capital[1] + dy;
             
-            // Проверяем, что клетка принадлежит стране
             if (world.getCell(x, y) === countryId) {
                 const unitId = entities.createEntity(countryId, 0, x, y);
                 console.log(`✅ Создан юнит ${unitId} в (${x},${y})`);
             }
         }
         
-        // Добавим танк если есть заводы
         const hasFactory = world.hasBuilding(capital[0], capital[1], 'factory');
         if (hasFactory) {
             const unitId = entities.createEntity(countryId, 1, capital[0] + 2, capital[1]);
@@ -533,20 +525,18 @@ function startGame(countryId) {
         }
     }
     
-    // Закрываем меню и показываем игру
     document.getElementById('country-select').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     document.getElementById('game-tabs').classList.remove('hidden');
     
     updateSpeedButtons(1);
-    topBar.update();
+    if (topBar) topBar.update();
     
     addNotification(`🎌 Вы играете за ${countryId.toUpperCase()}`, 'info');
     addNotification(`🖱️ Клик по юниту → ЛКМ по врагу = АТАКА`, 'info');
     addNotification(`⌨️ WASD — камера | Пробел — пауза`, 'info');
     
-    // Принудительный рендер
-    renderer.cameraInitialized = false;
+    if (renderer) renderer.cameraInitialized = false;
 }
 
 function saveGame() {
@@ -574,7 +564,6 @@ function loadGame() {
         entities.deserialize(data.entities);
         gameState.deserialize(data.gameState);
         
-        // Пересоздаём зависимости
         economy = new EconomySystem(world, entities, gameState);
         combat = new CombatSystem(world, entities, gameState);
         movement = new MovementSystem(world, entities);
