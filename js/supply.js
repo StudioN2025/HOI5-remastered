@@ -1,8 +1,22 @@
-// supply.js — ПОЛНАЯ ФИНАЛЬНАЯ ВЕРСИЯ (КОТЁЛ = 100% ОКРУЖЕНИЕ ВРАГАМИ)
+// supply.js — ОПТИМИЗИРОВАННАЯ ВЕРСИЯ (реже проверяем котлы)
 
-import { getGridData, getUnits, getMyCountryId, getWars, getCellStats, getAlliances } from './game.js';
+import { getGridData, getUnits, getMyCountryId, getWars, getCellStats, getAlliances, getGameDate } from './game.js';
 import { isAtWar, addNotification } from './utils.js';
 import { checkCapitulation } from './diplomacy.js';
+
+// Ограничение частоты проверки котлов
+let supplyTickCounter = 0;
+const SUPPLY_TICK_INTERVAL = 5; // Проверяем котлы раз в 5 дней
+
+// Кэш для групп и котлов
+let groupCache = new Map();
+let pocketCache = new Map();
+let lastUpdateDay = 0;
+
+function getCurrentDay() {
+    const date = getGameDate();
+    return Math.floor(date.getTime() / 86400000);
+}
 
 function areAlliesWith(c1, c2) {
     if (c1 === c2) return true;
@@ -19,9 +33,17 @@ function getEnemiesOf(countryId, wars) {
     return [...new Set(enemies)];
 }
 
-// ========== ПОИСК СВЯЗНЫХ ГРУПП ==========
+// ========== ПОИСК СВЯЗНЫХ ГРУПП С КЭШЕМ ==========
 
 function findAllGroups(countryId) {
+    const currentDay = getCurrentDay();
+    const cached = groupCache.get(countryId);
+    
+    // Используем кэш если он свежий (менее 5 дней)
+    if (cached && (currentDay - cached.day) < SUPPLY_TICK_INTERVAL) {
+        return cached.groups;
+    }
+    
     const gridData = getGridData();
     const myCells = Object.keys(gridData).filter(pos => gridData[pos] === countryId);
     if (myCells.length === 0) return [];
@@ -57,10 +79,13 @@ function findAllGroups(countryId) {
     }
     
     allGroups.sort((a, b) => b.size - a.size);
+    
+    // Сохраняем в кэш
+    groupCache.set(countryId, { groups: allGroups, day: currentDay });
+    
     return allGroups;
 }
 
-// ✅ ПРОВЕРКА: клетка полностью окружена врагами?
 function isFullySurroundedByEnemies(pos, countryId, enemies) {
     const gridData = getGridData();
     const [x, y] = pos.split(',').map(Number);
@@ -72,27 +97,23 @@ function isFullySurroundedByEnemies(pos, countryId, enemies) {
         const neighbor = `${x+dx},${y+dy}`;
         const owner = gridData[neighbor];
         
-        if (owner === undefined) continue; // Вода — не считается соседом для окружения
+        if (owner === undefined) continue;
         
         totalNeighbors++;
         
-        // Враг или вода (море тоже блокирует)
         if (enemies.includes(owner) || !owner) {
             enemyNeighbors++;
         }
     }
     
-    // 100% сухопутных соседей — враги
     return totalNeighbors > 0 && enemyNeighbors >= totalNeighbors;
 }
 
-// ✅ ПРОВЕРКА: вся группа окружена врагами?
 function isGroupSurrounded(group, countryId, enemies) {
     if (group.size === 0) return false;
     
     const gridData = getGridData();
     
-    // Проверяем внешние границы группы
     for (const pos of group) {
         const [x, y] = pos.split(',').map(Number);
         
@@ -100,13 +121,9 @@ function isGroupSurrounded(group, countryId, enemies) {
             const neighbor = `${x+dx},${y+dy}`;
             const owner = gridData[neighbor];
             
-            // Пропускаем клетки внутри группы
             if (group.has(neighbor)) continue;
             
-            // Вода — не враг (морское снабжение)
             if (!owner) return false;
-            
-            // Союзник или нейтрал — не враг
             if (owner === countryId) continue;
             if (areAlliesWith(countryId, owner)) return false;
             if (!enemies.includes(owner)) return false;
@@ -117,17 +134,21 @@ function isGroupSurrounded(group, countryId, enemies) {
 }
 
 function findPockets(countryId) {
+    const currentDay = getCurrentDay();
+    const cached = pocketCache.get(countryId);
+    
+    // Используем кэш если он свежий
+    if (cached && (currentDay - cached.day) < SUPPLY_TICK_INTERVAL) {
+        return cached.pockets;
+    }
+    
     const gridData = getGridData();
     const wars = getWars();
     const enemies = getEnemiesOf(countryId, wars);
     const myCells = Object.keys(gridData).filter(pos => gridData[pos] === countryId);
     
     if (myCells.length === 0) return [];
-    
-    // ✅ Нет врагов — нет котлов
     if (enemies.length === 0) return [];
-    
-    // ✅ Страна ≤5 клеток — не считаем котлы
     if (myCells.length <= 5) return [];
     
     const allGroups = findAllGroups(countryId);
@@ -135,11 +156,9 @@ function findPockets(countryId) {
     
     const pockets = [];
     
-    // Проверяем каждую группу кроме самой большой
     for (let i = 1; i < allGroups.length; i++) {
         const group = allGroups[i];
         
-        // ✅ Группа с портом — не котёл (морское снабжение)
         const cellStats = getCellStats();
         let hasPort = false;
         for (const pos of group) {
@@ -151,7 +170,6 @@ function findPockets(countryId) {
         }
         if (hasPort) continue;
         
-        // ✅ Группа граничит с водой (порт не обязателен, но море рядом) — не котёл
         let touchesWater = false;
         for (const pos of group) {
             const [x, y] = pos.split(',').map(Number);
@@ -163,9 +181,8 @@ function findPockets(countryId) {
             }
             if (touchesWater) break;
         }
-        if (touchesWater) continue; // Море = снабжение
+        if (touchesWater) continue;
         
-        // ✅ Группа граничит с нейтралом — не котёл
         let touchesNeutral = false;
         for (const pos of group) {
             const [x, y] = pos.split(',').map(Number);
@@ -179,9 +196,8 @@ function findPockets(countryId) {
             }
             if (touchesNeutral) break;
         }
-        if (touchesNeutral) continue; // Нейтрал = нет окружения
+        if (touchesNeutral) continue;
         
-        // ✅ ФИНАЛЬНАЯ ПРОВЕРКА: 100% окружение врагами
         if (isGroupSurrounded(group, countryId, enemies)) {
             pockets.push({
                 cells: [...group],
@@ -190,6 +206,9 @@ function findPockets(countryId) {
             });
         }
     }
+    
+    // Сохраняем в кэш
+    pocketCache.set(countryId, { pockets, day: currentDay });
     
     return pockets;
 }
@@ -252,56 +271,27 @@ function applySupplyPenalties() {
     }
 }
 
-// ========== ВИЗУАЛИЗАЦИЯ ==========
-
-export function renderSupplyOverlay(ctx, camera, CELL_SIZE) {
-    const myId = getMyCountryId();
-    const gridData = getGridData();
-    const wars = getWars();
-    
-    if (!myId || !wars.length) return;
-    
-    const now = Date.now();
-    
-    for (const countryId of [...new Set(Object.values(gridData))]) {
-        const isEnemy = isAtWar(myId, countryId, wars);
-        const isOurs = countryId === myId;
-        if (!isEnemy && !isOurs) continue;
-        
-        const pockets = findPockets(countryId);
-        if (pockets.length === 0) continue;
-        
-        for (const pocket of pockets) {
-            const pulse = Math.sin(now / 500) * 0.3 + 0.7;
-            
-            for (const pos of pocket.cells) {
-                const [x, y] = pos.split(',').map(Number);
-                
-                ctx.strokeStyle = isEnemy ? `rgba(255,30,30,${pulse})` : `rgba(255,200,0,${pulse})`;
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
-                ctx.strokeRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-                ctx.setLineDash([]);
-                
-                ctx.fillStyle = isEnemy ? 'rgba(255,0,0,0.08)' : 'rgba(255,200,0,0.08)';
-                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                
-                if (pocket.size > 3) {
-                    ctx.font = `${CELL_SIZE * 0.6}px serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillStyle = isEnemy ? `rgba(255,50,50,${pulse+0.2})` : `rgba(255,180,0,${pulse+0.2})`;
-                    ctx.fillText('💀', x * CELL_SIZE + CELL_SIZE/2, y * CELL_SIZE + CELL_SIZE/2);
-                }
-            }
-        }
-    }
-}
-
 // ========== ЭКСПОРТ ==========
 
-export function processSupply() { applySupplyPenalties(); }
-export function getPocketsForCountry(countryId) { return findPockets(countryId); }
+export function processSupply() {
+    supplyTickCounter++;
+    if (supplyTickCounter < SUPPLY_TICK_INTERVAL) return;
+    supplyTickCounter = 0;
+    
+    applySupplyPenalties();
+}
+
+export function getPocketsForCountry(countryId) { 
+    return findPockets(countryId); 
+}
+
+// Очистка кэша при загрузке игры
+export function clearSupplyCache() {
+    groupCache.clear();
+    pocketCache.clear();
+    lastUpdateDay = 0;
+    console.log('🧹 Supply cache cleared');
+}
 
 export function debugSupply(countryId) {
     const allGroups = findAllGroups(countryId);
