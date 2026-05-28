@@ -1,4 +1,4 @@
-// economy.js — ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ
+// economy.js — ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ (стройка не работает без команды)
 
 import { 
     getPlayerResources, setPlayerResources,
@@ -8,6 +8,7 @@ import {
 } from './game.js';
 import { BUILDING_STATS } from './data.js';
 import { addNotification } from './utils.js';
+import { markDirty, renderMap } from './map.js';
 
 // Начало стройки
 export function startBuilding(buildingType, posKey) {
@@ -27,12 +28,18 @@ export function startBuilding(buildingType, posKey) {
         return false;
     }
 
-    // ✅ Списание ресурсов
+    // Проверяем, нет ли уже стройки на этой клетке
+    const queue = getBuildingQueue();
+    if (queue.some(item => item.pos === posKey)) {
+        addNotification('На этой клетке уже идёт строительство!', 'war');
+        return false;
+    }
+
+    // Списание ресурсов
     resources.equipment -= stats.costEquipment;
     setPlayerResources(resources);
 
-    // ✅ Добавление в очередь
-    const queue = getBuildingQueue();
+    // Добавление в очередь
     queue.push({
         pos: posKey,
         type: buildingType,
@@ -46,6 +53,9 @@ export function startBuilding(buildingType, posKey) {
     // Показываем индикатор
     const indicator = document.getElementById('build-indicator');
     if (indicator) indicator.classList.remove('hidden');
+    
+    markDirty();
+    renderMap();
     
     return true;
 }
@@ -62,33 +72,42 @@ export function processConstruction() {
 
     const current = queue[0];
     
-    // ✅ Уменьшаем счётчик дней
+    if (!current) {
+        queue.shift();
+        setBuildingQueue(queue);
+        return;
+    }
+    
+    // Уменьшаем счётчик дней
     current.daysLeft = (current.daysLeft || 0) - 1;
     
-    // ✅ Проверка завершения
+    // Проверка завершения
     if (current.daysLeft <= 0) {
         completeConstruction(current);
         
-        // ✅ Удаляем из очереди
+        // Удаляем из очереди
         queue.shift();
         setBuildingQueue(queue);
         
-        // ✅ Скрываем индикатор если очередь пуста
+        // Скрываем индикатор если очередь пуста
         if (queue.length === 0) {
             const indicator = document.getElementById('build-indicator');
             if (indicator) indicator.classList.add('hidden');
         }
+        
+        markDirty();
+        renderMap();
     }
 }
 
-// ✅ Завершение постройки
+// Завершение постройки
 function completeConstruction(project) {
     if (!project || !project.pos || !project.type) return;
     
     const cellStats = getCellStats();
     const myId = getMyCountryId();
     
-    // ✅ Создаём клетку если её нет
+    // Создаём клетку если её нет
     if (!cellStats[project.pos]) {
         cellStats[project.pos] = {
             population: Math.floor(Math.random() * 80000) + 5000,
@@ -99,7 +118,7 @@ function completeConstruction(project) {
     
     const cell = cellStats[project.pos];
     
-    // ✅ Применяем постройку
+    // Применяем постройку
     if (project.type === 'factory') {
         cell.factories = (cell.factories || 0) + 1;
         
@@ -109,7 +128,7 @@ function completeConstruction(project) {
     } else if (project.type === 'port') {
         if (!cell.buildings) cell.buildings = [];
         
-        // ✅ Проверяем что порта ещё нет
+        // Проверяем что порта ещё нет
         if (!cell.buildings.includes('port')) {
             cell.buildings.push('port');
             if (project.owner === myId) {
@@ -118,14 +137,13 @@ function completeConstruction(project) {
         }
     }
     
-    // ✅ СОХРАНЯЕМ ИЗМЕНЕНИЯ
+    // Сохраняем изменения
     cellStats[project.pos] = cell;
     setCellStats(cellStats);
     
-    // ✅ Обновляем интерфейс
+    // Обновляем интерфейс
     if (project.owner === myId) {
         import('./ui.js').then(m => m.updateTopBar());
-        import('./map.js').then(m => { m.markDirty(); m.renderMap(); });
     }
 }
 
@@ -136,7 +154,7 @@ export function updateEconomy(techLevel, unitStats) {
     const gridData = getGridData();
     const cellStats = getCellStats();
 
-    // ✅ Считаем заводы на территории игрока
+    // Считаем заводы на территории игрока
     let totalFactories = 0;
     for (const [pos, owner] of Object.entries(gridData)) {
         if (owner === myId && cellStats[pos]) {
