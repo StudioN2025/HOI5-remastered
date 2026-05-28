@@ -3,19 +3,17 @@
 import { getGridData, getWars, getGameDate } from './game.js';
 import { getEnemiesOf, areAllies } from './utils.js';
 
-// Кэш
-let borderCache = new Map();      // countryId -> Set(borderPositions)
-let frontLineCache = new Map();   // countryId -> Set(frontPositions)
-let lastUpdateCache = new Map();  // countryId -> lastUpdateDay
+let borderCache = new Map();
+let frontLineCache = new Map();
+let lastUpdateCache = new Map();
 
-const UPDATE_INTERVAL_DAYS = 3;   // Обновляем раз в 3 дня
+const UPDATE_INTERVAL_DAYS = 3;
 
 function getCurrentDay() {
     const date = getGameDate();
     return Math.floor(date.getTime() / 86400000);
 }
 
-// Проверить, нужно ли обновлять кэш для страны
 function shouldUpdate(countryId) {
     const lastUpdate = lastUpdateCache.get(countryId);
     if (lastUpdate === undefined) return true;
@@ -23,7 +21,6 @@ function shouldUpdate(countryId) {
     return (currentDay - lastUpdate) >= UPDATE_INTERVAL_DAYS;
 }
 
-// Обновить кэш для страны
 export function updateAICache(countryId) {
     if (!shouldUpdate(countryId)) return false;
     
@@ -35,13 +32,11 @@ export function updateAICache(countryId) {
     const borders = new Set();
     const frontLine = new Set();
     
-    // Находим все клетки страны
     const myCells = [];
     for (const [pos, owner] of Object.entries(gridData)) {
         if (owner === countryId) myCells.push(pos);
     }
     
-    // Для каждой клетки проверяем соседей
     for (const pos of myCells) {
         const [x, y] = pos.split(',').map(Number);
         let isBorder = false;
@@ -70,19 +65,16 @@ export function updateAICache(countryId) {
     return true;
 }
 
-// Получить границы страны
 export function getCachedBorders(countryId) {
     updateAICache(countryId);
     return borderCache.get(countryId) || new Set();
 }
 
-// Получить фронт страны
 export function getCachedFrontLine(countryId) {
     updateAICache(countryId);
     return frontLineCache.get(countryId) || new Set();
 }
 
-// Получить границы с конкретным врагом
 export function getCachedBordersWithEnemy(countryId, enemyId) {
     const borders = getCachedBorders(countryId);
     const gridData = getGridData();
@@ -101,14 +93,13 @@ export function getCachedBordersWithEnemy(countryId, enemyId) {
     return result;
 }
 
-// Очистить весь кэш (при загрузке игры)
 export function clearAICache() {
     borderCache.clear();
     frontLineCache.clear();
     lastUpdateCache.clear();
+    console.log('🧹 AI cache cleared');
 }
 
-// Получить статистику кэша (для дебага)
 export function getAICacheStats() {
     return {
         borderCacheSize: borderCache.size,
