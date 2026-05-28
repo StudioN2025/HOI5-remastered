@@ -1,4 +1,4 @@
-// ai.js — ОПТИМИЗИРОВАННАЯ ВЕРСИЯ С КЭШЕМ
+// ai.js — ОПТИМИЗИРОВАННАЯ ВЕРСИЯ С КЭШЕМ И ОГРАНИЧЕНИЕМ ЧАСТОТЫ
 
 import { 
     getMyCountryId, getGridData, getWars, getUnits, getGameSpeed, 
@@ -11,6 +11,11 @@ import { NATIONAL_FOCUSES, UNIT_STATS } from './data.js';
 import { isAtWar, getEnemiesOf, calculateCountryStats } from './utils.js';
 import { getPocketsForCountry } from './supply.js';
 import { getCachedFrontLine, getCachedBordersWithEnemy, clearAICache } from './ai-cache.js';
+
+// Ограничение частоты работы ИИ
+let aiTickCounter = 0;
+const AI_TICK_INTERVAL = 2; // Запускаем ИИ раз в 2 дня
+const MAX_COUNTRIES_PER_TICK = 4; // Максимум стран за один тик
 
 const RESEARCH_DURATION = 100;
 const CONSTRUCTION_TIME = 135;
@@ -241,7 +246,7 @@ export function runCountryAI(countryId) {
         }
     }
     
-    // Фокусы (оставляем без изменений)
+    // Фокусы
     const aiActiveFocus = getAIActiveFocus(countryId);
     const aiCompleted = getAICompletedFocuses(countryId);
     const countryFocuses = NATIONAL_FOCUSES[countryId] || [];
@@ -438,9 +443,19 @@ export function runCountryAI(countryId) {
 }
 
 export function runAllAI() {
+    aiTickCounter++;
+    if (aiTickCounter < AI_TICK_INTERVAL) return;
+    aiTickCounter = 0;
+    
     const gridData = getGridData();
     const allCountries = [...new Set(Object.values(gridData))];
-    allCountries.forEach(countryId => runCountryAI(countryId));
+    
+    // Ограничиваем количество стран, обрабатываемых за тик
+    const startIndex = Math.floor(Math.random() * allCountries.length);
+    for (let i = 0; i < Math.min(MAX_COUNTRIES_PER_TICK, allCountries.length); i++) {
+        const countryId = allCountries[(startIndex + i) % allCountries.length];
+        runCountryAI(countryId);
+    }
 }
 
 // Экспортируем функцию очистки кэша для использования при загрузке игры
