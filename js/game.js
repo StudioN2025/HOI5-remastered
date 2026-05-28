@@ -1,4 +1,6 @@
-// game.js — центральное состояние игры + сохранения
+// game.js — центральное состояние игры + сохранения + очистка кэша ИИ
+
+import { clearAICache } from './ai-cache.js';
 
 let _gridData = {};
 let _cellStats = {};
@@ -256,6 +258,9 @@ export function loadGame(slot = 'autosave') {
         _aiCompletedFocuses = {};
         if (data.aiCompletedFocuses) Object.entries(data.aiCompletedFocuses).forEach(([k, v]) => { _aiCompletedFocuses[k] = new Set(v || []); });
         
+        // ✅ ОЧИЩАЕМ КЭШ ИИ ПРИ ЗАГРУЗКЕ
+        clearAICache();
+        
         window._gridData = _gridData;
         window._cellStats = _cellStats;
         window._units = _units;
@@ -286,7 +291,7 @@ export function getSaveSlots() {
     const slots = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key.startsWith('hoi5_save_')) {
+        if (key && key.startsWith('hoi5_save_')) {
             try {
                 const data = JSON.parse(localStorage.getItem(key));
                 slots.push({
@@ -331,4 +336,7 @@ export function resetGameState() {
     _activeBattles = [];
     _aiActiveFocus = {};
     _aiCompletedFocuses = {};
+    
+    // ✅ ОЧИЩАЕМ КЭШ ИИ ПРИ СБРОСЕ
+    clearAICache();
 }
