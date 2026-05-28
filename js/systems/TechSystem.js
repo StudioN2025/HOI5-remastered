@@ -1,5 +1,7 @@
 // TechSystem.js — Система исследований
 
+import { addNotification } from '../utils/helpers.js';
+
 export class TechSystem {
     constructor(gameState) {
         this.gameState = gameState;
