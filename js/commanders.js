@@ -1,9 +1,10 @@
 // commanders.js — СИСТЕМА КОМАНДУЮЩИХ И АРМИЙ
 
-import { getUnits, setUnits, getMyCountryId, getGridData, getWars } from './game.js';
+import { getUnits, setUnits, getMyCountryId, getGridData, getWars, getAlliances } from './game.js';
 import { UNIT_STATS } from './data.js';
 import { isAtWar, addNotification } from './utils.js';
 import { renderMap, markDirty } from './map.js';
+import { giveOrder } from './military.js';
 
 // Хранилище армий
 let _armies = []; // { id, name, commander, units: [], stance: 'attack'|'defense'|'balanced' }
@@ -11,12 +12,18 @@ let _armies = []; // { id, name, commander, units: [], stance: 'attack'|'defense
 export function getArmies() { return _armies; }
 export function setArmies(data) { _armies = data || []; }
 
+// Проверка альянса
+function areAlliesCheck(c1, c2) {
+    if (c1 === c2) return true;
+    const alliances = getAlliances();
+    return alliances.some(a => a.has && a.has(c1) && a.has(c2));
+}
+
 // Создание армии
 export function createArmy(name, unitIds) {
     const myId = getMyCountryId();
     const allUnits = getUnits();
     
-    // Проверяем что юниты принадлежат игроку
     const armyUnits = allUnits.filter(u => unitIds.includes(u.id) && u.owner === myId);
     
     if (armyUnits.length === 0) {
@@ -25,7 +32,7 @@ export function createArmy(name, unitIds) {
     }
     
     const army = {
-        id: `army_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
+        id: `army_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         name: name || `${armyUnits.length}-я армия`,
         commander: generateCommander(),
         units: armyUnits.map(u => u.id),
@@ -49,7 +56,7 @@ function generateCommander() {
     
     return {
         name,
-        skill: 1 + Math.floor(Math.random() * 5), // 1-5
+        skill: 1 + Math.floor(Math.random() * 5),
         attack: 1 + Math.floor(Math.random() * 3),
         defense: 1 + Math.floor(Math.random() * 3),
         logistics: 1 + Math.floor(Math.random() * 3),
@@ -88,8 +95,8 @@ export function orderArmyAttack(armyId, targetPos) {
     const allUnits = getUnits();
     const myId = getMyCountryId();
     const gridData = getGridData();
+    const wars = getWars();
     
-    // ✅ Распределяем юниты веером для атаки
     const armyUnits = allUnits.filter(u => army.units.includes(u.id) && u.owner === myId);
     
     if (armyUnits.length === 0) {
@@ -99,7 +106,6 @@ export function orderArmyAttack(armyId, targetPos) {
     
     const [tx, ty] = targetPos.split(',').map(Number);
     
-    // Находим центр армии
     let avgX = 0, avgY = 0;
     armyUnits.forEach(u => {
         const [ux, uy] = u.pos.split(',').map(Number);
@@ -109,21 +115,16 @@ export function orderArmyAttack(armyId, targetPos) {
     avgX = Math.floor(avgX / armyUnits.length);
     avgY = Math.floor(avgY / armyUnits.length);
     
-    // ✅ Каждый юнит получает свою цель (веер)
     armyUnits.forEach((u, index) => {
         if (u.inCombat || u.trainingDaysLeft > 0) return;
         
-        // Смещение для веера
         const offsetX = Math.floor((index - armyUnits.length / 2) * 1.5);
         const offsetY = Math.floor((index % 3) - 1);
         
         const unitTarget = `${tx + offsetX},${ty + offsetY}`;
         
-        // Проверяем что цель существует
         if (gridData[unitTarget]) {
-            import('./military.js').then(m => {
-                m.giveOrder(unitTarget, u.id);
-            });
+            giveOrder(unitTarget, u.id);
         }
     });
     
@@ -143,15 +144,12 @@ export function orderArmyDefend(armyId, frontPositions) {
     
     if (armyUnits.length === 0) return false;
     
-    // Распределяем юнитов по линии обороны
     armyUnits.forEach((u, index) => {
         if (u.inCombat || u.trainingDaysLeft > 0) return;
         
         const targetPos = frontPositions[index % frontPositions.length];
         if (targetPos) {
-            import('./military.js').then(m => {
-                m.giveOrder(targetPos, u.id);
-            });
+            giveOrder(targetPos, u.id);
         }
     });
     
@@ -160,21 +158,17 @@ export function orderArmyDefend(armyId, frontPositions) {
     return true;
 }
 
-// ✅ ВЫДЕЛЕНИЕ ВСЕХ ЮНИТОВ АРМИИ
+// Выделение всех юнитов армии
 export function selectArmy(armyId) {
     const army = _armies.find(a => a.id === armyId);
-    if (!army) return;
+    if (!army) return [];
     
     const allUnits = getUnits();
     const myId = getMyCountryId();
     const armyUnits = allUnits.filter(u => army.units.includes(u.id) && u.owner === myId);
     
-    // Подсвечиваем всех юнитов армии
-    import('./map.js').then(m => {
-        m.setSelectedArmy(army.id);
-        m.markDirty();
-        m.renderMap();
-    });
+    markDirty();
+    renderMap();
     
     addNotification(`🎖️ Армия "${army.name}" выбрана (${armyUnits.length} дивизий)`, 'info');
     return armyUnits;
@@ -216,11 +210,9 @@ export function getCommanderBonus(unitId) {
     const commander = army.commander;
     let bonus = { attack: 1, defense: 1 };
     
-    // Базовый бонус от навыка
     bonus.attack += commander.attack * 0.05;
     bonus.defense += commander.defense * 0.05;
     
-    // Бонусы от трейтов
     const unit = getUnits().find(u => u.id === unitId);
     if (unit) {
         commander.traits.forEach(trait => {
