@@ -1095,10 +1095,10 @@ body {
     margin-right: 4px;
 }
 /* ==========================================================================
-   🔥 КРИТИЧЕСКИЙ ФИКС СЛОЕВ И КЛИКОВ (ДОПИСАТЬ В КОНЕЦ ФАЙЛА)
+   🔥 КРИТИЧЕСКИЙ ВОЗВРАТ ИНТЕРФЕЙСА И МЕНЮ (ДОПИСАТЬ В КОНЕЦ CSS-ФАЙЛА)
    ========================================================================== */
 
-/* 1. Карту принудительно отправляем на самый задний план */
+/* 1. Карту принудительно отправляем на задний план, чтобы она не перекрывала UI */
 #map-canvas {
     position: fixed !important;
     top: 0 !important;
@@ -1124,29 +1124,45 @@ body {
     pointer-events: none !important; /* Клики летят сквозь пустоту на карту */
 }
 
-/* 3. Возвращаем кликабельность всем кнопкам, меню и панелям внутри HUD */
+/* 3. Принудительно включаем видимость главного меню и экрана выбора стран поверх карты */
+#main-menu, #country-select {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    display: flex !important; /* Проявляем меню по центру экрана */
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 100 !important; /* Самый верхний слой — выше карты */
+    pointer-events: auto !important;
+}
+
+/* Если у какого-то окна есть класс hidden — оно должно скрываться */
+#main-menu.hidden, #country-select.hidden, #hud.hidden, #info-sidebar.hidden, #info-window.hidden {
+    display: none !important;
+}
+
+/* 4. Возвращаем кликабельность всем твоим красивым кнопкам, меню и панелям */
 #top-bar, 
 #speed-controls, 
 #game-navigation, 
 #info-sidebar, 
 #info-window, 
-#main-menu, 
-#country-select,
+.menu-box,
+.select-box,
 .action-btn,
 button {
     pointer-events: auto !important; /* Эти элементы снова ловят клики мыши */
-}
-
-/* 4. Гарантируем, что главные меню и окна будут видны поверх холста */
-#main-menu, #country-select {
-    position: fixed !important;
-    z-index: 100 !important; /* Выше всего */
 }
 
 #info-sidebar {
     z-index: 11 !important; /* Поверх HUD, но под главными меню */
 }
 
+#info-window {
+    z-index: 50 !important; /* Поверх боковой панели */
+}
 #info-window {
     z-index: 50 !important; /* Поверх боковой панели */
 }
