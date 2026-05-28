@@ -8,26 +8,24 @@ export class GameState {
         this.gameDate = new Date(1936, 0, 1);
         this.days = 0;
         
-        // Ресурсы
-        this.equipment = 1000;
+        this.equipment = 5000;
         this.manpower = 500000;
         this.factories = 0;
         
-        // Технологии
+        // Глобальные технологии (для совместимости)
         this.tech = { industry: 1, infantry: 1, tank: 1 };
         
-        // Дипломатия
-        this.wars = []; // { a, b }
-        this.alliances = []; // Set()
+        // Технологии по странам
+        this.countryTech = new Map();
+        this.countryResearch = new Map();
         
-        // Фокусы
+        this.wars = [];
+        this.alliances = [];
+        
         this.activeFocus = null;
         this.completedFocuses = new Set();
         
-        // Активный юнит
         this.selectedUnitId = null;
-        
-        // Активные бои
         this.activeBattles = [];
     }
     
@@ -77,11 +75,14 @@ export class GameState {
             manpower: this.manpower,
             factories: this.factories,
             tech: { ...this.tech },
+            countryTech: Array.from(this.countryTech.entries()),
+            countryResearch: Array.from(this.countryResearch.entries()),
             wars: [...this.wars],
             alliances: this.alliances.map(a => [...a]),
             activeFocus: this.activeFocus ? { ...this.activeFocus } : null,
             completedFocuses: [...this.completedFocuses],
-            selectedUnitId: this.selectedUnitId
+            selectedUnitId: this.selectedUnitId,
+            activeBattles: this.activeBattles.map(b => ({ ...b }))
         };
     }
     
@@ -94,11 +95,14 @@ export class GameState {
         this.equipment = data.equipment;
         this.manpower = data.manpower;
         this.factories = data.factories;
-        this.tech = data.tech;
-        this.wars = data.wars;
-        this.alliances = data.alliances.map(a => new Set(a));
+        this.tech = data.tech || { industry: 1, infantry: 1, tank: 1 };
+        this.countryTech = new Map(data.countryTech || []);
+        this.countryResearch = new Map(data.countryResearch || []);
+        this.wars = data.wars || [];
+        this.alliances = (data.alliances || []).map(a => new Set(a));
         this.activeFocus = data.activeFocus;
-        this.completedFocuses = new Set(data.completedFocuses);
+        this.completedFocuses = new Set(data.completedFocuses || []);
         this.selectedUnitId = data.selectedUnitId;
+        this.activeBattles = data.activeBattles || [];
     }
 }
