@@ -1,4 +1,4 @@
-// renderer.js — ПОДДЕРЖКА ОТРИЦАТЕЛЬНЫХ КООРДИНАТ
+// renderer.js — ПОДДЕРЖКА ОТРИЦАТЕЛЬНЫХ КООРДИНАТ + БЕЗ МИГАНИЯ
 
 import { getGridData, getCellStats } from './game.js';
 import { getCountryInfo } from './utils.js';
@@ -8,6 +8,7 @@ let offscreenCtx = null;
 let dirtyCells = new Set();
 let worldBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 let isInitialized = false;
+let lastIconHash = new Map(); // Для отслеживания изменений иконок
 const CELL_SIZE = 20;
 
 // Функции преобразования координат
@@ -42,7 +43,7 @@ function updateWorldBounds() {
     
     worldBounds = { minX: minX - 1, maxX: maxX + 1, minY: minY - 1, maxY: maxY + 1 };
     
-    console.log(`📐 Границы мира: X[${worldBounds.minX}..${worldBounds.maxX}] (${worldBounds.maxX - worldBounds.minX + 1} клеток), Y[${worldBounds.minY}..${worldBounds.maxY}] (${worldBounds.maxY - worldBounds.minY + 1} клеток)`);
+    console.log(`📐 Границы мира: X[${worldBounds.minX}..${worldBounds.maxX}], Y[${worldBounds.minY}..${worldBounds.maxY}]`);
 }
 
 export function markAllDirty() {
@@ -51,6 +52,7 @@ export function markAllDirty() {
     for (const pos of Object.keys(gridData)) {
         dirtyCells.add(pos);
     }
+    lastIconHash.clear();
 }
 
 export function initOffscreen() {
@@ -73,27 +75,11 @@ export function initOffscreen() {
     offscreenCtx.fillStyle = '#1a3a4a';
     offscreenCtx.fillRect(0, 0, width, height);
     
-    // Сетка
-    offscreenCtx.strokeStyle = 'rgba(100, 150, 200, 0.15)';
-    offscreenCtx.lineWidth = 0.5;
-    for (let x = 0; x <= width; x += CELL_SIZE) {
-        offscreenCtx.beginPath();
-        offscreenCtx.moveTo(x, 0);
-        offscreenCtx.lineTo(x, height);
-        offscreenCtx.stroke();
-    }
-    for (let y = 0; y <= height; y += CELL_SIZE) {
-        offscreenCtx.beginPath();
-        offscreenCtx.moveTo(0, y);
-        offscreenCtx.lineTo(width, y);
-        offscreenCtx.stroke();
-    }
-    
     markAllDirty();
     renderDirtyCells();
     
     isInitialized = true;
-    console.log(`✅ Offscreen canvas создан: ${width}x${height}px (${worldBounds.maxX - worldBounds.minX + 1}x${worldBounds.maxY - worldBounds.minY + 1} клеток)`);
+    console.log(`✅ Offscreen canvas создан: ${width}x${height}px`);
 }
 
 export function renderDirtyCells() {
@@ -128,26 +114,41 @@ export function renderDirtyCells() {
         const hasPort = cell.buildings?.includes('port') || false;
         
         const countryInfo = getCountryInfo(owner);
+        
+        // Рисуем фон клетки
         offscreenCtx.fillStyle = countryInfo.color;
         offscreenCtx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
         
+        // Граница
         offscreenCtx.strokeStyle = 'rgba(0,0,0,0.2)';
         offscreenCtx.lineWidth = 0.5;
         offscreenCtx.strokeRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
         
-        offscreenCtx.font = `${Math.max(12, Math.min(18, CELL_SIZE * 0.6))}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-        offscreenCtx.textAlign = 'left';
-        offscreenCtx.textBaseline = 'top';
-        
-        let yOffset = 2;
-        if (hasPort) {
-            offscreenCtx.fillStyle = '#3b82f6';
-            offscreenCtx.fillText('⚓', screenX + 2, screenY + yOffset);
-            yOffset += 9;
-        }
-        if (factories > 0) {
-            offscreenCtx.fillStyle = '#ffffff';
-            offscreenCtx.fillText('🏭', screenX + 2, screenY + yOffset);
+        // Иконки - только если изменились
+        const iconKey = `${pos}|${hasPort}|${factories}`;
+        if (lastIconHash.get(pos) !== iconKey) {
+            const fontSize = Math.max(10, Math.min(16, CELL_SIZE * 0.7));
+            offscreenCtx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+            offscreenCtx.textAlign = 'left';
+            offscreenCtx.textBaseline = 'top';
+            
+            // Сначала очищаем область иконок (заливаем цветом страны)
+            offscreenCtx.fillStyle = countryInfo.color;
+            offscreenCtx.fillRect(screenX + 1, screenY + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+            
+            // Рисуем иконки заново
+            let yOffset = 2;
+            if (hasPort) {
+                offscreenCtx.fillStyle = '#3b82f6';
+                offscreenCtx.fillText('⚓', screenX + 2, screenY + yOffset);
+                yOffset += 10;
+            }
+            if (factories > 0) {
+                offscreenCtx.fillStyle = '#ffffff';
+                offscreenCtx.fillText('🏭', screenX + 2, screenY + yOffset);
+            }
+            
+            lastIconHash.set(pos, iconKey);
         }
     }
     
