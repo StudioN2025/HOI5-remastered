@@ -1,4 +1,4 @@
-// map.js — ИСПРАВЛЕННАЯ ВЕРСИЯ
+// map.js — с правильной настройкой камеры для отрицательных координат
 
 import { getCountryInfo } from './utils.js';
 import { getGridData, getUnits, getMyCountryId, getBuildingQueue, getSelectedUnitId, getCellStats } from './game.js';
@@ -22,6 +22,7 @@ let ctx = canvas.getContext('2d', {
 // Камера
 let camera = { x: 0, y: 0, zoom: 0.8 };
 let hoverCell = null;
+let cameraInitialized = false;
 
 // Кэш котлов
 let pocketCache = null;
@@ -34,6 +35,24 @@ export function setHoverCell(cell) { hoverCell = cell; }
 export function getCellSize() { return CELL_SIZE; }
 export { canvas, ctx };
 
+// Инициализация камеры по центру карты
+function initCamera() {
+    const bounds = getWorldBounds();
+    const centerX = (bounds.minX + bounds.maxX) / 2 * CELL_SIZE;
+    const centerY = (bounds.minY + bounds.maxY) / 2 * CELL_SIZE;
+    
+    camera.x = centerX;
+    camera.y = centerY;
+    camera.zoom = Math.min(
+        canvas.width / ((bounds.maxX - bounds.minX + 2) * CELL_SIZE),
+        canvas.height / ((bounds.maxY - bounds.minY + 2) * CELL_SIZE),
+        2.0
+    ) * 0.9;
+    
+    cameraInitialized = true;
+    console.log(`🎥 Камера инициализирована: центр (${centerX}, ${centerY}), зум ${camera.zoom}`);
+}
+
 export function markDirty() {
     markAllDirty();
     pocketCache = null;
@@ -43,6 +62,7 @@ export function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     markAllDirty();
+    if (cameraInitialized) renderMap();
 }
 
 export function screenToWorld(sx, sy) {
@@ -63,11 +83,16 @@ export function renderMap() {
         return;
     }
     
+    // Инициализируем камеру при первом рендере
+    if (!cameraInitialized) {
+        initCamera();
+    }
+    
     // Обновляем только грязные клетки
     renderDirtyCells();
     
-    // Очищаем экран (море)
-    ctx.fillStyle = '#1b3a4b';
+    // Очищаем экран
+    ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Копируем видимую часть оффскрин-канваса
@@ -85,18 +110,19 @@ export function renderMap() {
         }
     }
     
-    // Динамический слой: юниты, стройка, котлы, ховер
+    // Динамический слой
     renderDynamicLayer();
 }
 
-// Динамический слой
+// ... остальной код renderDynamicLayer, updatePocketCache, updateCamera, setupMapEvents остаётся без изменений
+
+// Динамический слой (оставляем как было)
 function renderDynamicLayer() {
     const units = getUnits();
     const myId = getMyCountryId();
     const selectedUnitId = getSelectedUnitId();
     const gridData = getGridData();
     const buildingQueue = getBuildingQueue();
-    const now = Date.now();
     
     ctx.save();
     
@@ -104,14 +130,12 @@ function renderDynamicLayer() {
         if (!u?.pos) continue;
         const [ux, uy] = u.pos.split(',').map(Number);
         
-        // Проверяем видимость
         const screenX = (ux * CELL_SIZE - camera.x) * camera.zoom + canvas.width/2;
         const screenY = (uy * CELL_SIZE - camera.y) * camera.zoom + canvas.height/2;
         const size = CELL_SIZE * camera.zoom;
         
         if (screenX + size < 0 || screenX > canvas.width || screenY + size < 0 || screenY > canvas.height) continue;
         
-        // Путь (только для выбранного)
         if (u.id === selectedUnitId && u.path?.length > 0) {
             const lastStep = u.path[u.path.length - 1];
             if (lastStep) {
@@ -129,7 +153,6 @@ function renderDynamicLayer() {
             }
         }
         
-        // Подсветка выбранного
         if (u.id === selectedUnitId) {
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
@@ -137,8 +160,7 @@ function renderDynamicLayer() {
             ctx.strokeRect(screenX - 1, screenY - 1, size + 2, size + 2);
         }
         
-        // Иконка юнита
-        ctx.font = `${Math.max(10, size * 0.7)}px serif`;
+        ctx.font = `${Math.max(10, size * 0.7)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff';
@@ -154,7 +176,6 @@ function renderDynamicLayer() {
             ctx.fillText(u.type === 'tank' ? '🚜' : '💂', cx, cy);
         }
         
-        // HP бар
         if (u.hp != null) {
             const maxHp = u.type === 'tank' ? 50 : 100;
             const hpP = Math.max(0, Math.min(1, u.hp / maxHp));
@@ -169,7 +190,6 @@ function renderDynamicLayer() {
         }
     }
     
-    // Стройка
     if (buildingQueue.length > 0 && buildingQueue[0]?.pos) {
         const [bx, by] = buildingQueue[0].pos.split(',').map(Number);
         const stats = BUILDING_STATS[buildingQueue[0].type];
@@ -186,7 +206,6 @@ function renderDynamicLayer() {
         }
     }
     
-    // Котлы
     pocketFrame++;
     if (pocketFrame >= POCKET_INTERVAL) {
         pocketFrame = 0;
@@ -211,7 +230,6 @@ function renderDynamicLayer() {
         }
     }
     
-    // Ховер
     if (hoverCell && gridData[hoverCell]) {
         const [hx, hy] = hoverCell.split(',').map(Number);
         const screenX = (hx * CELL_SIZE - camera.x) * camera.zoom + canvas.width/2;
@@ -266,7 +284,7 @@ export function setupMapEvents() {
     canvas.addEventListener('wheel', e => {
         e.preventDefault();
         const before = screenToWorld(e.clientX, e.clientY);
-        camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.05), 10);
+        camera.zoom = Math.min(Math.max(camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.1), 5);
         const after = screenToWorld(e.clientX, e.clientY);
         camera.x += before.x - after.x;
         camera.y += before.y - after.y;
