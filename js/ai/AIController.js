@@ -1,4 +1,4 @@
-// AIController.js — ИИ КОТОРЫЙ РЕАЛЬНО ИГРАЕТ
+// AIController.js — ЛЁГКИЙ И УМНЫЙ ИИ
 
 export class AIController {
     constructor(world, entities, gameState) {
@@ -6,70 +6,23 @@ export class AIController {
         this.entities = entities;
         this.gameState = gameState;
         this.tickCounter = 0;
-        this.TICK_INTERVAL = 2;
+        this.TICK_INTERVAL = 5; // Раз в 5 дней (легче)
         
-        // Память для каждой страны
         this.memory = new Map();
         
-        // Реальная сила стран (на основе территории и истории)
-        this.countryPower = {
-            germany: 95,
-            ussr: 90,
-            uk: 85,
-            france: 80,
-            italy: 65,
-            spain: 55,
-            poland: 50,
-            turkey: 45,
-            yugoslavia: 40,
-            czechoslovakia: 40,
-            greece: 35,
-            romania: 35,
-            hungary: 30,
-            netherlands: 30,
-            belgium: 28,
-            portugal: 25,
-            finland: 25,
-            bulgaria: 22,
-            austria: 20,
-            switzerland: 18,
-            denmark: 15,
-            sweden: 15,
-            norway: 15,
-            lithuania: 12,
-            latvia: 10,
-            estonia: 10,
-            luxembourg: 5
-        };
-        
-        // Стратегии для разных типов стран
-        this.strategies = {
-            major: {  // Великие державы (power >= 70)
-                armyTarget: 50,
-                factoryTarget: 20,
-                aggression: 0.9,
-                expansionist: true,
-                researchFocus: 'tank'
-            },
-            regional: {  // Региональные державы (power >= 40)
-                armyTarget: 25,
-                factoryTarget: 10,
-                aggression: 0.6,
-                expansionist: true,
-                researchFocus: 'infantry'
-            },
-            minor: {  // Малые страны (power < 40)
-                armyTarget: 12,
-                factoryTarget: 5,
-                aggression: 0.3,
-                expansionist: false,
-                researchFocus: 'industry'
-            }
+        // Историческая сила (для приоритетов)
+        this.power = {
+            germany: 95, ussr: 90, uk: 85, france: 80, italy: 65,
+            spain: 55, poland: 50, turkey: 45, yugoslavia: 40,
+            czechoslovakia: 40, greece: 35, romania: 35, hungary: 30,
+            netherlands: 30, belgium: 28, portugal: 25, finland: 25,
+            bulgaria: 22, austria: 20, switzerland: 18, denmark: 15,
+            lithuania: 12, latvia: 10, estonia: 10, luxembourg: 5
         };
     }
     
     async init() {
-        console.log('🤖 AI Controller инициализирован');
+        console.log('🤖 AI инициализирован');
     }
     
     update() {
@@ -80,16 +33,17 @@ export class AIController {
         const countries = this.world.getAllCountries();
         const myId = this.gameState.myCountryId;
         
-        // Сортируем по силе (сильные сначала)
-        const sorted = Array.from(countries).sort((a,b) => 
-            (this.countryPower[b]||0) - (this.countryPower[a]||0)
-        );
-        
-        for (const countryId of sorted) {
+        // Обрабатываем не больше 5 стран за раз
+        let processed = 0;
+        for (const countryId of countries) {
             if (countryId === myId) continue;
+            if (processed >= 5) break;
+            
             const cells = this.world.getCountryCells(countryId);
             if (cells.size === 0) continue;
+            
             this.processCountry(countryId);
+            processed++;
         }
     }
     
@@ -100,71 +54,63 @@ export class AIController {
         const unitCount = units.length;
         const factories = this.countFactories(countryId);
         const enemies = this.getEnemies(countryId);
-        const power = this.countryPower[countryId] || 20;
+        const powerLvl = this.power[countryId] || 20;
         
-        // Определяем тип страны
-        let strat = this.strategies.minor;
-        if (power >= 70) strat = this.strategies.major;
-        else if (power >= 40) strat = this.strategies.regional;
-        
-        // Получаем или создаём память
+        // Получаем память
         if (!this.memory.has(countryId)) {
             this.memory.set(countryId, {
                 target: null,
-                attackTimer: 0,
-                buildTimer: 0,
-                recruitTimer: 0,
-                warDeclarationTimer: 0,
-                lastAction: 0
+                lastRecruit: 0,
+                lastBuild: 0
             });
         }
         const mem = this.memory.get(countryId);
         
-        // ========== 1. ЭКОНОМИКА И АРМИЯ ==========
+        // ===== ЦЕЛИ В ЗАВИСИМОСТИ ОТ СИЛЫ =====
+        let targetUnits = 15;
+        let targetFactories = 5;
         
-        // Нанять юнитов если нужно
-        if (unitCount < strat.armyTarget && Date.now() - mem.recruitTimer > 5000) {
-            const toRecruit = Math.min(3, strat.armyTarget - unitCount);
-            for (let i = 0; i < toRecruit; i++) {
-                this.recruitUnit(countryId, cells, power, enemies.length > 0);
-            }
-            mem.recruitTimer = Date.now();
-        }
-        
-        // Построить завод если нужно
-        if (factories < strat.factoryTarget && Date.now() - mem.buildTimer > 10000) {
-            this.buildFactory(countryId, cells);
-            mem.buildTimer = Date.now();
-        }
-        
-        // ========== 2. ВОЕННЫЕ ДЕЙСТВИЯ ==========
-        
-        if (enemies.length > 0) {
-            // Есть враги - военные действия
-            this.handleWar(countryId, cells, units, enemies, mem, strat, power);
+        if (powerLvl >= 70) {
+            targetUnits = Math.min(40, Math.floor(cellCount / 4));
+            targetFactories = Math.min(15, Math.floor(cellCount / 15));
+        } else if (powerLvl >= 40) {
+            targetUnits = Math.min(25, Math.floor(cellCount / 5));
+            targetFactories = Math.min(8, Math.floor(cellCount / 20));
         } else {
-            // Нет врагов - экспансия
-            this.handlePeace(countryId, cells, units, mem, strat, power);
+            targetUnits = Math.min(12, Math.floor(cellCount / 6));
+            targetFactories = Math.min(4, Math.floor(cellCount / 25));
         }
         
-        // ========== 3. ОБЪЯВЛЕНИЕ ВОЙН ==========
-        
-        if (strat.expansionist && Date.now() - mem.warDeclarationTimer > 30000) {
-            const target = this.findTarget(countryId, power);
-            if (target) {
-                this.gameState.addWar(countryId, target);
-                mem.target = target;
-                mem.warDeclarationTimer = Date.now();
-                console.log(`⚔️ ${countryId} объявил войну ${target}`);
+        // ===== 1. НАЙМ ЮНИТОВ =====
+        if (unitCount < targetUnits && Date.now() - mem.lastRecruit > 8000) {
+            const toAdd = Math.min(2, targetUnits - unitCount);
+            for (let i = 0; i < toAdd; i++) {
+                this.recruitUnit(countryId, cells, powerLvl, enemies.length > 0);
             }
+            mem.lastRecruit = Date.now();
+        }
+        
+        // ===== 2. СТРОИТЕЛЬСТВО =====
+        if (factories < targetFactories && Date.now() - mem.lastBuild > 15000) {
+            this.buildFactory(countryId, cells);
+            mem.lastBuild = Date.now();
+        }
+        
+        // ===== 3. ВОЕННЫЕ ДЕЙСТВИЯ =====
+        if (enemies.length > 0 && units.length > 0) {
+            this.doMilitary(countryId, units, enemies, mem);
+        } 
+        // ===== 4. ЭКСПАНСИЯ =====
+        else if (units.length > 0) {
+            this.doExpand(countryId, cells, units);
         }
     }
     
-    handleWar(countryId, cells, units, enemies, mem, strat, power) {
+    doMilitary(countryId, units, enemies, mem) {
         // Выбираем цель
         let target = mem.target;
         if (!target || !enemies.includes(target)) {
-            target = this.getBestTarget(countryId, enemies, power);
+            target = this.getWeakest(enemies);
             mem.target = target;
         }
         
@@ -173,100 +119,124 @@ export class AIController {
         const border = this.world.getBorderWith(countryId, target);
         if (border.length === 0) return;
         
-        // Атакуем если есть юниты
-        if (units.length > 0 && Date.now() - mem.attackTimer > 3000) {
-            const success = this.executeAttack(countryId, units, border, target);
-            if (success) mem.attackTimer = Date.now();
-        }
-    }
-    
-    handlePeace(countryId, cells, units, mem, strat, power) {
-        // Захватываем нейтральные клетки
-        const neutral = this.getNeutralCells(countryId, cells);
-        if (neutral.length > 0 && units.length > 0) {
-            this.expand(countryId, units, neutral);
-        }
-    }
-    
-    executeAttack(countryId, units, borderCells, targetId) {
-        // Находим лучший юнит для атаки
+        // Двигаем ближайший юнит к границе
         let bestUnit = null;
         let bestDist = Infinity;
-        let bestTarget = null;
+        let bestBorder = null;
         
         for (const unitId of units) {
             const ux = this.entities.x[unitId];
             const uy = this.entities.y[unitId];
             
-            for (const border of borderCells) {
-                const [bx, by] = border.split(',').map(Number);
+            for (const b of border) {
+                const [bx, by] = b.split(',').map(Number);
                 const dist = Math.abs(ux - bx) + Math.abs(uy - by);
-                
                 if (dist < bestDist) {
                     bestDist = dist;
                     bestUnit = unitId;
-                    bestTarget = { x: bx, y: by };
+                    bestBorder = { x: bx, y: by };
                 }
             }
         }
         
-        if (!bestUnit || !bestTarget) return false;
-        
-        // Двигаемся к врагу
-        const dx = Math.sign(bestTarget.x - this.entities.x[bestUnit]);
-        const dy = Math.sign(bestTarget.y - this.entities.y[bestUnit]);
-        const newX = this.entities.x[bestUnit] + dx;
-        const newY = this.entities.y[bestUnit] + dy;
-        
-        const targetOwner = this.world.getCell(newX, newY);
-        
-        // Если клетка принадлежит врагу - атакуем (moveTo вызовет бой)
-        if (targetOwner === targetId || borderCells.includes(`${newX},${newY}`)) {
-            this.entities.moveTo(bestUnit, newX, newY);
-            return true;
-        }
-        
-        return false;
-    }
-    
-    expand(countryId, units, neutralCells) {
-        for (const unitId of units) {
-            const target = neutralCells[0];
-            const [tx, ty] = target.split(',').map(Number);
+        if (bestUnit && bestBorder && bestDist > 1) {
+            // Двигаемся к границе
+            const dx = Math.sign(bestBorder.x - this.entities.x[bestUnit]);
+            const dy = Math.sign(bestBorder.y - this.entities.y[bestUnit]);
+            const newX = this.entities.x[bestUnit] + dx;
+            const newY = this.entities.y[bestUnit] + dy;
             
-            const dist = Math.abs(this.entities.x[unitId] - tx) + 
-                        Math.abs(this.entities.y[unitId] - ty);
-            
-            if (dist <= 2) {
-                const dx = Math.sign(tx - this.entities.x[unitId]);
-                const dy = Math.sign(ty - this.entities.y[unitId]);
-                const newX = this.entities.x[unitId] + dx;
-                const newY = this.entities.y[unitId] + dy;
-                
-                if (this.world.getCell(newX, newY) === 0) {
-                    this.world.setCell(newX, newY, countryId);
-                    this.entities.moveTo(unitId, newX, newY);
+            if (this.world.getCell(newX, newY) !== 0) {
+                this.entities.moveTo(bestUnit, newX, newY);
+            }
+        } else if (bestUnit && bestBorder && bestDist <= 1) {
+            // Атакуем вражескую клетку
+            const [bx, by] = border[0].split(',').map(Number);
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                const enemyX = bx + dx;
+                const enemyY = by + dy;
+                if (this.world.getCell(enemyX, enemyY) === target) {
+                    this.entities.moveTo(bestUnit, enemyX, enemyY);
                     break;
                 }
             }
         }
     }
     
-    recruitUnit(countryId, cells, power, atWar) {
-        // Находим лучшую клетку для спавна
-        let bestCell = null;
-        let bestScore = -Infinity;
+    doExpand(countryId, cells, units) {
+        // Ищем нейтральную клетку рядом
+        let targetNeutral = null;
         
         for (const cell of cells) {
             const [x, y] = cell.split(',').map(Number);
-            let score = Math.random() * 100;
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (this.world.getCell(nx, ny) === 0) {
+                    targetNeutral = { x: nx, y: ny };
+                    break;
+                }
+            }
+            if (targetNeutral) break;
+        }
+        
+        if (!targetNeutral) return;
+        
+        // Двигаем ближайший юнит к нейтральной клетке
+        let bestUnit = null;
+        let bestDist = Infinity;
+        
+        for (const unitId of units) {
+            const dist = Math.abs(this.entities.x[unitId] - targetNeutral.x) + 
+                        Math.abs(this.entities.y[unitId] - targetNeutral.y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestUnit = unitId;
+            }
+        }
+        
+        if (bestUnit && bestDist <= 2) {
+            const dx = Math.sign(targetNeutral.x - this.entities.x[bestUnit]);
+            const dy = Math.sign(targetNeutral.y - this.entities.y[bestUnit]);
+            const newX = this.entities.x[bestUnit] + dx;
+            const newY = this.entities.y[bestUnit] + dy;
             
-            // Заводы = лучше
-            if (this.world.hasBuilding(x, y, 'factory')) score += 200;
+            if (this.world.getCell(newX, newY) === 0) {
+                this.world.setCell(newX, newY, countryId);
+                this.entities.moveTo(bestUnit, newX, newY);
+            }
+        } else if (bestUnit) {
+            const dx = Math.sign(targetNeutral.x - this.entities.x[bestUnit]);
+            const dy = Math.sign(targetNeutral.y - this.entities.y[bestUnit]);
+            const newX = this.entities.x[bestUnit] + dx;
+            const newY = this.entities.y[bestUnit] + dy;
+            if (this.world.getCell(newX, newY) !== 0) {
+                this.entities.moveTo(bestUnit, newX, newY);
+            }
+        }
+    }
+    
+    recruitUnit(countryId, cells, powerLvl, atWar) {
+        // Находим безопасную клетку (с заводом или в центре)
+        let bestCell = null;
+        let bestScore = -1;
+        
+        for (const cell of cells) {
+            const [x, y] = cell.split(',').map(Number);
+            let score = 0;
             
-            // Центр страны = лучше
-            const center = this.getCenter(cells);
-            const centerDist = Math.abs(x - center.x) + Math.abs(y - center.y);
+            if (this.world.hasBuilding(x, y, 'factory')) score += 100;
+            
+            // Ближе к центру = лучше
+            let sumX = 0, sumY = 0;
+            for (const c of cells) {
+                const [cx, cy] = c.split(',').map(Number);
+                sumX += cx;
+                sumY += cy;
+            }
+            const centerX = sumX / cells.size;
+            const centerY = sumY / cells.size;
+            const centerDist = Math.abs(x - centerX) + Math.abs(y - centerY);
             score += (50 - centerDist);
             
             if (score > bestScore) {
@@ -277,114 +247,42 @@ export class AIController {
         
         if (bestCell) {
             const [x, y] = bestCell.split(',').map(Number);
-            const hasFactory = this.world.hasBuilding(x, y, 'factory');
-            const tech = this.gameState.countryTech?.get(countryId) || { tank: 1 };
-            
-            // Сильные страны и те у кого есть заводы могут нанимать танки
-            const canBuildTank = (power >= 60 && hasFactory && tech.tank >= 2);
-            const type = (canBuildTank && atWar) ? 1 : 0;
-            
+            // Танки только для сильных стран в военное время
+            const useTank = (powerLvl >= 60 && atWar && this.world.hasBuilding(x, y, 'factory'));
+            const type = useTank ? 1 : 0;
             this.entities.createEntity(countryId, type, x, y);
         }
     }
     
     buildFactory(countryId, cells) {
-        // Находим лучшую клетку для завода
-        let bestCell = null;
-        let bestScore = -Infinity;
-        const center = this.getCenter(cells);
-        
+        // Строим в случайной клетке без завода
+        const available = [];
         for (const cell of cells) {
             const [x, y] = cell.split(',').map(Number);
-            if (this.world.hasBuilding(x, y, 'factory')) continue;
-            
-            let score = Math.random() * 50;
-            
-            // Ближе к центру = лучше
-            const centerDist = Math.abs(x - center.x) + Math.abs(y - center.y);
-            score += (100 - centerDist);
-            
-            if (score > bestScore) {
-                bestScore = score;
-                bestCell = cell;
+            if (!this.world.hasBuilding(x, y, 'factory')) {
+                available.push(cell);
             }
         }
         
-        if (bestCell) {
-            const [x, y] = bestCell.split(',').map(Number);
+        if (available.length > 0) {
+            const randomCell = available[Math.floor(Math.random() * available.length)];
+            const [x, y] = randomCell.split(',').map(Number);
             this.world.addBuilding(x, y, 'factory');
-            console.log(`🏭 ${countryId} построил завод в (${x},${y})`);
         }
     }
     
-    getBestTarget(countryId, enemies, myPower) {
-        // Выбираем самого слабого врага
-        let best = null;
-        let bestScore = Infinity;
+    getWeakest(enemies) {
+        let weakest = null;
+        let weakestPower = Infinity;
         
         for (const enemy of enemies) {
-            const enemyPower = this.countryPower[enemy] || 20;
-            // Атакуем слабых
-            if (enemyPower < bestScore && enemyPower < myPower * 1.2) {
-                bestScore = enemyPower;
-                best = enemy;
+            const power = this.power[enemy] || 20;
+            if (power < weakestPower) {
+                weakestPower = power;
+                weakest = enemy;
             }
         }
-        
-        return best || enemies[0];
-    }
-    
-    findTarget(countryId, myPower) {
-        // Ищем слабого соседа для войны
-        const allCountries = this.world.getAllCountries();
-        let bestTarget = null;
-        let bestScore = Infinity;
-        
-        for (const other of allCountries) {
-            if (other === countryId) continue;
-            if (this.gameState.isAtWar(countryId, other)) continue;
-            
-            const otherPower = this.countryPower[other] || 20;
-            const border = this.world.getBorderWith(countryId, other);
-            
-            // Сосед и слабее нас
-            if (border.length > 0 && otherPower < bestScore && otherPower < myPower * 0.7) {
-                bestScore = otherPower;
-                bestTarget = other;
-            }
-        }
-        
-        return bestTarget;
-    }
-    
-    getCenter(cells) {
-        let sumX = 0, sumY = 0;
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            sumX += x;
-            sumY += y;
-        }
-        return {
-            x: Math.round(sumX / cells.size),
-            y: Math.round(sumY / cells.size)
-        };
-    }
-    
-    getNeutralCells(countryId, cells) {
-        const neutrals = new Set();
-        
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                const nx = x + dx;
-                const ny = y + dy;
-                if (this.world.getCell(nx, ny) === 0) {
-                    neutrals.add(`${nx},${ny}`);
-                }
-            }
-        }
-        
-        return Array.from(neutrals);
+        return weakest || enemies[0];
     }
     
     countFactories(countryId) {
