@@ -13,8 +13,8 @@ export class EntityManager {
         // Плоские массивы (быстрый доступ)
         this.active = new Uint8Array(maxEntities);
         
-        // Компоненты
-        this.owner = new Uint16Array(maxEntities);
+        // Компоненты (owner — строка-id страны, обычный массив)
+        this.owner = new Array(maxEntities).fill(null);
         this.type = new Uint8Array(maxEntities);
         this.x = new Int16Array(maxEntities);
         this.y = new Int16Array(maxEntities);
