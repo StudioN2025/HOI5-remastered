@@ -1,692 +1,648 @@
-// AIController.js — Умный исторический ИИ v2.0
+// AIController.js — v3.0 (нормальное управление войсками)
 
 import { addNotification } from '../utils/helpers.js';
+import { AStarFinder } from '../core/AStar.js';
 
-// =============================================
-// ИСТОРИЧЕСКИЕ ДАННЫЕ
-// =============================================
+// ── Профили стран ────────────────────────────────────────────────────────────
 
-const COUNTRY_PROFILES = {
-    germany:        { power: 95, ideology: 'fascist',   aggression: 0.9, role: 'aggressor' },
-    italy:          { power: 65, ideology: 'fascist',   aggression: 0.7, role: 'aggressor' },
-    ussr:           { power: 90, ideology: 'communist', aggression: 0.6, role: 'opportunist' },
+const PROFILES = {
+    germany:        { power: 95, ideology: 'fascist',    aggression: 0.9, role: 'aggressor' },
+    italy:          { power: 65, ideology: 'fascist',    aggression: 0.7, role: 'aggressor' },
+    ussr:           { power: 90, ideology: 'communist',  aggression: 0.6, role: 'opportunist' },
     uk:             { power: 85, ideology: 'democratic', aggression: 0.2, role: 'defender' },
-    france:         { power: 80, ideology: 'democratic', aggression: 0.15, role: 'defender' },
-    usa:            { power: 100, ideology: 'democratic', aggression: 0.1, role: 'defender' },
-    spain:          { power: 55, ideology: 'fascist',   aggression: 0.4, role: 'neutral' },
+    france:         { power: 80, ideology: 'democratic', aggression: 0.2, role: 'defender' },
     poland:         { power: 50, ideology: 'democratic', aggression: 0.3, role: 'defender' },
-    turkey:         { power: 45, ideology: 'neutral',   aggression: 0.2, role: 'neutral' },
+    turkey:         { power: 45, ideology: 'neutral',    aggression: 0.1, role: 'neutral' },
     yugoslavia:     { power: 40, ideology: 'democratic', aggression: 0.2, role: 'defender' },
     czechoslovakia: { power: 40, ideology: 'democratic', aggression: 0.1, role: 'defender' },
     greece:         { power: 35, ideology: 'democratic', aggression: 0.1, role: 'defender' },
-    romania:        { power: 35, ideology: 'fascist',   aggression: 0.3, role: 'opportunist' },
-    hungary:        { power: 30, ideology: 'fascist',   aggression: 0.4, role: 'opportunist' },
-    netherlands:    { power: 30, ideology: 'democratic', aggression: 0.05, role: 'neutral' },
-    belgium:        { power: 28, ideology: 'democratic', aggression: 0.05, role: 'neutral' },
-    portugal:       { power: 25, ideology: 'fascist',   aggression: 0.1, role: 'neutral' },
+    romania:        { power: 35, ideology: 'fascist',    aggression: 0.3, role: 'opportunist' },
+    hungary:        { power: 30, ideology: 'fascist',    aggression: 0.4, role: 'opportunist' },
+    netherlands:    { power: 30, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    belgium:        { power: 28, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    portugal:       { power: 25, ideology: 'fascist',    aggression: 0.1, role: 'neutral' },
     finland:        { power: 25, ideology: 'democratic', aggression: 0.1, role: 'defender' },
-    bulgaria:       { power: 22, ideology: 'fascist',   aggression: 0.35, role: 'opportunist' },
-    austria:        { power: 20, ideology: 'fascist',   aggression: 0.1, role: 'neutral' },
-    switzerland:    { power: 18, ideology: 'neutral',   aggression: 0.0, role: 'neutral' },
-    denmark:        { power: 15, ideology: 'democratic', aggression: 0.05, role: 'neutral' },
-    lithuania:      { power: 12, ideology: 'democratic', aggression: 0.1, role: 'neutral' },
-    latvia:         { power: 10, ideology: 'democratic', aggression: 0.05, role: 'neutral' },
-    estonia:        { power: 10, ideology: 'democratic', aggression: 0.05, role: 'neutral' },
-    luxembourg:     { power: 5,  ideology: 'democratic', aggression: 0.0, role: 'neutral' },
-    slovakia:       { power: 15, ideology: 'fascist',   aggression: 0.2, role: 'opportunist' },
+    bulgaria:       { power: 22, ideology: 'fascist',    aggression: 0.3, role: 'opportunist' },
+    austria:        { power: 20, ideology: 'fascist',    aggression: 0.1, role: 'neutral' },
+    switzerland:    { power: 18, ideology: 'neutral',    aggression: 0.0, role: 'neutral' },
+    denmark:        { power: 15, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    spain:          { power: 55, ideology: 'fascist',    aggression: 0.4, role: 'neutral' },
+    lithuania:      { power: 12, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    latvia:         { power: 10, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    estonia:        { power: 10, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    luxembourg:     { power:  5, ideology: 'democratic', aggression: 0.0, role: 'neutral' },
+    slovakia:       { power: 15, ideology: 'fascist',    aggression: 0.2, role: 'opportunist' },
 };
 
-// Исторические альянсы
 const INITIAL_ALLIANCES = [
-    { name: 'Ось',      members: ['germany', 'italy'] },
-    { name: 'Союзники', members: ['uk', 'france'] },
+    ['germany', 'italy'],
+    ['uk', 'france'],
 ];
 
-// Исторические триггеры войн (день от старта = 1 Янв 1936)
-// 1939-09-01 = день ~1339 от 1936-01-01
+// день от 1936-01-01 → историческое событие
 const HISTORICAL_WARS = [
-    { day: 100,  attacker: 'italy',   defender: 'greece',        chance: 0.4, label: 'вторжение в Грецию' },
-    { day: 200,  attacker: 'germany', defender: 'austria',       chance: 0.7, label: 'аншлюс Австрии' },
-    { day: 400,  attacker: 'germany', defender: 'czechoslovakia',chance: 0.8, label: 'захват Чехословакии' },
-    { day: 600,  attacker: 'ussr',    defender: 'finland',       chance: 0.6, label: 'Зимняя война' },
-    { day: 700,  attacker: 'germany', defender: 'poland',        chance: 0.95, label: 'вторжение в Польшу' },
-    { day: 730,  attacker: 'germany', defender: 'france',        chance: 0.9, label: 'вторжение во Францию' },
-    { day: 730,  attacker: 'germany', defender: 'belgium',       chance: 0.9, label: 'оккупация Бельгии' },
-    { day: 730,  attacker: 'germany', defender: 'netherlands',   chance: 0.9, label: 'оккупация Нидерландов' },
-    { day: 730,  attacker: 'germany', defender: 'luxembourg',    chance: 0.9, label: 'оккупация Люксембурга' },
-    { day: 800,  attacker: 'germany', defender: 'denmark',       chance: 0.9, label: 'оккупация Дании' },
-    { day: 900,  attacker: 'italy',   defender: 'yugoslavia',    chance: 0.5, label: 'вторжение в Югославию' },
-    { day: 1000, attacker: 'germany', defender: 'ussr',          chance: 0.95, label: 'операция Барбаросса' },
-    { day: 1000, attacker: 'romania', defender: 'ussr',          chance: 0.6, label: 'Румыния атакует СССР' },
-    { day: 1000, attacker: 'hungary', defender: 'ussr',          chance: 0.5, label: 'Венгрия атакует СССР' },
-    { day: 1000, attacker: 'bulgaria', defender: 'yugoslavia',   chance: 0.5, label: 'Болгария атакует Югославию' },
+    { day: 200,  a: 'germany',  b: 'austria',        chance: 0.8 },
+    { day: 400,  a: 'germany',  b: 'czechoslovakia', chance: 0.85 },
+    { day: 600,  a: 'ussr',     b: 'finland',        chance: 0.7 },
+    { day: 700,  a: 'germany',  b: 'poland',         chance: 0.95 },
+    { day: 740,  a: 'germany',  b: 'france',         chance: 0.9 },
+    { day: 740,  a: 'germany',  b: 'belgium',        chance: 0.9 },
+    { day: 740,  a: 'germany',  b: 'netherlands',    chance: 0.9 },
+    { day: 740,  a: 'germany',  b: 'luxembourg',     chance: 0.9 },
+    { day: 800,  a: 'germany',  b: 'denmark',        chance: 0.9 },
+    { day: 900,  a: 'italy',    b: 'greece',         chance: 0.6 },
+    { day: 950,  a: 'italy',    b: 'yugoslavia',     chance: 0.5 },
+    { day: 1000, a: 'germany',  b: 'ussr',           chance: 0.95 },
+    { day: 1000, a: 'romania',  b: 'ussr',           chance: 0.6 },
+    { day: 1000, a: 'hungary',  b: 'ussr',           chance: 0.5 },
+    { day: 1050, a: 'bulgaria', b: 'yugoslavia',     chance: 0.5 },
 ];
 
-// =============================================
-// ОСНОВНОЙ КОНТРОЛЛЕР
-// =============================================
+// ── Главный контроллер ───────────────────────────────────────────────────────
 
 export class AIController {
     constructor(world, entities, gameState) {
-        this.world = world;
+        this.world    = world;
         this.entities = entities;
-        this.gameState = gameState;
+        this.gs       = gameState;
 
-        this.memory = new Map();         // countryId -> { ... }
-        this.firedWars = new Set();      // уже сработавшие триггеры
+        this.astar = new AStarFinder(world);
+
+        // countryId → { warTarget, lastRecruit, lastBuild, lastDiplo,
+        //               unitOrders: Map<unitId, {path, goal}> }
+        this.mem = new Map();
+
+        this.firedWars       = new Set();
         this.alliancesInited = false;
-        this.roundRobinIndex = 0;        // для обхода стран по очереди
-        this.COUNTRIES_PER_TICK = 3;     // обрабатываем N стран за вызов
+        this.rrIndex         = 0;       // round-robin по странам
+        this.PATH_CACHE_TTL  = 15;      // пересчитываем путь раз в N дней
     }
 
-    async init() {
-        console.log('🤖 AI v2.0 инициализирован');
-    }
+    async init() { console.log('🤖 AI v3.0'); }
 
-    // Вызывается из main.js раз в игровой день
+    // вызывается раз в игровой день (из main.js дневного тика)
     update() {
-        const day = this.gameState.days;
+        const day = this.gs.days;
 
-        // Один раз инициализируем альянсы
         if (!this.alliancesInited && day >= 1) {
             this._initAlliances();
             this.alliancesInited = true;
         }
 
-        // Исторические триггеры войн
         this._checkHistoricalWars(day);
 
-        // Обновляем страны по круговому принципу
-        const countries = this.world.getAllCountries().filter(c => c !== this.gameState.myCountryId);
-        if (countries.length === 0) return;
-
-        for (let i = 0; i < this.COUNTRIES_PER_TICK; i++) {
-            const idx = this.roundRobinIndex % countries.length;
-            this.roundRobinIndex++;
-            this._processCountry(countries[idx], day);
+        // Обходим страны по 4 за день
+        const countries = this.world.getAllCountries().filter(c => c !== this.gs.myCountryId);
+        if (!countries.length) return;
+        for (let i = 0; i < 4; i++) {
+            const c = countries[this.rrIndex++ % countries.length];
+            this._processCountry(c, day);
         }
     }
 
-    // =============================================
-    // АЛЬЯНСЫ
-    // =============================================
+    // ── Альянсы ──────────────────────────────────────────────────────────────
 
     _initAlliances() {
-        for (const alliance of INITIAL_ALLIANCES) {
-            const members = alliance.members.filter(m => this.world.getCountryCells(m).size > 0);
-            for (let i = 0; i < members.length; i++) {
-                for (let j = i + 1; j < members.length; j++) {
-                    if (!this.gameState.areAllies(members[i], members[j])) {
-                        this.gameState.addAlliance(members[i], members[j]);
-                    }
-                }
-            }
+        for (const pair of INITIAL_ALLIANCES) {
+            const [a, b] = pair.filter(id => this.world.getCountryCells(id).size > 0);
+            if (a && b && !this.gs.areAllies(a, b)) this.gs.addAlliance(a, b);
         }
-        console.log('🤝 Исторические альянсы сформированы');
     }
 
-    // =============================================
-    // ИСТОРИЧЕСКИЕ ВОЙНЫ
-    // =============================================
+    // ── Исторические войны ────────────────────────────────────────────────────
 
     _checkHistoricalWars(day) {
         for (let i = 0; i < HISTORICAL_WARS.length; i++) {
-            const trigger = HISTORICAL_WARS[i];
             if (this.firedWars.has(i)) continue;
-            if (day < trigger.day) continue;
-            if (Math.random() > trigger.chance) {
-                // Отложим, но не больше чем на 30 дней
-                if (day > trigger.day + 30) {
-                    this.firedWars.add(i); // пропускаем навсегда
-                }
-                continue;
+            const t = HISTORICAL_WARS[i];
+            if (day < t.day) continue;
+            if (day > t.day + 40) { this.firedWars.add(i); continue; } // просрочено
+            if (Math.random() > t.chance) continue;
+
+            const { a, b } = t;
+            if (a === b || this.gs.isAtWar(a, b)) { this.firedWars.add(i); continue; }
+            if (!this.world.getCountryCells(a).size || !this.world.getCountryCells(b).size) {
+                this.firedWars.add(i); continue;
             }
 
-            const { attacker, defender } = trigger;
+            this.gs.addWar(a, b);
+            this._pullAllies(a, b);
 
-            // Не воевать с самим собой или если уже воюют
-            if (attacker === defender) { this.firedWars.add(i); continue; }
-            if (this.gameState.isAtWar(attacker, defender)) { this.firedWars.add(i); continue; }
-
-            // Страна должна существовать
-            if (this.world.getCountryCells(attacker).size === 0) { this.firedWars.add(i); continue; }
-            if (this.world.getCountryCells(defender).size === 0) { this.firedWars.add(i); continue; }
-
-            // Союзники атакующего тоже вступают
-            this.gameState.addWar(attacker, defender);
-            this._pullAlliesIntoWar(attacker, defender);
-
-            const myId = this.gameState.myCountryId;
-            if (attacker === myId || defender === myId) {
-                addNotification(`⚔️ ${trigger.label}! Вы вовлечены в войну!`, 'war');
-            } else {
-                addNotification(`⚔️ ${trigger.label}!`, 'war');
-            }
+            const my = this.gs.myCountryId;
+            const label = `${a} → ${b}`;
+            if (a === my || b === my) addNotification(`⚔️ ${label} — вы вовлечены!`, 'war');
+            else                       addNotification(`⚔️ ${label}`, 'war');
 
             this.firedWars.add(i);
         }
     }
 
-    _pullAlliesIntoWar(attacker, defender) {
-        // Союзники атакующего объявляют войну защитнику
-        const attackerAllies = this._getAllies(attacker);
-        for (const ally of attackerAllies) {
-            if (ally === defender) continue;
-            if (!this.gameState.isAtWar(ally, defender)) {
-                this.gameState.addWar(ally, defender);
-            }
+    _pullAllies(attacker, defender) {
+        for (const ally of this._allies(attacker)) {
+            if (!this.gs.isAtWar(ally, defender)) this.gs.addWar(ally, defender);
         }
-        // Союзники защитника объявляют войну атакующему
-        const defenderAllies = this._getAllies(defender);
-        for (const ally of defenderAllies) {
-            if (ally === attacker) continue;
-            if (!this.gameState.isAtWar(ally, attacker)) {
-                this.gameState.addWar(ally, attacker);
-            }
+        for (const ally of this._allies(defender)) {
+            if (!this.gs.isAtWar(ally, attacker)) this.gs.addWar(ally, attacker);
         }
     }
 
-    _getAllies(countryId) {
-        const allies = [];
-        for (const alliance of this.gameState.alliances) {
-            if (alliance.has(countryId)) {
-                for (const member of alliance) {
-                    if (member !== countryId) allies.push(member);
-                }
-            }
-        }
-        return allies;
+    _allies(id) {
+        const res = [];
+        for (const a of this.gs.alliances) if (a.has(id)) for (const m of a) if (m !== id) res.push(m);
+        return res;
     }
 
-    // =============================================
-    // ОБРАБОТКА СТРАНЫ
-    // =============================================
+    // ── Страна ───────────────────────────────────────────────────────────────
 
-    _processCountry(countryId, day) {
-        const cells = this.world.getCountryCells(countryId);
-        if (cells.size === 0) return;
+    _processCountry(id, day) {
+        const cells = this.world.getCountryCells(id);
+        if (!cells.size) return;
 
-        const profile = COUNTRY_PROFILES[countryId] || { power: 20, aggression: 0.2, role: 'neutral' };
-        const units = this.entities.getEntitiesByOwner(countryId);
-        const enemies = this._getEnemies(countryId);
-        const factories = this._countFactories(countryId);
+        const profile = PROFILES[id] || { power: 20, aggression: 0.2, role: 'neutral' };
+        const units   = this.entities.getEntitiesByOwner(id);
+        const enemies = this._enemies(id);
 
-        // Инициализируем память
-        if (!this.memory.has(countryId)) {
-            this.memory.set(countryId, {
-                warTarget: null,
-                lastRecruit: 0,
-                lastBuild: 0,
-                lastDiplomacy: 0,
-                attackCooldown: 0,
-            });
+        if (!this.mem.has(id)) {
+            this.mem.set(id, { warTarget: null, lastRecruit: 0, lastBuild: 0,
+                               lastDiplo: 0, unitOrders: new Map() });
         }
-        const mem = this.memory.get(countryId);
-        if (mem.attackCooldown > 0) mem.attackCooldown--;
+        const mem = this.mem.get(id);
 
-        // --- Найм ---
-        this._doRecruitment(countryId, cells, units, profile, enemies.length > 0);
+        this._recruit(id, cells, units, profile, enemies.length > 0);
+        this._build(id, cells, profile);
+        this._diplomacy(id, profile, mem, day);
 
-        // --- Строительство ---
-        this._doBuild(countryId, cells, factories, profile);
-
-        // --- Дипломатия ---
-        this._doDiplomacy(countryId, profile, mem, day);
-
-        // --- Военные действия ---
         if (enemies.length > 0 && units.length > 0) {
-            this._doMilitary(countryId, units, enemies, mem, profile);
-        }
-        // --- Экспансия (только агрессоры и оппортунисты) ---
-        else if (units.length > 0 && (profile.role === 'aggressor' || profile.role === 'opportunist')) {
-            this._doExpansion(countryId, cells, units);
-        }
-        // --- Защитники держат оборону у границ ---
-        else if (units.length > 0 && profile.role === 'defender') {
-            this._doDefend(countryId, cells, units);
+            this._military(id, units, enemies, mem, profile, day);
+        } else if (units.length > 0 && profile.role !== 'neutral') {
+            this._peacetime(id, cells, units, profile);
         }
     }
 
-    // =============================================
-    // НАЙМ
-    // =============================================
+    // ── Найм ─────────────────────────────────────────────────────────────────
 
-    _doRecruitment(countryId, cells, units, profile, atWar) {
-        const mem = this.memory.get(countryId);
+    _recruit(id, cells, units, profile, atWar) {
+        const mem = this.mem.get(id);
         const now = Date.now();
-        const cooldown = atWar ? 5000 : 10000;
-        if (now - mem.lastRecruit < cooldown) return;
+        if (now - mem.lastRecruit < (atWar ? 4000 : 9000)) return;
 
-        const targetUnits = this._targetUnitCount(cells.size, profile, atWar);
-        if (units.length >= targetUnits) return;
+        const target = Math.min(50, Math.max(5,
+            Math.floor(cells.size / (profile.power >= 70 ? 4 : profile.power >= 40 ? 6 : 9))
+            * (atWar ? 1.5 : 1)
+        ));
+        if (units.length >= target) return;
 
-        const toAdd = Math.min(atWar ? 3 : 1, targetUnits - units.length);
-        for (let i = 0; i < toAdd; i++) {
-            this._recruitUnit(countryId, cells, profile, atWar);
-        }
+        const toSpawn = Math.min(atWar ? 3 : 1, target - units.length);
+        for (let i = 0; i < toSpawn; i++) this._spawnUnit(id, cells, profile, atWar);
         mem.lastRecruit = now;
     }
 
-    _targetUnitCount(cellCount, profile, atWar) {
-        const base = Math.floor(cellCount / (profile.power >= 70 ? 4 : profile.power >= 40 ? 6 : 8));
-        const warBonus = atWar ? 1.5 : 1;
-        return Math.min(Math.max(base, 5), 50) * warBonus;
-    }
-
-    _recruitUnit(countryId, cells, profile, atWar) {
-        // Ищем клетку с заводом или ближайшую к центру
-        let bestCell = null, bestScore = -Infinity;
-        let sumX = 0, sumY = 0;
+    _spawnUnit(id, cells, profile, atWar) {
+        // Ищем незанятую клетку с заводом или ближе к центру
+        let best = null, bestScore = -Infinity;
+        let sumX = 0, sumY = 0, n = 0;
         for (const c of cells) {
-            const [cx, cy] = c.split(',').map(Number);
-            sumX += cx; sumY += cy;
+            const [x, y] = c.split(',').map(Number);
+            sumX += x; sumY += y; n++;
         }
-        const cx0 = sumX / cells.size, cy0 = sumY / cells.size;
+        const cx = sumX / n, cy = sumY / n;
 
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            let score = -Math.abs(x - cx0) - Math.abs(y - cy0);
-            if (this.world.hasBuilding(x, y, 'factory')) score += 50;
-            if (!this.entities.getUnitAt(x, y)) score += 10; // свободная клетка
-            if (score > bestScore) { bestScore = score; bestCell = cell; }
+        for (const c of cells) {
+            const [x, y] = c.split(',').map(Number);
+            if (this.entities.getUnitAt(x, y)) continue;
+            let score = -(Math.abs(x - cx) + Math.abs(y - cy));
+            if (this.world.hasBuilding(x, y, 'factory')) score += 40;
+            if (score > bestScore) { bestScore = score; best = [x, y]; }
         }
-        if (!bestCell) return;
+        if (!best) return;
 
-        const [x, y] = bestCell.split(',').map(Number);
-        // Танки только для сильных стран на войне с заводом
-        const useTank = profile.power >= 60 && atWar && this.world.hasBuilding(x, y, 'factory');
-        this.entities.createEntity(countryId, useTank ? 1 : 0, x, y);
+        const useTank = profile.power >= 60 && atWar && this.world.hasBuilding(best[0], best[1], 'factory');
+        this.entities.createEntity(id, useTank ? 1 : 0, best[0], best[1]);
     }
 
-    // =============================================
-    // СТРОИТЕЛЬСТВО
-    // =============================================
+    // ── Строительство ─────────────────────────────────────────────────────────
 
-    _doBuild(countryId, cells, factories, profile) {
-        const mem = this.memory.get(countryId);
-        const now = Date.now();
-        if (now - mem.lastBuild < 20000) return;
+    _build(id, cells, profile) {
+        const mem = this.mem.get(id);
+        if (Date.now() - mem.lastBuild < 18000) return;
 
-        const targetFactories = Math.min(
+        const targetFact = Math.min(
             profile.power >= 70 ? 15 : profile.power >= 40 ? 8 : 4,
             Math.floor(cells.size / 12)
         );
-        if (factories >= targetFactories) return;
-
-        // Строим в клетке без завода
+        let factCount = 0;
         const available = [];
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            if (!this.world.hasBuilding(x, y, 'factory')) available.push([x, y]);
+        for (const c of cells) {
+            const [x, y] = c.split(',').map(Number);
+            if (this.world.hasBuilding(x, y, 'factory')) factCount++;
+            else available.push([x, y]);
         }
-        if (available.length === 0) return;
+        if (factCount >= targetFact || !available.length) return;
 
         const [x, y] = available[Math.floor(Math.random() * available.length)];
         this.world.addBuilding(x, y, 'factory');
-        mem.lastBuild = now;
+        mem.lastBuild = Date.now();
     }
 
-    // =============================================
-    // ДИПЛОМАТИЯ
-    // =============================================
+    // ── Дипломатия ────────────────────────────────────────────────────────────
 
-    _doDiplomacy(countryId, profile, mem, day) {
-        const now = Date.now();
-        if (now - mem.lastDiplomacy < 30000) return;
-        mem.lastDiplomacy = now;
+    _diplomacy(id, profile, mem, day) {
+        if (Date.now() - mem.lastDiplo < 25000) return;
+        mem.lastDiplo = Date.now();
 
-        // Агрессоры могут сами объявлять войны (не исторические)
         if (profile.role === 'aggressor' || profile.role === 'opportunist') {
-            this._considerWar(countryId, profile);
+            this._considerWar(id, profile);
         }
-
-        // Защитники ищут союзников если в опасности
-        if (profile.role === 'defender') {
-            this._seekAlliance(countryId, profile);
+        if (profile.role === 'defender' && this._enemies(id).length > 0) {
+            this._seekAlly(id, profile);
         }
     }
 
-    _considerWar(countryId, profile) {
-        const enemies = this._getEnemies(countryId);
-        if (enemies.length >= 2) return; // уже достаточно войн
-
-        const myPower = this._calcPower(countryId);
-        const neighbors = this._getNeighboringCountries(countryId);
-
-        for (const neighbor of neighbors) {
-            if (this.gameState.isAtWar(countryId, neighbor)) continue;
-            if (this.gameState.areAllies(countryId, neighbor)) continue;
-            if (neighbor === this.gameState.myCountryId) continue;
-
-            const theirPower = this._calcPower(neighbor);
-            const neighborProfile = COUNTRY_PROFILES[neighbor];
-
-            // Атакуем только если значительно сильнее
-            const powerRatio = myPower / Math.max(theirPower, 1);
-            if (powerRatio < 1.5) continue;
-
-            // Идеологические противники атакуются охотнее
-            const ideologyBonus = neighborProfile && neighborProfile.ideology !== profile.ideology ? 1.3 : 1.0;
-            const roll = Math.random();
-
-            if (roll < profile.aggression * 0.05 * ideologyBonus) {
-                this.gameState.addWar(countryId, neighbor);
-                this._pullAlliesIntoWar(countryId, neighbor);
-                addNotification(`⚔️ ${countryId} объявляет войну ${neighbor}!`, 'war');
+    _considerWar(id, profile) {
+        if (this._enemies(id).length >= 2) return;
+        const myPow = this._power(id);
+        for (const nb of this._neighborCountries(id)) {
+            if (this.gs.isAtWar(id, nb) || this.gs.areAllies(id, nb)) continue;
+            if (nb === this.gs.myCountryId) continue;
+            const ratio = myPow / Math.max(this._power(nb), 1);
+            if (ratio < 1.6) continue;
+            const nbProfile = PROFILES[nb];
+            const bonus = nbProfile && nbProfile.ideology !== profile.ideology ? 1.3 : 1.0;
+            if (Math.random() < profile.aggression * 0.04 * bonus) {
+                this.gs.addWar(id, nb);
+                this._pullAllies(id, nb);
+                addNotification(`⚔️ ${id} объявил войну ${nb}!`, 'war');
                 break;
             }
         }
     }
 
-    _seekAlliance(countryId, profile) {
-        const enemies = this._getEnemies(countryId);
-        if (enemies.length === 0) return; // не в опасности
-
-        const neighbors = this._getNeighboringCountries(countryId);
-        for (const neighbor of neighbors) {
-            if (this.gameState.areAllies(countryId, neighbor)) continue;
-            if (this.gameState.isAtWar(countryId, neighbor)) continue;
-
-            const neighborProfile = COUNTRY_PROFILES[neighbor];
-            if (!neighborProfile) continue;
-            // Ищем союзников со схожей идеологией
-            if (neighborProfile.ideology !== profile.ideology && neighborProfile.ideology !== 'neutral') continue;
-
-            if (Math.random() < 0.3) {
-                this.gameState.addAlliance(countryId, neighbor);
-                addNotification(`🤝 ${countryId} и ${neighbor} заключили альянс!`, 'info');
+    _seekAlly(id, profile) {
+        for (const nb of this._neighborCountries(id)) {
+            if (this.gs.areAllies(id, nb) || this.gs.isAtWar(id, nb)) continue;
+            const nbp = PROFILES[nb];
+            if (!nbp || (nbp.ideology !== profile.ideology && nbp.ideology !== 'neutral')) continue;
+            if (Math.random() < 0.25) {
+                this.gs.addAlliance(id, nb);
+                addNotification(`🤝 ${id} и ${nb} заключили альянс!`, 'info');
                 break;
             }
         }
     }
 
-    // =============================================
-    // ВОЕННЫЕ ДЕЙСТВИЯ
-    // =============================================
+    // ── Военные действия ─────────────────────────────────────────────────────
 
-    _doMilitary(countryId, units, enemies, mem, profile) {
-        // Выбираем приоритетного врага — слабейшего соседа
-        let warTarget = mem.warTarget;
-        if (!warTarget || !enemies.includes(warTarget) || this.world.getCountryCells(warTarget).size === 0) {
-            warTarget = this._pickWarTarget(countryId, enemies);
-            mem.warTarget = warTarget;
+    _military(id, units, enemies, mem, profile, day) {
+        // Выбираем цель — ближайшего слабого врага с общей границей
+        if (!mem.warTarget || !enemies.includes(mem.warTarget)
+            || !this.world.getCountryCells(mem.warTarget).size
+            || !this.world.getBorderWith(id, mem.warTarget).length) {
+            mem.warTarget = this._pickTarget(id, enemies);
         }
-        if (!warTarget) return;
+        const target = mem.warTarget;
+        if (!target) return;
 
-        const border = this.world.getBorderWith(countryId, warTarget);
-        if (border.length === 0) {
-            // Нет общей границы — переключаемся
-            mem.warTarget = null;
+        const border = this.world.getBorderWith(id, target);
+        if (!border.length) { mem.warTarget = null; return; }
+
+        // Парсим точки границы один раз
+        const borderPts = border.map(b => { const [x,y]=b.split(',').map(Number); return {x,y}; });
+
+        // Делим юниты: 75% атакуют, 25% держат оборону
+        const attackCount = Math.max(1, Math.ceil(units.length * 0.75));
+        const attackers   = units.slice(0, attackCount);
+        const defenders   = units.slice(attackCount);
+
+        this._moveAttackers(id, attackers, target, borderPts, mem, day);
+        if (defenders.length) this._moveDefenders(id, defenders, enemies);
+    }
+
+    // ── Движение атакующих (с A*) ────────────────────────────────────────────
+
+    _moveAttackers(id, units, target, borderPts, mem, day) {
+        const orders = mem.unitOrders;
+
+        for (let i = 0; i < units.length; i++) {
+            const uid = units[i];
+            if (this.entities.inCombat[uid]) continue;
+
+            const ux = this.entities.x[uid];
+            const uy = this.entities.y[uid];
+
+            // Назначаем точку на границе (распределяем равномерно)
+            const assignedBorder = borderPts[i % borderPts.length];
+
+            const dist = Math.abs(ux - assignedBorder.x) + Math.abs(uy - assignedBorder.y);
+
+            if (dist === 0) {
+                // Стоим на границе — атакуем вражескую клетку рядом
+                this._attackAdjacent(uid, target);
+                continue;
+            }
+
+            if (dist === 1) {
+                // Рядом с границей — попробуем атаковать через неё
+                const attacked = this._attackAdjacent(uid, target);
+                if (!attacked) this._stepAlongPath(uid, orders, assignedBorder, id, day);
+                continue;
+            }
+
+            // Двигаемся по A* к точке границы
+            this._stepAlongPath(uid, orders, assignedBorder, id, day);
+        }
+    }
+
+    // Делаем один шаг по кешированному пути (или строим новый)
+    _stepAlongPath(uid, orders, goal, ownerId, day) {
+        let order = orders.get(uid);
+
+        const needRepath = !order
+            || !order.path.length
+            || order.goal.x !== goal.x || order.goal.y !== goal.y
+            || (day - (order.builtDay || 0)) > this.PATH_CACHE_TTL;
+
+        if (needRepath) {
+            const sx = this.entities.x[uid], sy = this.entities.y[uid];
+            // A* по своей + вражеской территории (передаём null как ownerId чтобы идти везде)
+            const raw = this._findPath(sx, sy, goal.x, goal.y, ownerId);
+            order = { path: raw || [], goal: { ...goal }, builtDay: day };
+            orders.set(uid, order);
+        }
+
+        if (!order.path.length) return; // путь не найден
+
+        // Берём следующую точку из пути
+        const next = order.path[0];
+        const [nx, ny] = next.split(',').map(Number);
+
+        // Клетка занята другим юнитом — пропускаем шаг (не застреваем)
+        if (this.entities.getUnitAt(nx, ny)) {
+            // Пробуем следующую точку в пути
+            if (order.path.length > 1) {
+                const [nx2, ny2] = order.path[1].split(',').map(Number);
+                if (!this.entities.getUnitAt(nx2, ny2)) {
+                    order.path.shift();
+                    this.entities.moveTo(uid, nx2, ny2);
+                    order.path.shift();
+                }
+            }
             return;
         }
 
-        // Разделяем юниты на атакующих (80%) и защитников (20%)
-        const attackCount = Math.ceil(units.length * 0.8);
-        const attackers = units.slice(0, attackCount);
-        const defenders = units.slice(attackCount);
-
-        // Атакующие движутся к границе и атакуют фронтом
-        this._advanceFront(countryId, attackers, warTarget, border, mem);
-
-        // Защитники держатся у своих границ
-        if (defenders.length > 0) {
-            this._holdBorder(countryId, defenders);
-        }
+        this.entities.moveTo(uid, nx, ny);
+        order.path.shift();
     }
 
-    _advanceFront(countryId, units, target, border, mem) {
-        if (mem.attackCooldown > 0) return;
+    // Атакуем соседнюю вражескую клетку (захват)
+    _attackAdjacent(uid, targetCountry) {
+        const ux = this.entities.x[uid], uy = this.entities.y[uid];
+        const owner = this.entities.owner[uid];
 
-        // Распределяем юниты по точкам на границе
-        const borderPts = border.slice(0, Math.min(border.length, units.length)).map(b => {
-            const [x, y] = b.split(',').map(Number);
-            return { x, y };
-        });
-
-        for (let i = 0; i < units.length; i++) {
-            const unitId = units[i];
-            if (this.entities.inCombat[unitId]) continue;
-
-            // Назначаем точку на границе (round-robin)
-            const targetPt = borderPts[i % borderPts.length];
-            if (!targetPt) continue;
-
-            const ux = this.entities.x[unitId];
-            const uy = this.entities.y[unitId];
-            const dist = Math.abs(ux - targetPt.x) + Math.abs(uy - targetPt.y);
-
-            if (dist <= 1) {
-                // Уже у границы — атакуем вражескую клетку
-                this._attackAdjacentEnemy(unitId, target);
-            } else {
-                // Двигаемся к границе
-                this._moveToward(unitId, targetPt.x, targetPt.y, true);
-            }
-        }
-
-        mem.attackCooldown = 2;
-    }
-
-    _attackAdjacentEnemy(unitId, targetCountry) {
-        const ux = this.entities.x[unitId];
-        const uy = this.entities.y[unitId];
-
-        for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const nx = ux + dx, ny = uy + dy;
-            if (this.world.getCell(nx, ny) === targetCountry) {
-                // Захватываем клетку
-                const owner = this.entities.owner[unitId];
+            if (this.world.getCell(nx, ny) !== targetCountry) continue;
+
+            // Есть ли вражеский юнит на этой клетке?
+            const enemyUnit = this.entities.getUnitAt(nx, ny);
+            if (enemyUnit) {
+                // Бой через CombatSystem уже обрабатывается — просто отмечаем inCombat
+                // Дополнительно уменьшаем HP противника напрямую (ИИ наносит урон)
+                this.entities.hp[uid] = Math.max(1, this.entities.hp[uid] - 5);
+                const died = this.entities.damage(enemyUnit, 15);
+                if (died) {
+                    // Враг убит — захватываем клетку
+                    this.world.setCell(nx, ny, owner);
+                    this.entities.moveTo(uid, nx, ny);
+                    this._checkCapitulation(targetCountry, owner);
+                }
+            } else {
+                // Клетка пуста — просто захватываем
                 this.world.setCell(nx, ny, owner);
-                this.entities.moveTo(unitId, nx, ny);
-
-                // Проверяем капитуляцию
-                if (this.world.getCountryCells(targetCountry).size < 3) {
-                    this._handleCapitulation(targetCountry, owner);
-                }
-                break;
+                this.entities.moveTo(uid, nx, ny);
+                this._checkCapitulation(targetCountry, owner);
             }
+            return true;
         }
+        return false;
     }
 
-    _holdBorder(countryId, units) {
-        // Держим юниты у границ со всеми врагами
-        const allEnemies = this._getEnemies(countryId);
-        if (allEnemies.length === 0) return;
+    // ── Движение защитников ───────────────────────────────────────────────────
 
-        for (const unitId of units) {
-            const ux = this.entities.x[unitId];
-            const uy = this.entities.y[unitId];
-
-            // Ищем ближайший вражеский юнит или границу
-            let closestBorderPt = null, closestDist = Infinity;
-            for (const enemy of allEnemies) {
-                const border = this.world.getBorderWith(countryId, enemy);
-                for (const b of border.slice(0, 10)) {
-                    const [bx, by] = b.split(',').map(Number);
-                    const d = Math.abs(ux - bx) + Math.abs(uy - by);
-                    if (d < closestDist) { closestDist = d; closestBorderPt = { x: bx, y: by }; }
-                }
-            }
-
-            if (closestBorderPt && closestDist > 2) {
-                this._moveToward(unitId, closestBorderPt.x, closestBorderPt.y, true);
+    _moveDefenders(id, units, enemies) {
+        // Собираем все точки границы со всеми врагами
+        const borderPts = [];
+        for (const e of enemies) {
+            const b = this.world.getBorderWith(id, e);
+            for (const c of b.slice(0, 20)) {
+                const [x,y] = c.split(',').map(Number);
+                borderPts.push({x,y});
             }
         }
-    }
-
-    // =============================================
-    // ЭКСПАНСИЯ (нейтральные территории)
-    // =============================================
-
-    _doExpansion(countryId, cells, units) {
-        // Ищем нейтральную клетку рядом с нашей территорией
-        const candidates = [];
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                const nx = x + dx, ny = y + dy;
-                if (this.world.getCell(nx, ny) === 0) {
-                    candidates.push({ x: nx, y: ny });
-                }
-            }
-        }
-        if (candidates.length === 0) return;
-
-        const target = candidates[Math.floor(Math.random() * Math.min(candidates.length, 5))];
-
-        // Ближайший юнит движется туда
-        let bestUnit = null, bestDist = Infinity;
-        for (const unitId of units) {
-            const d = Math.abs(this.entities.x[unitId] - target.x) + Math.abs(this.entities.y[unitId] - target.y);
-            if (d < bestDist) { bestDist = d; bestUnit = unitId; }
-        }
-        if (!bestUnit) return;
-
-        if (bestDist <= 1) {
-            // Захватываем
-            this.world.setCell(target.x, target.y, countryId);
-            this.entities.moveTo(bestUnit, target.x, target.y);
-        } else {
-            this._moveToward(bestUnit, target.x, target.y, false);
-        }
-    }
-
-    // =============================================
-    // ОБОРОНА
-    // =============================================
-
-    _doDefend(countryId, cells, units) {
-        // Держим юниты ближе к границам страны
-        const allNeighborCountries = this._getNeighboringCountries(countryId);
-        if (allNeighborCountries.length === 0) return;
-
-        const borderCells = [];
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            const neighbors = [
-                this.world.getCell(x+1, y), this.world.getCell(x-1, y),
-                this.world.getCell(x, y+1), this.world.getCell(x, y-1),
-            ];
-            const isBorder = neighbors.some(n => n !== 0 && n !== countryId);
-            if (isBorder) borderCells.push({ x, y });
-        }
-        if (borderCells.length === 0) return;
+        if (!borderPts.length) return;
 
         for (let i = 0; i < units.length; i++) {
-            const unitId = units[i];
-            const target = borderCells[i % borderCells.length];
-            const ux = this.entities.x[unitId], uy = this.entities.y[unitId];
-            const d = Math.abs(ux - target.x) + Math.abs(uy - target.y);
-            if (d > 1) this._moveToward(unitId, target.x, target.y, true);
-        }
-    }
+            const uid = units[i];
+            if (this.entities.inCombat[uid]) continue;
 
-    // =============================================
-    // ВСПОМОГАТЕЛЬНЫЕ
-    // =============================================
+            const target = borderPts[i % borderPts.length];
+            const dx = Math.sign(target.x - this.entities.x[uid]);
+            const dy = Math.sign(target.y - this.entities.y[uid]);
+            const nx = this.entities.x[uid] + (dx || dy ? dx : 0);
+            const ny = this.entities.y[uid] + (dx ? 0 : dy);
 
-    _moveToward(unitId, tx, ty, stayOnLand) {
-        const ux = this.entities.x[unitId];
-        const uy = this.entities.y[unitId];
-
-        const dx = Math.sign(tx - ux);
-        const dy = Math.sign(ty - uy);
-
-        // Пробуем основное направление, потом альтернативное
-        const moves = [];
-        if (dx !== 0) moves.push([dx, 0]);
-        if (dy !== 0) moves.push([0, dy]);
-        if (dx !== 0 && dy !== 0) moves.push([dx, dy]);
-
-        for (const [mx, my] of moves) {
-            const nx = ux + mx, ny = uy + my;
-            const cell = this.world.getCell(nx, ny);
-            if (stayOnLand && cell === 0) continue;
-            if (!stayOnLand && cell !== 0) continue;
-            if (this.entities.getUnitAt(nx, ny)) continue; // клетка занята
-            this.entities.moveTo(unitId, nx, ny);
-            return;
-        }
-    }
-
-    _pickWarTarget(countryId, enemies) {
-        let weakest = null, weakestPower = Infinity;
-        for (const enemy of enemies) {
-            const cells = this.world.getCountryCells(enemy);
-            if (cells.size === 0) continue;
-            // Проверяем что есть общая граница
-            const border = this.world.getBorderWith(countryId, enemy);
-            if (border.length === 0) continue;
-            const power = this._calcPower(enemy);
-            if (power < weakestPower) { weakestPower = power; weakest = enemy; }
-        }
-        return weakest;
-    }
-
-    _calcPower(countryId) {
-        const profile = COUNTRY_PROFILES[countryId];
-        const base = profile ? profile.power : 20;
-        const cells = this.world.getCountryCells(countryId).size;
-        const units = this.entities.getEntitiesByOwner(countryId).length;
-        return base * 0.4 + cells * 0.4 + units * 0.2;
-    }
-
-    _getEnemies(countryId) {
-        const enemies = [];
-        if (!this.gameState.wars) return enemies;
-        for (const war of this.gameState.wars) {
-            if (war.a === countryId && this.world.getCountryCells(war.b).size > 0) enemies.push(war.b);
-            if (war.b === countryId && this.world.getCountryCells(war.a).size > 0) enemies.push(war.a);
-        }
-        return enemies;
-    }
-
-    _getNeighboringCountries(countryId) {
-        const neighbors = new Set();
-        const cells = this.world.getCountryCells(countryId);
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
-            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                const neighbor = this.world.getCell(x + dx, y + dy);
-                if (neighbor !== 0 && neighbor !== countryId) neighbors.add(neighbor);
+            if (this.world.getCell(nx, ny) !== 0 && !this.entities.getUnitAt(nx, ny)) {
+                this.entities.moveTo(uid, nx, ny);
             }
         }
-        return [...neighbors];
     }
 
-    _countFactories(countryId) {
-        let count = 0;
-        for (const cell of this.world.getCountryCells(countryId)) {
-            const [x, y] = cell.split(',').map(Number);
-            if (this.world.hasBuilding(x, y, 'factory')) count++;
+    // ── Мирное время ─────────────────────────────────────────────────────────
+
+    _peacetime(id, cells, units, profile) {
+        if (profile.role === 'defender') {
+            // Держим у границ
+            const nbs = this._neighborCountries(id);
+            if (!nbs.length) return;
+            const borderPts = [];
+            for (const nb of nbs) {
+                const b = this.world.getBorderWith(id, nb);
+                for (const c of b.slice(0, 10)) {
+                    const [x,y] = c.split(',').map(Number);
+                    borderPts.push({x,y});
+                }
+            }
+            for (let i = 0; i < units.length; i++) {
+                const uid = units[i];
+                const target = borderPts[i % borderPts.length];
+                if (!target) continue;
+                const dx = Math.sign(target.x - this.entities.x[uid]);
+                const dy = Math.sign(target.y - this.entities.y[uid]);
+                if (dx === 0 && dy === 0) continue;
+                const nx = this.entities.x[uid] + dx;
+                const ny = this.entities.y[uid] + (dx ? 0 : dy);
+                if (this.world.getCell(nx, ny) && !this.entities.getUnitAt(nx, ny)) {
+                    this.entities.moveTo(uid, nx, ny);
+                }
+            }
+        } else if (profile.role === 'aggressor' || profile.role === 'opportunist') {
+            // Захватываем нейтральные клетки
+            const candidates = [];
+            for (const c of cells) {
+                const [x,y] = c.split(',').map(Number);
+                for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                    if (this.world.getCell(x+dx, y+dy) === 0) candidates.push({x:x+dx,y:y+dy});
+                }
+            }
+            if (!candidates.length) return;
+            const target = candidates[Math.floor(Math.random() * Math.min(candidates.length, 8))];
+            let bestUnit = null, bestDist = Infinity;
+            for (const uid of units) {
+                const d = Math.abs(this.entities.x[uid]-target.x)+Math.abs(this.entities.y[uid]-target.y);
+                if (d < bestDist) { bestDist = d; bestUnit = uid; }
+            }
+            if (!bestUnit) return;
+            if (bestDist === 0) {
+                this.world.setCell(target.x, target.y, id);
+            } else {
+                const dx = Math.sign(target.x - this.entities.x[bestUnit]);
+                const dy = Math.sign(target.y - this.entities.y[bestUnit]);
+                const nx = this.entities.x[bestUnit] + dx;
+                const ny = this.entities.y[bestUnit] + (dx ? 0 : dy);
+                const cell = this.world.getCell(nx, ny);
+                if (!this.entities.getUnitAt(nx, ny)) {
+                    if (cell === 0) {
+                        this.world.setCell(nx, ny, id);
+                        this.entities.moveTo(bestUnit, nx, ny);
+                    } else if (cell === id) {
+                        this.entities.moveTo(bestUnit, nx, ny);
+                    }
+                }
+            }
         }
-        return count;
     }
 
-    _handleCapitulation(countryId, winner) {
+    // ── A* (обёртка, умеет идти через вражескую территорию) ─────────────────
+
+    _findPath(sx, sy, ex, ey, ownerId) {
+        // Патчим A* — разрешаем идти по своей И вражеской земле
+        const origGetCell = this.world.getCell.bind(this.world);
+        // Временно делаем A* без ограничения на владельца
+        const path = this._astarFree(sx, sy, ex, ey, 150);
+        return path;
+    }
+
+    // Простой A* без ограничений на владельца клетки (только вода = нельзя)
+    _astarFree(sx, sy, ex, ey, maxSteps) {
+        const h = (x, y) => Math.abs(x-ex)+Math.abs(y-ey);
+        const open = [{ x:sx, y:sy, f:h(sx,sy), g:0 }];
+        const cameFrom = new Map();
+        const gScore = new Map();
+        gScore.set(`${sx},${sy}`, 0);
+
+        let steps = 0;
+        while (open.length && steps++ < maxSteps) {
+            // Находим минимальный f
+            let minI = 0;
+            for (let i = 1; i < open.length; i++) if (open[i].f < open[minI].f) minI = i;
+            const cur = open.splice(minI, 1)[0];
+            const curKey = `${cur.x},${cur.y}`;
+
+            if (cur.x === ex && cur.y === ey) {
+                // Восстанавливаем путь
+                const path = [];
+                let node = curKey;
+                while (cameFrom.has(node)) { path.unshift(node); node = cameFrom.get(node); }
+                return path;
+            }
+
+            for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                const nx = cur.x+dx, ny = cur.y+dy;
+                const nKey = `${nx},${ny}`;
+                const cell = this.world.getCell(nx, ny);
+                if (cell === 0) continue; // вода/пусто — нельзя
+
+                const ng = cur.g + 1;
+                if (!gScore.has(nKey) || ng < gScore.get(nKey)) {
+                    gScore.set(nKey, ng);
+                    cameFrom.set(nKey, curKey);
+                    open.push({ x:nx, y:ny, f: ng + h(nx,ny), g: ng });
+                }
+            }
+        }
+        return null; // путь не найден
+    }
+
+    // ── Капитуляция ───────────────────────────────────────────────────────────
+
+    _checkCapitulation(countryId, winner) {
         const cells = this.world.getCountryCells(countryId);
-        for (const cell of cells) {
-            const [x, y] = cell.split(',').map(Number);
+        if (cells.size > 3) return;
+
+        // Передаём все оставшиеся клетки победителю
+        for (const c of [...cells]) {
+            const [x,y] = c.split(',').map(Number);
             this.world.setCell(x, y, winner);
         }
-        const units = this.entities.getEntitiesByOwner(countryId);
-        for (const unitId of units) this.entities.removeEntity(unitId);
-
-        this.gameState.wars = this.gameState.wars.filter(w => w.a !== countryId && w.b !== countryId);
-        const newAlliances = [];
-        for (const alliance of this.gameState.alliances) {
-            const na = new Set(alliance);
-            na.delete(countryId);
-            if (na.size > 1) newAlliances.push(na);
+        // Удаляем юниты
+        for (const uid of this.entities.getEntitiesByOwner(countryId)) {
+            this.entities.removeEntity(uid);
         }
-        this.gameState.alliances = newAlliances;
+        // Убираем из войн и альянсов
+        this.gs.wars = this.gs.wars.filter(w => w.a !== countryId && w.b !== countryId);
+        this.gs.alliances = this.gs.alliances
+            .map(a => { const s=new Set(a); s.delete(countryId); return s; })
+            .filter(a => a.size > 1);
+
+        // Сбрасываем цели ИИ которые были на эту страну
+        for (const [, m] of this.mem) { if (m.warTarget === countryId) m.warTarget = null; }
 
         addNotification(`💀 ${countryId} капитулировал перед ${winner}!`, 'war');
 
-        if (countryId === this.gameState.myCountryId) {
+        if (countryId === this.gs.myCountryId) {
             addNotification('💀 ВАША СТРАНА КАПИТУЛИРОВАЛА! Игра окончена.', 'war');
-            this.gameState.setGameSpeed(0);
-            this.gameState.isGameActive = false;
+            this.gs.setGameSpeed(0);
+            this.gs.isGameActive = false;
         }
+    }
+
+    // ── Вспомогательные ──────────────────────────────────────────────────────
+
+    _enemies(id) {
+        if (!this.gs.wars) return [];
+        return this.gs.wars.flatMap(w => {
+            if (w.a === id && this.world.getCountryCells(w.b).size) return [w.b];
+            if (w.b === id && this.world.getCountryCells(w.a).size) return [w.a];
+            return [];
+        });
+    }
+
+    _neighborCountries(id) {
+        const res = new Set();
+        for (const c of this.world.getCountryCells(id)) {
+            const [x,y] = c.split(',').map(Number);
+            for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                const nb = this.world.getCell(x+dx, y+dy);
+                if (nb && nb !== id) res.add(nb);
+            }
+        }
+        return [...res];
+    }
+
+    _power(id) {
+        const p  = PROFILES[id];
+        const base = p ? p.power : 20;
+        return base * 0.4
+             + this.world.getCountryCells(id).size * 0.4
+             + this.entities.getEntitiesByOwner(id).length * 0.2;
+    }
+
+    _pickTarget(id, enemies) {
+        let best = null, bestScore = Infinity;
+        for (const e of enemies) {
+            if (!this.world.getBorderWith(id, e).length) continue;
+            const score = this._power(e);
+            if (score < bestScore) { bestScore = score; best = e; }
+        }
+        return best;
     }
 }
