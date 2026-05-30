@@ -56,10 +56,13 @@ export class RendererWebGL {
         ctx.fillStyle = '#1a3a4a';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Вычисляем видимые клетки
-        const invZoom = 1 / this.camera.zoom;
+        const zoom = this.camera.zoom;
+        const invZoom = 1 / zoom;
         const halfWidth = this.canvas.width / 2 * invZoom;
         const halfHeight = this.canvas.height / 2 * invZoom;
+        const camX = this.canvas.width / 2 - this.camera.x * zoom;
+        const camY = this.canvas.height / 2 - this.camera.y * zoom;
+        const size = 20 * zoom;
         
         let startX = Math.floor((this.camera.x - halfWidth) / 20);
         let endX = Math.ceil((this.camera.x + halfWidth) / 20);
@@ -71,38 +74,67 @@ export class RendererWebGL {
         startY = Math.max(startY, bounds.minY - 1);
         endY = Math.min(endY, bounds.maxY + 1);
         
-        let cellsDrawn = 0;
+        // Группируем клетки по цвету для пакетного рисования
+        const colorBuckets = new Map();
         
-        // Рисуем клетки
         for (let x = startX; x <= endX; x++) {
             for (let y = startY; y <= endY; y++) {
                 const owner = world.getCell(x, y);
                 if (owner === 0) continue;
                 
-                const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
-                const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
-                const size = 20 * this.camera.zoom;
+                const screenX = x * 20 * zoom + camX;
+                const screenY = y * 20 * zoom + camY;
                 
                 if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
                     screenY + size < -50 || screenY > this.canvas.height + 50) continue;
                 
-                // Цвет страны
-                ctx.fillStyle = this.getCountryColor(owner);
-                ctx.fillRect(screenX, screenY, size, size);
-                
-                // Граница
-                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-                ctx.lineWidth = 0.5;
-                ctx.strokeRect(screenX, screenY, size, size);
-                
-                // Иконки построек
-                if (size > 12) {
+                const color = this.getCountryColor(owner);
+                if (!colorBuckets.has(color)) colorBuckets.set(color, []);
+                colorBuckets.get(color).push(screenX, screenY);
+            }
+        }
+        
+        // Рисуем все клетки одного цвета за один проход
+        let cellsDrawn = 0;
+        for (const [color, coords] of colorBuckets) {
+            ctx.fillStyle = color;
+            for (let i = 0; i < coords.length; i += 2) {
+                ctx.fillRect(coords[i], coords[i + 1], size, size);
+                cellsDrawn++;
+            }
+        }
+        
+        // Границы — один общий Path2D (гораздо быстрее чем strokeRect на каждую клетку)
+        if (size > 4) {
+            const borderPath = new Path2D();
+            for (const [color, coords] of colorBuckets) {
+                for (let i = 0; i < coords.length; i += 2) {
+                    borderPath.rect(coords[i], coords[i + 1], size, size);
+                }
+            }
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 0.5;
+            ctx.stroke(borderPath);
+        }
+        
+        // Иконки построек (только если достаточно зума)
+        if (size > 12) {
+            const emojiSize = Math.max(8, Math.min(14, size * 0.55));
+            ctx.font = `${emojiSize}px "Segoe UI Emoji"`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            
+            for (let x = startX; x <= endX; x++) {
+                for (let y = startY; y <= endY; y++) {
+                    const owner = world.getCell(x, y);
+                    if (owner === 0) continue;
+                    
                     const hasPort = world.hasBuilding(x, y, 'port');
                     const hasFactory = world.hasBuilding(x, y, 'factory');
+                    if (!hasPort && !hasFactory) continue;
                     
-                    ctx.font = `${Math.max(8, Math.min(14, size * 0.55))}px "Segoe UI Emoji"`;
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
+                    const screenX = x * 20 * zoom + camX;
+                    const screenY = y * 20 * zoom + camY;
                     
                     let yOffset = 2;
                     if (hasPort) {
@@ -115,31 +147,25 @@ export class RendererWebGL {
                         ctx.fillText('🏭', screenX + 2, screenY + yOffset);
                     }
                 }
-                
-                cellsDrawn++;
             }
         }
         
         // Рисуем юнитов
         let unitsDrawn = 0;
+        const unitFontSize = Math.max(12, size * 0.7);
+        ctx.font = `${unitFontSize}px "Segoe UI Emoji"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
         for (let i = 1; i < entities.nextId; i++) {
             if (!entities.active[i]) continue;
             
-            const x = entities.x[i];
-            const y = entities.y[i];
-            
-            const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
-            const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
-            const size = 20 * this.camera.zoom;
+            const screenX = entities.x[i] * 20 * zoom + camX;
+            const screenY = entities.y[i] * 20 * zoom + camY;
             
             if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
                 screenY + size < -50 || screenY > this.canvas.height + 50) continue;
             
-            ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji"`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            // Цвет юнита в зависимости от владельца
             if (entities.owner[i] === gameState.myCountryId) {
                 ctx.fillStyle = '#ffffff';
             } else if (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
@@ -151,7 +177,6 @@ export class RendererWebGL {
             const icon = entities.type[i] === 0 ? '💂' : '🚜';
             ctx.fillText(icon, screenX + size / 2, screenY + size / 2);
             
-            // HP бар
             if (entities.hp[i] < entities.maxHp[i] && size > 15) {
                 const hpPercent = entities.hp[i] / entities.maxHp[i];
                 const barWidth = size * 0.6;
@@ -170,12 +195,8 @@ export class RendererWebGL {
         // Выделенный юнит
         const selectedId = gameState.selectedUnitId;
         if (selectedId && entities.active[selectedId]) {
-            const x = entities.x[selectedId];
-            const y = entities.y[selectedId];
-            
-            const screenX = (x * 20 - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
-            const screenY = (y * 20 - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
-            const size = 20 * this.camera.zoom;
+            const screenX = entities.x[selectedId] * 20 * zoom + camX;
+            const screenY = entities.y[selectedId] * 20 * zoom + camY;
             
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
@@ -186,7 +207,7 @@ export class RendererWebGL {
         this.frameCount++;
         if (this.frameCount >= 60) {
             this.frameCount = 0;
-            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов, всего юнитов: ${entities.nextId - 1}`);
+            console.log(`🎨 Рендер: ${cellsDrawn} клеток, ${unitsDrawn} юнитов`);
         }
     }
     

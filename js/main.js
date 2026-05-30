@@ -369,12 +369,14 @@ function startGameLoop() {
         if (dayAccumulator >= DAY_DURATION && gameState.gameSpeed > 0 && gameState.isGameActive) {
             dayAccumulator = 0;
             gameState.advanceDay();
-            if (topBar) topBar.update();
             
             if (economy) economy.update();
             if (supply) supply.update();
             if (combat) combat.update();
             if (movement) movement.update();
+            if (tech) tech.update();
+            if (focus) focus.update();
+            if (topBar) topBar.update(); // только раз в день
             
             if (gameState.days % 30 === 0 && gameState.days > 0) {
                 saveGame();
@@ -385,8 +387,6 @@ function startGameLoop() {
         if (gameState.isGameActive && renderer) {
             renderer.render(world, entities, gameState);
         }
-        
-        if (topBar) topBar.update();
         
         animationFrameId = requestAnimationFrame(loop);
     }
@@ -400,9 +400,7 @@ function updateGame() {
     if (gameState.gameSpeed > 0 && Math.random() < 0.1 && aiController) {
         aiController.update();
     }
-    
-    if (tech) tech.update();
-    if (focus) focus.update();
+    // tech и focus теперь только в дневном тике (раз в секунду), не каждый фрейм
 }
 
 function updateSpeedButtons(speed) {
