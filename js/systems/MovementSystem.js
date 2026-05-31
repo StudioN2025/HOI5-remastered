@@ -9,7 +9,8 @@ export class MovementSystem {
         // unitId → { path: ['x,y',...], targetX, targetY }
         this.orders   = new Map();
         // Шагаем раз в N дней (скорость движения)
-        this.MOVE_EVERY = 2; // 1 клетка каждые 2 игровых дня
+        this.MOVE_EVERY = 1; // каждый день
+        this.STEPS_PER_DAY = 2; // 2 клетки за раз
         this.dayCounter = 0;
     }
 
@@ -58,40 +59,35 @@ export class MovementSystem {
             const e = this.entities;
             if (!e.active[unitId]) { this.orders.delete(unitId); continue; }
             if (e.inCombat[unitId]) continue;
-            if (!order.path.length)  { this.orders.delete(unitId); continue; }
+            if (!order.path.length) { this.orders.delete(unitId); continue; }
 
-            const next = order.path[0];
-            const [nx, ny] = next.split(',').map(Number);
+            for (let step = 0; step < this.STEPS_PER_DAY; step++) {
+                if (!order.path.length) { this.orders.delete(unitId); break; }
 
-            // Клетка занята своим юнитом — пропускаем шаг
-            const occupant = this.entities.getUnitAt(nx, ny);
-            if (occupant && occupant !== unitId) {
-                // Пробуем следующую точку
-                if (order.path.length > 1) {
-                    const [nx2, ny2] = order.path[1].split(',').map(Number);
-                    if (!this.entities.getUnitAt(nx2, ny2)) {
-                        order.path.shift();
-                        e.moveTo(unitId, nx2, ny2);
-                        order.path.shift();
+                const next = order.path[0];
+                const [nx, ny] = next.split(',').map(Number);
+
+                const occupant = this.entities.getUnitAt(nx, ny);
+                if (occupant && occupant !== unitId) {
+                    if (order.path.length > 1) {
+                        const [nx2, ny2] = order.path[1].split(',').map(Number);
+                        if (!this.entities.getUnitAt(nx2, ny2) && this.world.getCell(nx2, ny2) !== 0) {
+                            order.path.shift();
+                            e.moveTo(unitId, nx2, ny2);
+                            order.path.shift();
+                        }
                     }
+                    break;
                 }
-                continue;
-            }
 
-            const cellOwner = this.world.getCell(nx, ny);
-            // Разрешаем идти по своей и союзной территории, и через вражескую в военное время
-            if (cellOwner === 0) {
-                // вода — пересчитываем путь
-                this.orders.delete(unitId);
-                addNotification('Путь заблокирован водой!', 'war');
-                continue;
-            }
+                if (this.world.getCell(nx, ny) === 0) {
+                    this.orders.delete(unitId);
+                    addNotification('Путь заблокирован водой!', 'war');
+                    break;
+                }
 
-            e.moveTo(unitId, nx, ny);
-            order.path.shift();
-
-            if (!order.path.length) {
-                this.orders.delete(unitId);
+                e.moveTo(unitId, nx, ny);
+                order.path.shift();
             }
         }
     }
