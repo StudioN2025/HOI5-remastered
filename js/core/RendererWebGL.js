@@ -201,8 +201,66 @@ export class RendererWebGL {
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
             ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
+
+            // Линия к цели если есть приказ
+            // (путь хранится в movementSystem — не тянем сюда, просто подсветка достаточна)
         }
-        
+
+        // Отрисовка очередей обучения и строительства
+        if (size > 8 && gameState.trainingQueue) {
+            for (const item of gameState.trainingQueue) {
+                const sx = item.x * 20 * zoom + camX;
+                const sy = item.y * 20 * zoom + camY;
+                if (sx < -size || sx > this.canvas.width + size || sy < -size || sy > this.canvas.height + size) continue;
+
+                // Полупрозрачный синий квадрат
+                ctx.fillStyle = 'rgba(59,130,246,0.35)';
+                ctx.fillRect(sx, sy, size, size);
+
+                // Прогресс-бар снизу
+                const pct = 1 - item.daysLeft / item.totalDays;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(sx, sy + size - 4, size, 4);
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillRect(sx, sy + size - 4, size * pct, 4);
+
+                // Иконка
+                if (size > 14) {
+                    ctx.font = `${Math.max(10, size * 0.55)}px "Segoe UI Emoji"`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(item.type === 'infantry' ? '🪖' : '🛡️', sx + size / 2, sy + size / 2 - 2);
+                }
+            }
+        }
+
+        if (size > 8 && gameState.constructionQueue) {
+            for (const item of gameState.constructionQueue) {
+                const sx = item.x * 20 * zoom + camX;
+                const sy = item.y * 20 * zoom + camY;
+                if (sx < -size || sx > this.canvas.width + size || sy < -size || sy > this.canvas.height + size) continue;
+
+                // Полупрозрачный жёлтый квадрат
+                ctx.fillStyle = 'rgba(234,179,8,0.35)';
+                ctx.fillRect(sx, sy, size, size);
+
+                const pct = 1 - item.daysLeft / item.totalDays;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(sx, sy + size - 4, size, 4);
+                ctx.fillStyle = '#eab308';
+                ctx.fillRect(sx, sy + size - 4, size * pct, 4);
+
+                if (size > 14) {
+                    ctx.font = `${Math.max(10, size * 0.55)}px "Segoe UI Emoji"`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('🏗️', sx + size / 2, sy + size / 2 - 2);
+                }
+            }
+        }
+
         // Лог производительности
         this.frameCount++;
         if (this.frameCount >= 60) {

@@ -27,6 +27,12 @@ export class GameState {
         
         this.selectedUnitId = null;
         this.activeBattles = [];
+
+        // Очереди производства игрока
+        // { x, y, type, daysLeft, totalDays }
+        this.trainingQueue    = [];
+        // { x, y, buildingType, daysLeft, totalDays }
+        this.constructionQueue = [];
     }
     
     advanceDay() {
@@ -82,7 +88,9 @@ export class GameState {
             activeFocus: this.activeFocus ? { ...this.activeFocus } : null,
             completedFocuses: [...this.completedFocuses],
             selectedUnitId: this.selectedUnitId,
-            activeBattles: this.activeBattles.map(b => ({ ...b }))
+            activeBattles: this.activeBattles.map(b => ({ ...b })),
+            trainingQueue: this.trainingQueue.map(q => ({ ...q })),
+            constructionQueue: this.constructionQueue.map(q => ({ ...q })),
         };
     }
     
@@ -104,5 +112,7 @@ export class GameState {
         this.completedFocuses = new Set(data.completedFocuses || []);
         this.selectedUnitId = data.selectedUnitId;
         this.activeBattles = data.activeBattles || [];
+        this.trainingQueue = data.trainingQueue || [];
+        this.constructionQueue = data.constructionQueue || [];
     }
 }

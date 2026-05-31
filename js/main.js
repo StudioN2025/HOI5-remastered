@@ -17,6 +17,7 @@ import { SupplySystem } from './systems/SupplySystem.js';
 import { DiplomacySystem } from './systems/DiplomacySystem.js';
 import { TechSystem } from './systems/TechSystem.js';
 import { FocusSystem } from './systems/FocusSystem.js';
+import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
 
 // Глобальные экземпляры
@@ -36,6 +37,7 @@ let supply = null;
 let diplomacy = null;
 let tech = null;
 let focus = null;
+let queue = null;
 
 let animationFrameId = null;
 let lastTimestamp = 0;
@@ -133,37 +135,48 @@ function setupEvents() {
         uiManager.closeWindow();
         window._recruitMode = type;
         const hint = document.getElementById('recruit-hint');
-        if (hint) hint.classList.remove('hidden');
-        addNotification(`Выберите провинцию для найма ${type}`, 'info');
+        if (hint) {
+            const costs = { infantry: '100 снаряж. / 1000 манмощи / 30 дней', tank: '800 снаряж. / 500 манмощи / 60 дней' };
+            hint.innerHTML = `🪖 Выберите клетку для обучения (${costs[type] || type}) — ЛКМ`;
+            hint.classList.remove('hidden');
+        }
+        addNotification(`Выберите провинцию для обучения ${type}`, 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
             window._recruitMode = null;
-        }, 15000);
+        }, 20000);
     };
-    
+
     window.selectBuildType = (type) => {
         uiManager.closeWindow();
         window._pendingBuild = type;
         const hint = document.getElementById('build-hint');
-        if (hint) hint.classList.remove('hidden');
+        if (hint) {
+            const costs = { factory: '500 снаряж. / 90 дней', port: '300 снаряж. / 60 дней' };
+            hint.innerHTML = `🏗️ Выберите клетку для строительства (${costs[type] || type}) — ЛКМ`;
+            hint.classList.remove('hidden');
+        }
         addNotification(`Выберите провинцию для строительства`, 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
             window._pendingBuild = null;
-        }, 15000);
+        }, 20000);
     };
-    
+
     window.selectUnitForMove = (unitId) => {
         gameState.selectedUnitId = unitId;
         uiManager.closeWindow();
         const hint = document.getElementById('order-hint');
-        if (hint) hint.classList.remove('hidden');
-        addNotification(`Выберите цель для движения`, 'info');
+        if (hint) {
+            hint.innerHTML = '⚔️ Выбран юнит — ЛКМ куда идти, ПКМ отмена';
+            hint.classList.remove('hidden');
+        }
+        addNotification(`Юнит выбран — ЛКМ для указания цели`, 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
-        }, 10000);
+        }, 15000);
     };
-    
+
     window.startResearch = (type, level) => {
         tech.startResearch(type, level);
         uiManager.openWindow('research');
@@ -211,22 +224,14 @@ function setupEvents() {
 
 function handleCanvasClick(e) {
     if (!gameState.isGameActive) return;
-    
+
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
-    
-    // Режим найма
+
+    // Режим найма → теперь через очередь обучения
     if (window._recruitMode) {
         if (cellOwner === gameState.myCountryId) {
-            const typeNum = window._recruitMode === 'infantry' ? 0 : 1;
-            const unitId = entities.createEntity(gameState.myCountryId, typeNum, worldPos.x, worldPos.y);
-            if (unitId) {
-                const cost = window._recruitMode === 'infantry' ? 100 : 800;
-                const manpower = window._recruitMode === 'infantry' ? 1000 : 500;
-                gameState.equipment -= cost;
-                gameState.manpower -= manpower;
-                addNotification(`Юнит нанят!`, 'info');
-            }
+            economy.enqueueTraining(worldPos.x, worldPos.y, window._recruitMode);
         } else {
             addNotification('Можно нанимать только на своей территории!', 'war');
         }
@@ -234,14 +239,11 @@ function handleCanvasClick(e) {
         document.getElementById('recruit-hint')?.classList.add('hidden');
         return;
     }
-    
-    // Режим строительства
+
+    // Режим строительства → через очередь строительства
     if (window._pendingBuild) {
         if (cellOwner === gameState.myCountryId) {
-            world.addBuilding(worldPos.x, worldPos.y, window._pendingBuild);
-            const cost = window._pendingBuild === 'factory' ? 500 : 300;
-            gameState.equipment -= cost;
-            addNotification(`Строительство начато!`, 'info');
+            economy.enqueueBuilding(worldPos.x, worldPos.y, window._pendingBuild);
         } else {
             addNotification('Можно строить только на своей территории!', 'war');
         }
@@ -249,37 +251,27 @@ function handleCanvasClick(e) {
         document.getElementById('build-hint')?.classList.add('hidden');
         return;
     }
-    
-    // Выбран юнит
+
+    // Есть выбранный юнит → ЛКМ по карте = приказ на движение / атаку
     if (gameState.selectedUnitId !== null) {
         const unitId = gameState.selectedUnitId;
-        
-        if (cellOwner !== 0 && gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
-            const targetUnit = entities.getUnitAt(worldPos.x, worldPos.y);
-            if (targetUnit && entities.owner[targetUnit] === cellOwner) {
-                if (combat.startCombat) combat.startCombat(unitId, targetUnit);
-            } else {
-                movement.giveOrder(unitId, worldPos.x, worldPos.y);
-            }
-        } else if (cellOwner === gameState.myCountryId || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
+
+        if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
+            // Цель — вражеская территория: двигаемся к ней
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
+        } else if (cellOwner === gameState.myCountryId
+            || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
+            movement.giveOrder(unitId, worldPos.x, worldPos.y);
+        } else {
+            addNotification('Нельзя идти туда!', 'war');
         }
-        
+
         gameState.selectedUnitId = null;
         document.getElementById('order-hint')?.classList.add('hidden');
         return;
     }
-    
-    // Выбор юнита
-    const unitId = entities.getUnitAt(worldPos.x, worldPos.y);
-    if (unitId !== null && entities.owner[unitId] === gameState.myCountryId) {
-        gameState.selectedUnitId = unitId;
-        document.getElementById('order-hint')?.classList.remove('hidden');
-        addNotification(`Юнит выбран. ПКМ для отмены.`, 'info');
-        return;
-    }
-    
-    // Показ информации о стране
+
+    // Клик по клетке без выбранного юнита — показываем информацию о стране
     if (cellOwner !== 0) {
         uiManager.showCountryInfo(cellOwner, { x: worldPos.x, y: worldPos.y });
     }
@@ -287,17 +279,35 @@ function handleCanvasClick(e) {
 
 function handleCanvasRightClick(e) {
     e.preventDefault();
-    
     if (!gameState.isGameActive) return;
-    
+
+    // Отменяем режимы
+    if (window._recruitMode || window._pendingBuild) {
+        window._recruitMode = null;
+        window._pendingBuild = null;
+        document.getElementById('recruit-hint')?.classList.add('hidden');
+        document.getElementById('build-hint')?.classList.add('hidden');
+        return;
+    }
+
+    // Если юнит уже выбран — снимаем выбор
     if (gameState.selectedUnitId !== null) {
         gameState.selectedUnitId = null;
         document.getElementById('order-hint')?.classList.add('hidden');
-        addNotification(`Выбор отменён`, 'info');
         return;
     }
-    
+
+    // ПКМ по юниту игрока — выбрать его
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
+    const unitId = entities.getUnitAt(worldPos.x, worldPos.y);
+    if (unitId !== null && entities.owner[unitId] === gameState.myCountryId) {
+        gameState.selectedUnitId = unitId;
+        document.getElementById('order-hint')?.classList.remove('hidden');
+        addNotification('Юнит выбран — ЛКМ чтобы указать цель', 'info');
+        return;
+    }
+
+    // ПКМ по чужой клетке — инфо о стране
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
     if (cellOwner !== 0) {
         uiManager.showCountryInfo(cellOwner, { x: worldPos.x, y: worldPos.y });
