@@ -9,7 +9,7 @@ export class MovementSystem {
         // unitId → { path: ['x,y',...], targetX, targetY }
         this.orders   = new Map();
         // Шагаем раз в N дней (скорость движения)
-        this.MOVE_EVERY = 1; // 1 клетка в день
+        this.MOVE_EVERY = 2; // 1 клетка каждые 2 игровых дня
         this.dayCounter = 0;
     }
 

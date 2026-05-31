@@ -361,7 +361,10 @@ function startGameLoop() {
     let accumulator = 0;
     const TICK_DURATION = 1000 / 60;
     let dayAccumulator = 0;
-    const DAY_DURATION = 1000;
+    // Длительность одного игрового дня в мс при скорости 1
+    // 3000ms = 1 клетка каждые 3 секунды на скорости 1 (комфортно)
+    const BASE_DAY_MS = 3000;
+    const SPEED_MULTIPLIERS = { 1: 1.0, 2: 2.5, 3: 6.0, 4: 15.0, 5: 40.0 };
     
     function loop(now) {
         let delta = Math.min(100, now - lastTick);
@@ -376,7 +379,7 @@ function startGameLoop() {
             accumulator -= TICK_DURATION;
         }
         
-        if (dayAccumulator >= DAY_DURATION && gameState.gameSpeed > 0 && gameState.isGameActive) {
+        if (dayAccumulator >= BASE_DAY_MS / (SPEED_MULTIPLIERS[gameState.gameSpeed] || 1) && gameState.gameSpeed > 0 && gameState.isGameActive) {
             dayAccumulator = 0;
             gameState.advanceDay();
             
