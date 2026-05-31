@@ -1,4 +1,4 @@
-// World.js — Упрощённая версия с Map
+// World.js — Упрощённая версия с Map (с защитой от воды)
 
 export class World {
     constructor() {
@@ -12,6 +12,14 @@ export class World {
         const key = `${x},${y}`;
         const oldId = this.cells.get(key);
         
+        // ✅ ЗАЩИТА: НЕЛЬЗЯ СОЗДАВАТЬ КЛЕТКИ НА ВОДЕ
+        // Вода = 0 (пустая клетка). Нельзя заменить 0 на страну, если клетка была водой
+        // Но если клетка уже принадлежит какой-то стране, то можно менять владельца
+        if (oldId === 0 && countryId !== 0) {
+            console.warn(`❌ Попытка создать клетку на воде (${x},${y}) — запрещено!`);
+            return;
+        }
+        
         if (oldId !== countryId) {
             this.cells.set(key, countryId);
             
@@ -22,7 +30,7 @@ export class World {
             this.bounds.maxY = Math.max(this.bounds.maxY, y);
             
             // Обновляем кэш стран
-            if (oldId !== undefined) {
+            if (oldId !== undefined && oldId !== 0) {
                 const oldSet = this.countryCache.get(oldId);
                 if (oldSet) oldSet.delete(key);
             }
@@ -42,6 +50,11 @@ export class World {
     
     addBuilding(x, y, buildingType) {
         const key = `${x},${y}`;
+        // ✅ НЕЛЬЗЯ СТРОИТЬ НА ВОДЕ
+        if (this.getCell(x, y) === 0) {
+            console.warn(`❌ Попытка построить ${buildingType} на воде (${x},${y}) — запрещено!`);
+            return;
+        }
         if (!this.buildings.has(key)) {
             this.buildings.set(key, new Set());
         }
@@ -104,12 +117,17 @@ export class World {
         const world = new World();
         for (const [key, owner] of data.cells) {
             const [x, y] = key.split(',').map(Number);
-            world.setCell(x, y, owner);
+            // При десериализации пропускаем воду (owner === 0)
+            if (owner !== 0) {
+                world.setCell(x, y, owner);
+            }
         }
         for (const [key, buildings] of data.buildings) {
             for (const building of buildings) {
                 const [x, y] = key.split(',').map(Number);
-                world.addBuilding(x, y, building);
+                if (world.getCell(x, y) !== 0) {
+                    world.addBuilding(x, y, building);
+                }
             }
         }
         world.bounds = data.bounds;
