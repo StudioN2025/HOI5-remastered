@@ -142,7 +142,7 @@ export class MovementSystem {
             return;
         }
         
-        // Проверяем, не вода ли
+        // ✅ ПРОВЕРКА: НЕЛЬЗЯ ХОДИТЬ ПО ВОДЕ
         if (this.world.getCell(nx, ny) === 0) {
             this.orders.delete(unitId);
             addNotification('Путь заблокирован водой!', 'war');
@@ -221,7 +221,7 @@ export class MovementSystem {
         }
     }
     
-    // A* по суше
+    // A* по суше (запрещает ходить по воде)
     _findPath(sx, sy, ex, ey, ownerId) {
         const MAX = 300;
         const h = (x, y) => Math.abs(x - ex) + Math.abs(y - ey);
@@ -252,6 +252,7 @@ export class MovementSystem {
             for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
                 const nx = cur.x + dx, ny = cur.y + dy;
                 const nk = `${nx},${ny}`;
+                // ✅ НЕЛЬЗЯ ХОДИТЬ ПО ВОДЕ
                 const cell = this.world.getCell(nx, ny);
                 if (cell === 0) continue;
                 const ng = cur.g + 1;
