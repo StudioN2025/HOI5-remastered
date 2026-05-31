@@ -1,4 +1,4 @@
-// RendererWebGL.js — Полный рендер с юнитами
+// RendererWebGL.js — Полный рендер с плавной интерполяцией юнитов
 
 export class RendererWebGL {
     constructor(canvasId) {
@@ -7,6 +7,8 @@ export class RendererWebGL {
         
         this.camera = { x: 0, y: 0, zoom: 0.6 };
         this.cameraInitialized = false;
+        
+        this.movementSystem = null; // Будет установлен из main.js
         
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -150,7 +152,7 @@ export class RendererWebGL {
             }
         }
         
-        // Рисуем юнитов
+        // Рисуем юнитов с плавной интерполяцией
         let unitsDrawn = 0;
         const unitFontSize = Math.max(12, size * 0.7);
         ctx.font = `${unitFontSize}px "Segoe UI Emoji"`;
@@ -160,12 +162,27 @@ export class RendererWebGL {
         for (let i = 1; i < entities.nextId; i++) {
             if (!entities.active[i]) continue;
             
-            const screenX = entities.x[i] * 20 * zoom + camX;
-            const screenY = entities.y[i] * 20 * zoom + camY;
+            // Получаем интерполированную позицию из MovementSystem
+            let renderX = entities.x[i];
+            let renderY = entities.y[i];
+            let isMoving = false;
+            let moveProgress = 0;
+            
+            if (this.movementSystem) {
+                const interp = this.movementSystem.getInterpolatedPosition(i);
+                renderX = interp.x;
+                renderY = interp.y;
+                isMoving = interp.isMoving;
+                moveProgress = interp.progress || 0;
+            }
+            
+            const screenX = renderX * 20 * zoom + camX;
+            const screenY = renderY * 20 * zoom + camY;
             
             if (screenX + size < -50 || screenX > this.canvas.width + 50 || 
                 screenY + size < -50 || screenY > this.canvas.height + 50) continue;
             
+            // Цвет юнита
             if (entities.owner[i] === gameState.myCountryId) {
                 ctx.fillStyle = '#ffffff';
             } else if (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, entities.owner[i])) {
@@ -174,9 +191,19 @@ export class RendererWebGL {
                 ctx.fillStyle = '#cccccc';
             }
             
+            // Лёгкое свечение для движущихся юнитов
+            if (isMoving) {
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = '#fbbf24';
+            }
+            
             const icon = entities.type[i] === 0 ? '💂' : '🚜';
             ctx.fillText(icon, screenX + size / 2, screenY + size / 2);
             
+            // Сбрасываем тень
+            ctx.shadowBlur = 0;
+            
+            // HP бар
             if (entities.hp[i] < entities.maxHp[i] && size > 15) {
                 const hpPercent = entities.hp[i] / entities.maxHp[i];
                 const barWidth = size * 0.6;
@@ -195,15 +222,21 @@ export class RendererWebGL {
         // Выделенный юнит
         const selectedId = gameState.selectedUnitId;
         if (selectedId && entities.active[selectedId]) {
-            const screenX = entities.x[selectedId] * 20 * zoom + camX;
-            const screenY = entities.y[selectedId] * 20 * zoom + camY;
+            let renderX = entities.x[selectedId];
+            let renderY = entities.y[selectedId];
+            
+            if (this.movementSystem) {
+                const interp = this.movementSystem.getInterpolatedPosition(selectedId);
+                renderX = interp.x;
+                renderY = interp.y;
+            }
+            
+            const screenX = renderX * 20 * zoom + camX;
+            const screenY = renderY * 20 * zoom + camY;
             
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
             ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
-
-            // Линия к цели если есть приказ
-            // (путь хранится в movementSystem — не тянем сюда, просто подсветка достаточна)
         }
 
         // Отрисовка очередей обучения и строительства
@@ -213,18 +246,15 @@ export class RendererWebGL {
                 const sy = item.y * 20 * zoom + camY;
                 if (sx < -size || sx > this.canvas.width + size || sy < -size || sy > this.canvas.height + size) continue;
 
-                // Полупрозрачный синий квадрат
                 ctx.fillStyle = 'rgba(59,130,246,0.35)';
                 ctx.fillRect(sx, sy, size, size);
 
-                // Прогресс-бар снизу
                 const pct = 1 - item.daysLeft / item.totalDays;
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(sx, sy + size - 4, size, 4);
                 ctx.fillStyle = '#3b82f6';
                 ctx.fillRect(sx, sy + size - 4, size * pct, 4);
 
-                // Иконка
                 if (size > 14) {
                     ctx.font = `${Math.max(10, size * 0.55)}px "Segoe UI Emoji"`;
                     ctx.textAlign = 'center';
@@ -241,7 +271,6 @@ export class RendererWebGL {
                 const sy = item.y * 20 * zoom + camY;
                 if (sx < -size || sx > this.canvas.width + size || sy < -size || sy > this.canvas.height + size) continue;
 
-                // Полупрозрачный жёлтый квадрат
                 ctx.fillStyle = 'rgba(234,179,8,0.35)';
                 ctx.fillRect(sx, sy, size, size);
 
