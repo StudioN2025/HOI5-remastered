@@ -17,7 +17,6 @@ import { SupplySystem } from './systems/SupplySystem.js';
 import { DiplomacySystem } from './systems/DiplomacySystem.js';
 import { TechSystem } from './systems/TechSystem.js';
 import { FocusSystem } from './systems/FocusSystem.js';
-import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
 
 // Глобальные экземпляры
@@ -37,7 +36,6 @@ let supply = null;
 let diplomacy = null;
 let tech = null;
 let focus = null;
-let queue = null;
 
 let animationFrameId = null;
 let lastTimestamp = 0;
@@ -61,6 +59,9 @@ async function init() {
     diplomacy = new DiplomacySystem(gameState, world, entities);
     tech = new TechSystem(gameState);
     focus = new FocusSystem(gameState, world, entities);
+    
+    // ✅ Связываем рендер с системой движения для плавной анимации
+    renderer.movementSystem = movement;
     
     // Инициализация UI
     notifications = new Notifications();
@@ -178,7 +179,7 @@ function setupEvents() {
     };
 
     window.startResearch = (type, level) => {
-        tech.startResearch(type, level);
+        tech.startResearch(gameState.myCountryId, type, level);
         uiManager.openWindow('research');
     };
     
@@ -228,7 +229,7 @@ function handleCanvasClick(e) {
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
 
-    // Режим найма → теперь через очередь обучения
+    // Режим найма
     if (window._recruitMode) {
         if (cellOwner === gameState.myCountryId) {
             economy.enqueueTraining(worldPos.x, worldPos.y, window._recruitMode);
@@ -240,7 +241,7 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Режим строительства → через очередь строительства
+    // Режим строительства
     if (window._pendingBuild) {
         if (cellOwner === gameState.myCountryId) {
             economy.enqueueBuilding(worldPos.x, worldPos.y, window._pendingBuild);
@@ -252,12 +253,11 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Есть выбранный юнит → ЛКМ по карте = приказ на движение / атаку
+    // Есть выбранный юнит → приказ на движение / атаку
     if (gameState.selectedUnitId !== null) {
         const unitId = gameState.selectedUnitId;
 
         if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
-            // Цель — вражеская территория: двигаемся к ней
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
         } else if (cellOwner === gameState.myCountryId
             || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
@@ -271,7 +271,7 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Клик по клетке без выбранного юнита — показываем информацию о стране
+    // Клик по клетке без выбранного юнита — информация о стране
     if (cellOwner !== 0) {
         uiManager.showCountryInfo(cellOwner, { x: worldPos.x, y: worldPos.y });
     }
@@ -361,8 +361,6 @@ function startGameLoop() {
     let accumulator = 0;
     const TICK_DURATION = 1000 / 60;
     let dayAccumulator = 0;
-    // Длительность одного игрового дня в мс при скорости 1
-    // 3000ms = 1 клетка каждые 3 секунды на скорости 1 (комфортно)
     const BASE_DAY_MS = 3000;
     const SPEED_MULTIPLIERS = { 1: 1.0, 2: 2.5, 3: 6.0, 4: 15.0, 5: 40.0 };
     
@@ -371,6 +369,11 @@ function startGameLoop() {
         lastTick = now;
         accumulator += delta;
         dayAccumulator += delta;
+        
+        // ✅ ОБНОВЛЯЕМ АНИМАЦИИ КАЖДЫЙ КАДР
+        if (movement) {
+            movement.updateAnimations(now);
+        }
         
         while (accumulator >= TICK_DURATION) {
             if (gameState.isGameActive) {
@@ -389,7 +392,7 @@ function startGameLoop() {
             if (movement) movement.update();
             if (tech) tech.update();
             if (focus) focus.update();
-            if (topBar) topBar.update(); // только раз в день
+            if (topBar) topBar.update();
             
             if (gameState.days % 30 === 0 && gameState.days > 0) {
                 saveGame();
@@ -413,7 +416,6 @@ function updateGame() {
     if (gameState.gameSpeed > 0 && Math.random() < 0.1 && aiController) {
         aiController.update();
     }
-    // tech и focus теперь только в дневном тике (раз в секунду), не каждый фрейм
 }
 
 function updateSpeedButtons(speed) {
@@ -505,7 +507,7 @@ function startGame(countryId) {
         const capital = sortedCells[0].split(',').map(Number);
         console.log(`🏰 Первая клетка: (${capital[0]}, ${capital[1]})`);
         
-        // Создаём 3 пехотные дивизии
+        // Создаём 3 пехотные дивизии вокруг столицы
         for (let i = 0; i < 3; i++) {
             const x = capital[0] + (i % 2);
             const y = capital[1] + Math.floor(i / 2);
@@ -531,7 +533,7 @@ function startGame(countryId) {
     
     if (renderer) renderer.cameraInitialized = false;
     
-    // Запускаем игровой цикл ТОЛЬКО ПОСЛЕ выбора страны
+    // Запускаем игровой цикл
     startGameLoop();
 }
 
@@ -567,6 +569,9 @@ function loadGame() {
         diplomacy = new DiplomacySystem(gameState, world, entities);
         tech = new TechSystem(gameState);
         focus = new FocusSystem(gameState, world, entities);
+        
+        // ✅ Восстанавливаем связь рендера с движением
+        renderer.movementSystem = movement;
         
         addNotification(`📂 Игра загружена! День ${gameState.days}`, 'info');
     } catch(e) {
