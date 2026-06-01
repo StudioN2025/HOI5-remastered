@@ -12,11 +12,13 @@ import { TopBar } from './ui/TopBar.js';
 import { Notifications } from './ui/Notifications.js';
 import { EconomySystem } from './systems/EconomySystem.js';
 import { CombatSystem } from './systems/CombatSystem.js';
+import { ProductionSystem } from './systems/ProductionSystem.js';
 import { MovementSystem } from './systems/MovementSystem.js';
 import { SupplySystem } from './systems/SupplySystem.js';
 import { DiplomacySystem } from './systems/DiplomacySystem.js';
 import { TechSystem } from './systems/TechSystem.js';
 import { FocusSystem } from './systems/FocusSystem.js';
+import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
 
 // Глобальные экземпляры
@@ -32,10 +34,12 @@ let notifications = null;
 let economy = null;
 let combat = null;
 let movement = null;
+let production = null;
 let supply = null;
 let diplomacy = null;
 let tech = null;
 let focus = null;
+let queue = null;
 
 let animationFrameId = null;
 let lastTimestamp = 0;
@@ -54,14 +58,12 @@ async function init() {
     // Инициализация систем
     economy = new EconomySystem(world, entities, gameState);
     combat = new CombatSystem(world, entities, gameState);
+    production = new ProductionSystem(world, entities, gameState);
     movement = new MovementSystem(world, entities);
     supply = new SupplySystem(world, entities, gameState);
     diplomacy = new DiplomacySystem(gameState, world, entities);
     tech = new TechSystem(gameState);
     focus = new FocusSystem(gameState, world, entities);
-    
-    // ✅ Связываем рендер с системой движения для плавной анимации
-    renderer.movementSystem = movement;
     
     // Инициализация UI
     notifications = new Notifications();
@@ -75,6 +77,7 @@ async function init() {
     
     // Инициализация ИИ
     aiController = new AIController(world, entities, gameState);
+    aiController.production = production;
     await aiController.init();
     
     // Настройка событий
@@ -179,7 +182,7 @@ function setupEvents() {
     };
 
     window.startResearch = (type, level) => {
-        tech.startResearch(gameState.myCountryId, type, level);
+        tech.startResearch(type, level);
         uiManager.openWindow('research');
     };
     
@@ -229,10 +232,10 @@ function handleCanvasClick(e) {
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
 
-    // Режим найма
+    // Режим найма → теперь через очередь обучения
     if (window._recruitMode) {
         if (cellOwner === gameState.myCountryId) {
-            economy.enqueueTraining(worldPos.x, worldPos.y, window._recruitMode);
+            production.enqueueTraining(worldPos.x, worldPos.y, window._recruitMode);
         } else {
             addNotification('Можно нанимать только на своей территории!', 'war');
         }
@@ -241,10 +244,10 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Режим строительства
+    // Режим строительства → через очередь строительства
     if (window._pendingBuild) {
         if (cellOwner === gameState.myCountryId) {
-            economy.enqueueBuilding(worldPos.x, worldPos.y, window._pendingBuild);
+            production.enqueueBuilding(worldPos.x, worldPos.y, window._pendingBuild);
         } else {
             addNotification('Можно строить только на своей территории!', 'war');
         }
@@ -253,11 +256,12 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Есть выбранный юнит → приказ на движение / атаку
+    // Есть выбранный юнит → ЛКМ по карте = приказ на движение / атаку
     if (gameState.selectedUnitId !== null) {
         const unitId = gameState.selectedUnitId;
 
         if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
+            // Цель — вражеская территория: двигаемся к ней
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
         } else if (cellOwner === gameState.myCountryId
             || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
@@ -271,7 +275,7 @@ function handleCanvasClick(e) {
         return;
     }
 
-    // Клик по клетке без выбранного юнита — информация о стране
+    // Клик по клетке без выбранного юнита — показываем информацию о стране
     if (cellOwner !== 0) {
         uiManager.showCountryInfo(cellOwner, { x: worldPos.x, y: worldPos.y });
     }
@@ -361,6 +365,8 @@ function startGameLoop() {
     let accumulator = 0;
     const TICK_DURATION = 1000 / 60;
     let dayAccumulator = 0;
+    // Длительность одного игрового дня в мс при скорости 1
+    // 3000ms = 1 клетка каждые 3 секунды на скорости 1 (комфортно)
     const BASE_DAY_MS = 3000;
     const SPEED_MULTIPLIERS = { 1: 1.0, 2: 2.5, 3: 6.0, 4: 15.0, 5: 40.0 };
     
@@ -369,11 +375,6 @@ function startGameLoop() {
         lastTick = now;
         accumulator += delta;
         dayAccumulator += delta;
-        
-        // ✅ ОБНОВЛЯЕМ АНИМАЦИИ КАЖДЫЙ КАДР
-        if (movement) {
-            movement.updateAnimations(now);
-        }
         
         while (accumulator >= TICK_DURATION) {
             if (gameState.isGameActive) {
@@ -387,12 +388,13 @@ function startGameLoop() {
             gameState.advanceDay();
             
             if (economy) economy.update();
+            if (production) production.update();
             if (supply) supply.update();
             if (combat) combat.update();
             if (movement) movement.update();
             if (tech) tech.update();
             if (focus) focus.update();
-            if (topBar) topBar.update();
+            if (topBar) topBar.update(); // только раз в день
             
             if (gameState.days % 30 === 0 && gameState.days > 0) {
                 saveGame();
@@ -401,7 +403,7 @@ function startGameLoop() {
         
         // Рендерим только если игра активна
         if (gameState.isGameActive && renderer) {
-            renderer.render(world, entities, gameState);
+            renderer.render(world, entities, gameState, production);
         }
         
         animationFrameId = requestAnimationFrame(loop);
@@ -416,6 +418,7 @@ function updateGame() {
     if (gameState.gameSpeed > 0 && Math.random() < 0.1 && aiController) {
         aiController.update();
     }
+    // tech и focus теперь только в дневном тике (раз в секунду), не каждый фрейм
 }
 
 function updateSpeedButtons(speed) {
@@ -507,7 +510,7 @@ function startGame(countryId) {
         const capital = sortedCells[0].split(',').map(Number);
         console.log(`🏰 Первая клетка: (${capital[0]}, ${capital[1]})`);
         
-        // Создаём 3 пехотные дивизии вокруг столицы
+        // Создаём 3 пехотные дивизии
         for (let i = 0; i < 3; i++) {
             const x = capital[0] + (i % 2);
             const y = capital[1] + Math.floor(i / 2);
@@ -533,7 +536,7 @@ function startGame(countryId) {
     
     if (renderer) renderer.cameraInitialized = false;
     
-    // Запускаем игровой цикл
+    // Запускаем игровой цикл ТОЛЬКО ПОСЛЕ выбора страны
     startGameLoop();
 }
 
@@ -569,9 +572,6 @@ function loadGame() {
         diplomacy = new DiplomacySystem(gameState, world, entities);
         tech = new TechSystem(gameState);
         focus = new FocusSystem(gameState, world, entities);
-        
-        // ✅ Восстанавливаем связь рендера с движением
-        renderer.movementSystem = movement;
         
         addNotification(`📂 Игра загружена! День ${gameState.days}`, 'info');
     } catch(e) {
