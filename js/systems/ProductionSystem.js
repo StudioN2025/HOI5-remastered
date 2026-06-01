@@ -16,10 +16,11 @@ export const BUILDING_COSTS = {
 const AI_RESOURCE_SCALE = 1.0;
 
 export class ProductionSystem {
-    constructor(world, entities, gameState) {
+    constructor(world, entities, gameState, combat) {
         this.world     = world;
         this.entities  = entities;
         this.gs        = gameState;
+        this.combat    = combat;
 
         // countryId → [{ type:'unit'|'building', unitType, buildingType, x, y, daysLeft, totalDays }]
         this.queues = new Map();
@@ -157,6 +158,11 @@ export class ProductionSystem {
         }
         const typeNum = item.unitType === 'infantry' ? 0 : 1;
         const uid = this.entities.createEntity(countryId, typeNum, pos.x, pos.y);
+
+        // Инициализируем org в боевой системе
+        if (this.combat && this.combat.initUnit) {
+            this.combat.initUnit(uid);
+        }
 
         if (countryId === this.gs.myCountryId) {
             const name = item.unitType === 'infantry' ? 'Пехота' : 'Танки';

@@ -70,29 +70,15 @@ export class CombatSystem {
             for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
                 const nx = e.x[i] + dx, ny = e.y[i] + dy;
                 const j = e.getUnitAt(nx, ny);
-                if (!j || !e.active[j]) continue;
+                if (!j || !e.active[j] || i > j) continue; // i > j чтобы не обрабатывать пару дважды
                 const ownerJ = e.owner[j];
                 if (ownerI === ownerJ) continue;
                 if (!this.gs.isAtWar(ownerI, ownerJ)) continue;
 
-                // Кто атакует: стоит на чужой клетке
-                const cellI = this.world.getCell(e.x[i], e.y[i]);
-                const cellJ = this.world.getCell(nx, ny);
-
-                let attacker, defender, battleCell;
-                if (cellI !== ownerI) {
-                    // i стоит на чужой — i атакует, битва за клетку i
-                    attacker = i; defender = j;
-                    battleCell = `${e.x[i]},${e.y[i]}`;
-                } else if (cellJ !== ownerJ) {
-                    // j стоит на чужой — j атакует, битва за клетку j
-                    attacker = j; defender = i;
-                    battleCell = `${nx},${ny}`;
-                } else {
-                    // Оба на своей земле: i атакует клетку j
-                    attacker = i; defender = j;
-                    battleCell = `${nx},${ny}`;
-                }
+                // Простая логика: меньший ID атакует, больший защищается
+                // (или просто первый в паре атакует второго)
+                const attacker = i, defender = j;
+                const battleCell = `${nx},${ny}`;
 
                 if (this.battles.has(battleCell)) {
                     // Добавляем юнитов в существующее сражение
@@ -178,14 +164,18 @@ export class CombatSystem {
             const dOrgDmg = (dAttack / b.attackers.length) * numAdvD;
 
             for (const uid of b.defenders) {
-                this.org[uid] = Math.max(0, this.org[uid] - aOrgDmg * rng() * 0.5);
-                const died = e.damage(uid, Math.ceil(aOrgDmg * 0.08 * rng()));
-                if (died) addNotification(`💀 Юнит ${e.owner[uid]} уничтожен!`, 'war');
+                this.org[uid] = Math.max(0, this.org[uid] - aOrgDmg * rng());
+                const died = e.damage(uid, Math.ceil(aOrgDmg * 0.1 * rng()));
+                if (died && e.owner[uid] === this.gs.myCountryId) {
+                    addNotification(`💀 Юнит уничтожен!`, 'war');
+                }
             }
             for (const uid of b.attackers) {
-                this.org[uid] = Math.max(0, this.org[uid] - dOrgDmg * rng() * 0.5);
-                const died = e.damage(uid, Math.ceil(dOrgDmg * 0.05 * rng()));
-                if (died) addNotification(`💀 Юнит ${e.owner[uid]} уничтожен!`, 'war');
+                this.org[uid] = Math.max(0, this.org[uid] - dOrgDmg * rng());
+                const died = e.damage(uid, Math.ceil(dOrgDmg * 0.08 * rng()));
+                if (died && e.owner[uid] === this.gs.myCountryId) {
+                    addNotification(`💀 Юнит уничтожен!`, 'war');
+                }
             }
 
             // Перечищаем мёртвых после урона

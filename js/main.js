@@ -58,7 +58,7 @@ async function init() {
     // Инициализация систем
     economy = new EconomySystem(world, entities, gameState);
     combat = new CombatSystem(world, entities, gameState);
-    production = new ProductionSystem(world, entities, gameState);
+    production = new ProductionSystem(world, entities, gameState, combat);
     movement = new MovementSystem(world, entities);
     supply = new SupplySystem(world, entities, gameState);
     diplomacy = new DiplomacySystem(gameState, world, entities);
@@ -392,6 +392,7 @@ function startGameLoop() {
             if (supply) supply.update();
             if (combat) combat.update();
             if (movement) movement.update();
+            if (aiController) aiController.update();
             if (tech) tech.update();
             if (focus) focus.update();
             if (topBar) topBar.update(); // только раз в день
@@ -414,11 +415,7 @@ function startGameLoop() {
 
 function updateGame() {
     if (movement) movement.updatePositions();
-    
-    if (gameState.gameSpeed > 0 && Math.random() < 0.1 && aiController) {
-        aiController.update();
-    }
-    // tech и focus теперь только в дневном тике (раз в секунду), не каждый фрейм
+    // ИИ обновляется в дневном тике, не каждый фрейм
 }
 
 function updateSpeedButtons(speed) {
