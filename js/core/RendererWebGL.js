@@ -28,6 +28,7 @@ export class RendererWebGL {
             uk: 'assets/army/british_soldier.png',
             italy: 'assets/army/italian_soldier.png',
             poland: 'assets/army/poland_soldier.png',
+            czechoslovakia: 'assets/army/czechoslovakia_soldier.png',
         };
         for (const [country, src] of Object.entries(imageMap)) {
             const img = new Image();
