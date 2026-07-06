@@ -78,7 +78,7 @@ export class RendererWebGL {
             const wh = (bounds.maxY - bounds.minY + 2) * 20;
             this.camera.x = ((bounds.minX + bounds.maxX) / 2) * 20;
             this.camera.y = ((bounds.minY + bounds.maxY) / 2) * 20;
-            this.camera.zoom = Math.min(this.canvas.width / ww, this.canvas.height / wh, 1.2) * 0.9;
+            this.camera.zoom = Math.min(this.canvas.width / ww, this.canvas.height / wh, 0.5) * 0.9;
             this.cameraInitialized = true;
         }
 
@@ -279,7 +279,7 @@ export class RendererWebGL {
 
     zoom(delta, mouseX, mouseY) {
         const before = this.screenToWorld(mouseX, mouseY);
-        this.camera.zoom = Math.min(Math.max(this.camera.zoom * (delta > 0 ? 0.9 : 1.1), 0.1), 5);
+        this.camera.zoom = Math.min(Math.max(this.camera.zoom * (delta > 0 ? 0.9 : 1.1), 0.15), 3);
         const after = this.screenToWorld(mouseX, mouseY);
         this.camera.x += (before.x - after.x) * 20;
         this.camera.y += (before.y - after.y) * 20;

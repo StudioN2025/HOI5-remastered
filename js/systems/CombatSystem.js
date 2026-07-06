@@ -64,24 +64,57 @@ export class CombatSystem {
             if (!e.active[i]) continue;
             const ownerI = e.owner[i];
 
-            for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            // Проверяем 4 соседних клетки + свою собственную
+            for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[0,0]]) {
                 const nx = e.x[i] + dx, ny = e.y[i] + dy;
                 const j = e.getUnitAt(nx, ny);
-                if (!j || !e.active[j] || i > j) continue;
+                if (!j || !e.active[j] || i === j) continue;
                 const ownerJ = e.owner[j];
                 if (ownerI === ownerJ) continue;
                 if (!this.gs.isAtWar(ownerI, ownerJ)) continue;
 
-                const attacker = i, defender = j;
-                const battleCell = `${nx},${ny}`;
+                const battleCell = `${e.x[j]},${e.y[j]}`;
 
                 if (this.battles.has(battleCell)) {
                     const b = this.battles.get(battleCell);
-                    if (e.owner[attacker] === b.attackerCountry && !b.attackers.includes(attacker)
+                    // Атакующий присоединяется
+                    if (e.owner[i] === b.attackerCountry && !b.attackers.includes(i)
                         && b.attackers.length < FRONT_WIDTH) {
-                        b.attackers.push(attacker);
-                        e.inCombat[attacker] = 1;
+                        b.attackers.push(i);
+                        e.inCombat[i] = 1;
                     }
+                    // Защитник присоединяется
+                    if (e.owner[j] === b.defenderCountry && !b.defenders.includes(j)
+                        && b.defenders.length < FRONT_WIDTH) {
+                        b.defenders.push(j);
+                        e.inCombat[j] = 1;
+                    }
+                } else {
+                    if (this.org[i] === 0) this.initUnit(i);
+                    if (this.org[j] === 0) this.initUnit(j);
+                    e.inCombat[i] = 1;
+                    e.inCombat[j] = 1;
+
+                    const b = {
+                        attackerCountry: e.owner[i],
+                        defenderCountry: e.owner[j],
+                        attackers: [i],
+                        defenders: [j],
+                        cell: battleCell,
+                        day: 0,
+                    };
+                    this.battles.set(battleCell, b);
+
+                    const my = this.gs.myCountryId;
+                    if (e.owner[i] === my || e.owner[j] === my) {
+                        addNotification(`⚔️ Бой: ${b.attackerCountry} атакует ${b.defenderCountry}!`, 'war');
+                    }
+                }
+            }
+        }
+
+        this._sendReinforcements();
+    }
                     if (e.owner[defender] === b.defenderCountry && !b.defenders.includes(defender)
                         && b.defenders.length < FRONT_WIDTH) {
                         b.defenders.push(defender);
@@ -283,8 +316,11 @@ export class CombatSystem {
             if (!e.active[uid]) continue;
             const aStats = UNIT_STATS[e.type[uid]] || UNIT_STATS[0];
 
+            // Hardness сильно снижает урон пехоты по танкам
             const hardnessRatio = avgHardness / 100;
-            const effective = aStats.hardAttack * hardnessRatio + aStats.softAttack * (1 - hardnessRatio);
+            const effectiveSoft = aStats.softAttack * (1 - hardnessRatio * 0.85);
+            const effectiveHard = aStats.hardAttack * hardnessRatio;
+            const effective = effectiveSoft + effectiveHard;
 
             const orgMult = Math.max(0.3, (this.org[uid] || 1) / aStats.maxOrg);
 
