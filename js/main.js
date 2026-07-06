@@ -265,19 +265,27 @@ function setupEvents() {
         }
         armyManager.createArmy(selected);
         gameState._selectedUnits = [];
-        uiManager.openWindow('commanders');
+        gameState.selectedUnitId = null;
+        updateArmyPanel();
     };
 
     window.disbandArmy = (armyId) => {
         if (armyManager) armyManager.disbandArmy(armyId);
-        uiManager.openWindow('commanders');
+        if (gameState._selectedArmyId === armyId) gameState._selectedArmyId = null;
+        updateArmyPanel();
     };
 
     window.selectArmy = (armyId) => {
         if (!armyManager) return;
-        gameState._selectedArmyId = armyId;
-        const army = armyManager.armies.find(a => a.id === armyId);
-        if (army) addNotification(`🎖️ ${army.name} выбрана — ЛКМ по карте для приказа`, 'info');
+        if (gameState._selectedArmyId === armyId) {
+            gameState._selectedArmyId = null;
+        } else {
+            gameState._selectedArmyId = armyId;
+            const army = armyManager.armies.find(a => a.id === armyId);
+            if (army) addNotification(`🎖️ ${army.name} выбрана — ЛКМ по карте для приказа`, 'info');
+        }
+        gameState.selectedUnitId = null;
+        updateArmyPanel();
     };
 
     // Множественный выбор юнитов ПКМ
@@ -324,6 +332,7 @@ function handleCanvasClick(e) {
         }
         gameState._selectedArmyId = null;
         document.getElementById('order-hint')?.classList.add('hidden');
+        updateArmyPanel();
         return;
     }
 
@@ -342,6 +351,8 @@ function handleCanvasClick(e) {
         }
 
         gameState.selectedUnitId = null;
+        gameState._selectedUnits = [];
+        gameState._selectedArmyId = null;
         document.getElementById('order-hint')?.classList.add('hidden');
         return;
     }
@@ -517,6 +528,41 @@ function updateSpeedButtons(speed) {
         }
     });
 }
+
+function updateArmyPanel() {
+    if (!armyManager || !gameState.myCountryId) return;
+    const armies = armyManager.getArmiesForCountry(gameState.myCountryId);
+    const cards = document.getElementById('army-cards');
+    const countEl = document.getElementById('army-count');
+    if (!cards) return;
+
+    countEl.textContent = `${armies.length} армий`;
+
+    let html = '';
+    for (const army of armies) {
+        const isSelected = gameState._selectedArmyId === army.id;
+        const unitCount = [...army.unitIds].filter(id => entities.active[id]).length;
+        html += `
+            <div class="army-card ${isSelected ? 'selected' : ''}" onclick="window.selectArmy(${army.id})" style="border-color:${army.color}">
+                <div class="army-card-color" style="background:${army.color}"></div>
+                <div class="army-card-info">
+                    <div class="army-card-name">${army.name}</div>
+                    <div class="army-card-count">${unitCount} юнитов</div>
+                </div>
+                <button class="army-card-disband" onclick="event.stopPropagation(); window.disbandArmy(${army.id})" title="Распустить">✕</button>
+            </div>
+        `;
+    }
+    cards.innerHTML = html;
+}
+
+// Кнопка создания армии
+document.getElementById('btn-create-army')?.addEventListener('click', () => {
+    window.createArmy();
+});
+
+// Обновляем панель армий каждые 2 секунды
+setInterval(updateArmyPanel, 2000);
 
 function showCountrySelection() {
     const countries = world.getAllCountries();

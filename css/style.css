@@ -1105,3 +1105,129 @@ body {
     vertical-align: middle;
     margin-right: 4px;
 }
+
+/* ========== ПАНЕЛЬ АРМИЙ (HOI4-style) ========== */
+#army-panel {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid #374151;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 6px 10px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 90vw;
+    backdrop-filter: blur(8px);
+}
+
+#army-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #9ca3af;
+    white-space: nowrap;
+    border-right: 1px solid #374151;
+    padding-right: 8px;
+}
+
+#army-count {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+#btn-create-army {
+    background: #15803d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+#btn-create-army:hover {
+    background: #16a34a;
+}
+
+#army-cards {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 2px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #374151 transparent;
+}
+
+.army-card {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-size: 11px;
+    color: white;
+    min-height: 32px;
+}
+.army-card:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateY(-1px);
+}
+.army-card.selected {
+    border-color: #fbbf24;
+    background: rgba(251,191,36,0.15);
+}
+
+.army-card-color {
+    width: 10px;
+    height: 24px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.army-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.army-card-name {
+    font-weight: bold;
+    font-size: 10px;
+}
+
+.army-card-count {
+    font-size: 8px;
+    opacity: 0.7;
+}
+
+.army-card-disband {
+    background: #991b1b;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.army-card:hover .army-card-disband {
+    display: flex;
+}

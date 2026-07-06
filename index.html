@@ -55,7 +55,6 @@
         <button class="tab-btn" data-tab="focus">⭐ ФОКУСЫ</button>
         <button class="tab-btn" data-tab="diplomacy">🤝 ДИПЛОМАТИЯ</button>
         <button class="tab-btn" data-tab="build">🏗️ СТРОЙКА</button>
-        <button class="tab-btn" data-tab="commanders">🎖️ АРМИИ</button>
         <button class="tab-btn" data-tab="save">💾 СОХРАНИТЬ</button>
     </div>
 
@@ -88,6 +87,15 @@
 
     <div id="hint" class="hidden">💡 <span id="hint-text"></span></div>
     <div id="notifications"></div>
+
+    <!-- Панель армий внизу (как в HOI4) -->
+    <div id="army-panel">
+        <div id="army-panel-header">
+            <span id="army-count">0 армий</span>
+            <button id="btn-create-army" title="Создать армию из выделенных">➕</button>
+        </div>
+        <div id="army-cards"></div>
+    </div>
 </div>
 
 <script type="module" src="js/main.js"></script>
