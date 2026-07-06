@@ -347,7 +347,6 @@ function handleCanvasClick(e) {
         }
         return;
     }
-    }
 
     // Есть выбранная армия → приказ всей армии
     if (gameState._selectedArmyId && armyManager) {
