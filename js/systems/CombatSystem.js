@@ -115,39 +115,6 @@ export class CombatSystem {
 
         this._sendReinforcements();
     }
-                    if (e.owner[defender] === b.defenderCountry && !b.defenders.includes(defender)
-                        && b.defenders.length < FRONT_WIDTH) {
-                        b.defenders.push(defender);
-                        e.inCombat[defender] = 1;
-                    }
-                } else {
-                    if (this.org[attacker] === 0) this.initUnit(attacker);
-                    if (this.org[defender] === 0) this.initUnit(defender);
-
-                    e.inCombat[attacker] = 1;
-                    e.inCombat[defender] = 1;
-
-                    const b = {
-                        attackerCountry: e.owner[attacker],
-                        defenderCountry: e.owner[defender],
-                        attackers: [attacker],
-                        defenders: [defender],
-                        cell: battleCell,
-                        day: 0,
-                    };
-                    this.battles.set(battleCell, b);
-
-                    const my = this.gs.myCountryId;
-                    if (e.owner[attacker] === my || e.owner[defender] === my) {
-                        addNotification(`⚔️ Бой: ${b.attackerCountry} атакует ${b.defenderCountry}!`, 'war');
-                    }
-                }
-            }
-        }
-
-        // Подкрепления — юниты в радиусе 2 клеток присоединяются к бою
-        this._sendReinforcements();
-    }
 
     _sendReinforcements() {
         const e = this.entities;
