@@ -128,55 +128,85 @@ export class WindowsManager {
         const unlocked = tech.getPlayerTech ? tech.getPlayerTech() : new Set();
         const activeResearch = tech.getPlayerResearch ? tech.getPlayerResearch() : null;
 
-        let html = `<div style="padding:8px;">`;
-        html += `<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;text-align:center;">🔬 ДЕРЕВО ТЕХНОЛОГИЙ</div>`;
+        let html = `<div style="padding:8px;overflow-x:auto;">`;
+        html += `<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:8px;text-align:center;">🔬 ДЕРЕВО ТЕХНОЛОГИЙ</div>`;
 
+        // Баннер текущего исследования
         if (activeResearch) {
             const rt = techTree[activeResearch.techId];
             if (rt) {
-                html += `<div style="background:#1e3a5f;border:1px solid #3b82f6;border-radius:6px;padding:10px;margin-bottom:12px;text-align:center;">
-                    <div style="color:#60a5fa;font-size:11px;">ИССЛЕДУЕТСЯ</div>
-                    <div style="font-weight:bold;margin:4px 0;">${rt.icon} ${rt.name}</div>
-                    <div style="color:#9ca3af;font-size:11px;">Осталось ${activeResearch.daysLeft} дней</div>
+                html += `<div style="background:linear-gradient(90deg,#1e3a5f,#1e293b);border:1px solid #3b82f6;border-radius:8px;padding:10px;margin-bottom:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:12px;">
+                    <span style="font-size:20px;">${rt.icon}</span>
+                    <div>
+                        <div style="color:#60a5fa;font-size:10px;text-transform:uppercase;">Исследуется</div>
+                        <div style="font-weight:bold;font-size:13px;">${rt.name}</div>
+                    </div>
+                    <div style="background:#1e40af;padding:4px 10px;border-radius:12px;font-size:11px;color:#93c5fd;">${activeResearch.daysLeft} дн.</div>
                 </div>`;
             }
         }
 
+        // Каждая ветка — колонка дерева
+        html += `<div style="display:flex;gap:12px;align-items:flex-start;">`;
+
         for (const [branchId, branch] of Object.entries(branches)) {
-            html += `<div style="margin-bottom:16px;">`;
-            html += `<div style="color:${branch.color};font-weight:bold;font-size:12px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #374151;">${branch.icon} ${branch.name.toUpperCase()}</div>`;
-            html += `<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
-
             const branchTechs = Object.values(techTree).filter(t => t.branch === branchId).sort((a, b) => a.tier - b.tier);
-
+            // Группируем по tier
+            const tiers = {};
             for (const t of branchTechs) {
-                const isUnlocked = unlocked.has(t.id);
-                const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
-                const isResearching = activeResearch && activeResearch.techId === t.id;
-
-                let borderColor = '#374151';
-                let bgColor = '#1f2937';
-                if (isUnlocked) { borderColor = '#22c55e'; bgColor = '#14532d'; }
-                else if (isResearching) { borderColor = '#3b82f6'; bgColor = '#1e3a5f'; }
-                else if (canResearch) { borderColor = '#eab308'; bgColor = '#422006'; }
-
-                html += `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:6px;padding:8px;width:140px;cursor:${canResearch ? 'pointer' : 'default'};opacity:${canResearch || isUnlocked || isResearching ? 1 : 0.5};"`;
-                if (canResearch) {
-                    html += ` onclick="window.startResearch('${t.id}')"`;
-                }
-                html += `>`;
-                html += `<div style="font-size:16px;text-align:center;">${t.icon}</div>`;
-                html += `<div style="font-size:10px;font-weight:bold;text-align:center;margin:4px 0;">${t.name}</div>`;
-                html += `<div style="font-size:8px;color:#9ca3af;text-align:center;">${t.desc}</div>`;
-                if (isUnlocked) html += `<div style="font-size:8px;color:#22c55e;text-align:center;margin-top:4px;">✅</div>`;
-                else if (isResearching) html += `<div style="font-size:8px;color:#3b82f6;text-align:center;margin-top:4px;">⏳ ${activeResearch.daysLeft}д</div>`;
-                else if (canResearch) html += `<div style="font-size:8px;color:#eab308;text-align:center;margin-top:4px;">🔬 ${t.cost}д</div>`;
-                html += `</div>`;
+                if (!tiers[t.tier]) tiers[t.tier] = [];
+                tiers[t.tier].push(t);
             }
 
-            html += `</div></div>`;
+            html += `<div style="min-width:160px;flex-shrink:0;">`;
+            html += `<div style="color:${branch.color};font-weight:bold;font-size:11px;text-align:center;margin-bottom:8px;padding:4px;background:rgba(255,255,255,0.05);border-radius:4px;">${branch.icon} ${branch.name}</div>`;
+
+            const tierKeys = Object.keys(tiers).sort((a, b) => a - b);
+            for (let ti = 0; ti < tierKeys.length; ti++) {
+                const tier = tierKeys[ti];
+                const techs = tiers[tier];
+
+                html += `<div style="display:flex;justify-content:center;gap:6px;margin-bottom:4px;position:relative;">`;
+
+                for (const t of techs) {
+                    const isUnlocked = unlocked.has(t.id);
+                    const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
+                    const isResearching = activeResearch && activeResearch.techId === t.id;
+
+                    let borderColor = '#374151';
+                    let bgColor = '#111827';
+                    let textColor = '#6b7280';
+                    if (isUnlocked) { borderColor = '#22c55e'; bgColor = '#052e16'; textColor = '#86efac'; }
+                    else if (isResearching) { borderColor = '#3b82f6'; bgColor = '#0c1e3a'; textColor = '#93c5fd'; }
+                    else if (canResearch) { borderColor = '#eab308'; bgColor = '#422006'; textColor = '#fde047'; }
+
+                    const clickable = canResearch ? `onclick="window.startResearch('${t.id}')" style="cursor:pointer;"` : '';
+
+                    html += `<div ${clickable} style="background:${bgColor};border:2px solid ${borderColor};border-radius:6px;padding:6px;width:140px;text-align:center;transition:all 0.15s;${canResearch ? 'transform:scale(1.02);' : ''}">`;
+                    html += `<div style="font-size:18px;margin-bottom:2px;">${t.icon}</div>`;
+                    html += `<div style="font-size:9px;font-weight:bold;color:${textColor};line-height:1.2;">${t.name}</div>`;
+                    html += `<div style="font-size:7px;color:#6b7280;margin-top:2px;">${t.desc}</div>`;
+
+                    if (isUnlocked) html += `<div style="font-size:7px;color:#22c55e;margin-top:3px;">✓ Изучено</div>`;
+                    else if (isResearching) html += `<div style="font-size:7px;color:#3b82f6;margin-top:3px;">⏳ ${activeResearch.daysLeft}д</div>`;
+                    else if (canResearch) html += `<div style="font-size:7px;color:#eab308;margin-top:3px;">🔬 ${t.cost}д</div>`;
+                    else html += `<div style="font-size:7px;color:#4b5563;margin-top:3px;">🔒</div>`;
+
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+
+                // Линия-стрелка между тирами
+                if (ti < tierKeys.length - 1) {
+                    html += `<div style="text-align:center;color:#374151;font-size:14px;margin:2px 0;">▼</div>`;
+                }
+            }
+
+            html += `</div>`;
         }
 
+        html += `</div>`;
         html += `</div>`;
         content.innerHTML = html;
     }
