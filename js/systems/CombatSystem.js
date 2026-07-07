@@ -316,8 +316,6 @@ export class CombatSystem {
         }
         return total;
     }
-        return total;
-    }
 
     _avgOrg(units) {
         if (!units.length) return 0;
