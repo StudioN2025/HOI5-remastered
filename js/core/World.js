@@ -7,10 +7,34 @@ const TERRAIN_BONUS = { plain: 1.0, forest: 1.3, mountain: 1.5, urban: 1.4, dese
 export class World {
     constructor() {
         this.cells = new Map();
+        this.waterCells = new Set(); // "x,y" — невидимые водные клетки для флота
         this.buildings = new Map();
-        this.cellStats = new Map(); // "x,y" -> { terrain: string }
+        this.cellStats = new Map();
         this.countryCache = new Map();
         this.bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    }
+
+    // Добавить водную клетку (невидимая, для флота)
+    setWater(x, y) {
+        const key = `${x},${y}`;
+        this.waterCells.add(key);
+        // Обновляем границы
+        this.bounds.minX = Math.min(this.bounds.minX, x);
+        this.bounds.maxX = Math.max(this.bounds.maxX, x);
+        this.bounds.minY = Math.min(this.bounds.minY, y);
+        this.bounds.maxY = Math.max(this.bounds.maxY, y);
+    }
+
+    isWater(x, y) {
+        return this.waterCells.has(`${x},${y}`);
+    }
+
+    // Проверяет — можно ли двигаться на клетку (суша ИЛИ вода с портом)
+    isPassable(x, y, hasPortOnStart) {
+        const land = this.getCell(x, y);
+        if (land !== 0) return true; // суша
+        if (this.isWater(x, y) && hasPortOnStart) return true; // вода с порта
+        return false;
     }
     
     setCell(x, y, countryId) {
@@ -130,6 +154,7 @@ export class World {
     serialize() {
         return {
             cells: Array.from(this.cells.entries()),
+            waterCells: Array.from(this.waterCells),
             buildings: Array.from(this.buildings.entries()).map(([k, v]) => [k, Array.from(v)]),
             cellStats: Array.from(this.cellStats.entries()),
             bounds: this.bounds,
@@ -142,6 +167,11 @@ export class World {
         for (const [key, owner] of data.cells) {
             const [x, y] = key.split(',').map(Number);
             world.setCell(x, y, owner);
+        }
+        if (data.waterCells) {
+            for (const key of data.waterCells) {
+                world.waterCells.add(key);
+            }
         }
         for (const [key, buildings] of data.buildings) {
             for (const building of buildings) {

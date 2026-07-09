@@ -95,7 +95,20 @@ export class DataLoader {
         }
         
         console.log(`✅ Загружено построек: ${factoriesLoaded} заводов, ${portsLoaded} портов`);
-        
+
+        // Генерируем водные клетки вокруг суши (для флота)
+        for (const [posKey] of gridData) {
+            const [x, y] = posKey.split(',').map(Number);
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+                const nx = x + dx, ny = y + dy;
+                const nk = `${nx},${ny}`;
+                if (!gridData[nk] && !world.isWater(nx, ny)) {
+                    world.setWater(nx, ny);
+                }
+            }
+        }
+        console.log(`✅ Водных клеток: ${world.waterCells.size}`);
+
         const totalCells = world.debugCheckCells();
         console.log(`✅ Карта загружена: ${total} клеток в JSON, ${totalCells} клеток в мире`);
         
