@@ -169,7 +169,7 @@ export class RendererWebGL {
             if (!colorBuckets.has(color)) colorBuckets.set(color, []);
             colorBuckets.get(color).push(screenX, screenY);
 
-            if (!this.isMobile && size > 12 && world.buildings.has(posKey)) {
+            if (size > 10 && world.buildings.has(posKey)) {
                 const blds = world.buildings.get(posKey);
                 if (blds.has('port') || blds.has('factory')) {
                     buildingCells.push({ x: screenX, y: screenY, blds });
@@ -198,8 +198,8 @@ export class RendererWebGL {
             ctx.stroke(bp);
         }
 
-        // Здания — только на десктопе и при зуме > 15
-        if (!this.isMobile && size > 12) {
+        // Здания
+        if (size > 10) {
             const emojiSize = Math.max(8, Math.min(14, size * 0.55));
             ctx.font = `${emojiSize}px "Segoe UI Emoji"`;
             ctx.textAlign = 'left';
@@ -300,10 +300,9 @@ export class RendererWebGL {
             ctx.strokeRect(sx - 2, sy - 2, size + 4, size + 4);
         }
 
-        // Очереди производства — только на десктопе
-        if (!this.isMobile) {
-            const queue = production ? production.getPlayerQueue() : [];
-            if (size > 8 && queue.length) {
+        // Очереди производства
+        const queue = production ? production.getPlayerQueue() : [];
+        if (size > 6 && queue.length) {
                 for (const item of queue) {
                     const qx = item.x * 20 * zoom + camX;
                     const qy = item.y * 20 * zoom + camY;
@@ -317,7 +316,6 @@ export class RendererWebGL {
                     ctx.fillStyle = isUnit ? '#3b82f6' : '#eab308';
                     ctx.fillRect(qx, qy + size - 4, size * pct, 4);
                 }
-            }
         }
 
         this.frameCount++;
