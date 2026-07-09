@@ -143,35 +143,6 @@ export class MovementSystem {
         }
     }
 
-                // Проверяем — вражеская территория? Если да, начать бой
-                const cellOwner = e.owner[unitId] ? this.world.getCell(nx, ny) : 0;
-                if (cellOwner !== 0 && cellOwner !== e.owner[unitId]
-                    && !this._areAllied(e.owner[unitId], cellOwner)) {
-                    // Вражеская клетка — атакуем если есть враг, иначе захватываем
-                    const enemy = e.getUnitAt(nx, ny);
-                    if (enemy && e.active[enemy] && e.owner[enemy] !== e.owner[unitId]) {
-                        addNotification('⚔️ Встреча с врагом!', 'war');
-                        this.orders.delete(unitId);
-                        break;
-                    }
-                    // Захватываем пустую вражескую клетку
-                    this.world.setCell(nx, ny, e.owner[unitId]);
-                }
-
-                // Проверяем — занята другим юнитом? Ждём
-                const occupant = e.getUnitAt(nx, ny);
-                if (occupant && occupant !== unitId) {
-                    // Юнит на пути — ждём следующий день, не удаляем приказ
-                    break;
-                }
-
-                // Всё ок — делаем шаг
-                e.moveTo(unitId, nx, ny);
-                order.path.shift();
-            }
-        }
-    }
-
     // A* поиск пути — по своей, союзной и вражеской территории
     _findPath(sx, sy, ex, ey, ownerId) {
         const MAX = 800;

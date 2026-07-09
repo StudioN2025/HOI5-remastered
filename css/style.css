@@ -38,7 +38,7 @@ body {
     inset: 0;
     z-index: 1000;
     background: radial-gradient(circle, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.95) 100%),
-                url('../assets/heirloom-bg.png') center/cover;
+                url('../assets/loading-screen.png') center/cover;
     display: flex;
     align-items: center;
     justify-content: center;
