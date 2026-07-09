@@ -123,27 +123,130 @@ export class WindowsManager {
     
     renderResearchWindow(content) {
         const techTree = window._TECH_TREE || {};
-        const branches = window._TECH_BRANCHES || {};
-
         const unlocked = tech.getPlayerTech ? tech.getPlayerTech() : new Set();
         const activeResearch = tech.getPlayerResearch ? tech.getPlayerResearch() : null;
 
-        let html = `<div style="padding:8px;overflow-x:auto;">`;
-        html += `<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:8px;text-align:center;">🔬 ДЕРЕВО ТЕХНОЛОГИЙ</div>`;
+        // Позиции нод для каждой ветки (x, y)
+        const layouts = {
+            industry: { x: 0,   nodes: ['industry_1','mining_1','industry_2','mining_2','industry_3','industry_4','industry_5'] },
+            infantry: { x: 170, nodes: ['infantry_1','mountain_1','infantry_2','special_1','infantry_3','infantry_4','infantry_5'] },
+            tank:     { x: 340, nodes: ['tank_1','armor_1','tank_2','engine_1','tank_3','tank_4','tank_5'] },
+            air:      { x: 510, nodes: ['air_1','air_2','air_3','air_4'] },
+            navy:     { x: 650, nodes: ['navy_1','navy_2','navy_3','navy_4'] },
+        };
 
-        // Баннер текущего исследования
+        // Собираем позиции всех нод
+        const nodePos = {}; // techId → {x, y}
+        const nodeW = 120, nodeH = 60, gapX = 10, gapY = 8;
+
+        for (const [branchId, layout] of Object.entries(layouts)) {
+            const bx = layout.x;
+            for (let i = 0; i < layout.nodes.length; i++) {
+                const tid = layout.nodes[i];
+                if (!techTree[tid]) continue;
+                nodePos[tid] = { x: bx, y: 50 + i * (nodeH + gapY) };
+            }
+        }
+
+        // Определяем границы карты
+        let maxX = 0, maxY = 0;
+        for (const p of Object.values(nodePos)) {
+            maxX = Math.max(maxX, p.x + nodeW);
+            maxY = Math.max(maxY, p.y + nodeH);
+        }
+        const mapW = maxX + 20;
+        const mapH = maxY + 20;
+
+        // SVG для линий связей
+        let svg = `<svg style="position:absolute;top:0;left:0;width:${mapW}px;height:${mapH}px;pointer-events:none;">`;
+
+        for (const t of Object.values(techTree)) {
+            if (!nodePos[t.id]) continue;
+            for (const preId of t.prereqs) {
+                if (!nodePos[preId]) continue;
+                const from = nodePos[preId];
+                const to = nodePos[t.id];
+                const x1 = from.x + nodeW / 2;
+                const y1 = from.y + nodeH;
+                const x2 = to.x + nodeW / 2;
+                const y2 = to.y;
+
+                const preUnlocked = unlocked.has(preId);
+                const color = preUnlocked ? '#22c55e' : '#374151';
+                svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2" stroke-dasharray="${preUnlocked ? '' : '4,4'}"/>`;
+                // Стрелка
+                svg += `<polygon points="${x2-4},${y2-2} ${x2+4},${y2-2} ${x2},${y2+4}" fill="${color}"/>`;
+            }
+        }
+        svg += `</svg>`;
+
+        // Ноды
+        let nodes = '';
+        for (const [techId, pos] of Object.entries(nodePos)) {
+            const t = techTree[techId];
+            if (!t) continue;
+
+            const isUnlocked = unlocked.has(techId);
+            const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
+            const isResearching = activeResearch && activeResearch.techId === techId;
+
+            let bg = '#111827', border = '#374151', text = '#6b7280';
+            if (isUnlocked)     { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
+            if (isResearching)  { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
+            if (canResearch)    { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
+
+            const click = canResearch ? `onclick="window.startResearch('${techId}')"` : '';
+            const hover = canResearch ? 'onmouseover="this.style.transform=\'scale(1.08)\';this.style.boxShadow=\'0 0 12px rgba(234,179,8,0.4)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'"' : '';
+
+            nodes += `<div ${click} ${hover} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:8px;padding:6px;text-align:center;cursor:${canResearch?'pointer':'default'};transition:all 0.15s;${canResearch?'transform:scale(1.02);':''}">`;
+            nodes += `<div style="font-size:18px;">${t.icon}</div>`;
+            nodes += `<div style="font-size:8px;font-weight:bold;color:${text};line-height:1.2;margin-top:2px;">${t.name}</div>`;
+            nodes += `<div style="font-size:7px;color:#6b7280;margin-top:1px;">${t.desc}</div>`;
+
+            if (isUnlocked)     nodes += `<div style="font-size:7px;color:#22c55e;margin-top:2px;">✓</div>`;
+            else if (isResearching) nodes += `<div style="font-size:7px;color:#3b82f6;margin-top:2px;">⏳${activeResearch.daysLeft}д</div>`;
+            else if (canResearch)   nodes += `<div style="font-size:7px;color:#eab308;margin-top:2px;">🔬${t.cost}д</div>`;
+            else                    nodes += `<div style="font-size:7px;color:#4b5563;margin-top:2px;">🔒</div>`;
+
+            nodes += `</div>`;
+        }
+
+        // Заголовки веток
+        let headers = '';
+        const branchInfo = {
+            industry: { name: 'ПРОМЫШЛЕННОСТЬ', color: '#3b82f6', icon: '🏭' },
+            infantry: { name: 'ПЕХОТА', color: '#22c55e', icon: '💂' },
+            tank:     { name: 'ТАНКИ', color: '#eab308', icon: '🚜' },
+            air:      { name: 'АВИАЦИЯ', color: '#8b5cf6', icon: '✈️' },
+            navy:     { name: 'ФЛОТ', color: '#06b6d4', icon: '⚓' },
+        };
+        for (const [bid, layout] of Object.entries(layouts)) {
+            const bi = branchInfo[bid];
+            headers += `<div style="position:absolute;left:${layout.x}px;top:8px;width:${nodeW}px;text-align:center;color:${bi.color};font-size:10px;font-weight:bold;">${bi.icon} ${bi.name}</div>`;
+        }
+
+        // Баннер исследования
+        let banner = '';
         if (activeResearch) {
             const rt = techTree[activeResearch.techId];
             if (rt) {
-                html += `<div style="background:linear-gradient(90deg,#1e3a5f,#1e293b);border:1px solid #3b82f6;border-radius:8px;padding:10px;margin-bottom:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:12px;">
+                banner = `<div style="background:linear-gradient(90deg,#1e3a5f,#1e293b);border:1px solid #3b82f6;border-radius:8px;padding:8px;margin-bottom:8px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
                     <span style="font-size:20px;">${rt.icon}</span>
-                    <div>
-                        <div style="color:#60a5fa;font-size:10px;text-transform:uppercase;">Исследуется</div>
-                        <div style="font-weight:bold;font-size:13px;">${rt.name}</div>
-                    </div>
-                    <div style="background:#1e40af;padding:4px 10px;border-radius:12px;font-size:11px;color:#93c5fd;">${activeResearch.daysLeft} дн.</div>
+                    <div><div style="color:#60a5fa;font-size:9px;text-transform:uppercase;">Исследуется</div><div style="font-weight:bold;font-size:12px;">${rt.name}</div></div>
+                    <div style="background:#1e40af;padding:3px 8px;border-radius:10px;font-size:10px;color:#93c5fd;">${activeResearch.daysLeft} дн.</div>
                 </div>`;
             }
+        }
+
+        content.innerHTML = `
+            ${banner}
+            <div style="position:relative;width:${mapW}px;height:${mapH}px;overflow:auto;">
+                ${svg}
+                ${headers}
+                ${nodes}
+            </div>
+        `;
+    }
         }
 
         // Каждая ветка — колонка дерева
