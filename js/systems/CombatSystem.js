@@ -193,7 +193,7 @@ export class CombatSystem {
             }
 
             for (const uid of b.defenders) {
-                const reduction = avgDefDefense * terrainBonus * 0.15 * defTechMult;
+                const reduction = avgDefDefense * terrainBonus * 0.1 * defTechMult;
                 const netOrgDmg = Math.max(1, aOrgDmg - reduction) * rng();
                 this.org[uid] = Math.max(0, this.org[uid] - netOrgDmg);
 
@@ -417,7 +417,7 @@ export class CombatSystem {
 
     _checkCapitulation(loserCountry, winnerCountry) {
         const cells = this.world.getCountryCells(loserCountry);
-        if (cells.size > 10) return;
+        if (cells.size > 20) return;
 
         for (const c of [...cells]) {
             const [x, y] = c.split(',').map(Number);

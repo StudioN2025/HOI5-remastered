@@ -127,93 +127,22 @@ export class WindowsManager {
         const unlocked = this.tech && this.tech.getPlayerTech ? this.tech.getPlayerTech() : new Set();
         const activeResearch = this.tech && this.tech.getPlayerResearch ? this.tech.getPlayerResearch() : null;
 
-        // Позиции нод для каждой ветки (x, y)
-        const layouts = {
-            industry: { x: 0,   nodes: ['industry_1','mining_1','industry_2','mining_2','industry_3','industry_4','industry_5'] },
-            infantry: { x: 190, nodes: ['infantry_1','mountain_1','infantry_2','special_1','infantry_3','infantry_4','infantry_5'] },
-            tank:     { x: 380, nodes: ['tank_1','armor_1','tank_2','engine_1','tank_3','tank_4','tank_5'] },
-            air:      { x: 570, nodes: ['air_1','air_2','air_3','air_4'] },
-            navy:     { x: 760, nodes: ['navy_1','navy_2','navy_3','navy_4'] },
-        };
+        let html = `<div style="padding:12px;">`;
+        html += `<div style="font-size:16px;font-weight:bold;color:#eab308;margin-bottom:12px;text-align:center;">🔬 ДЕРЕВО ТЕХНОЛОГИЙ</div>`;
 
-        // Собираем позиции всех нод
-        const nodePos = {};
-        const nodeW = 160, nodeH = 90, gapX = 10, gapY = 12;
-
-        for (const [branchId, layout] of Object.entries(layouts)) {
-            const bx = layout.x;
-            for (let i = 0; i < layout.nodes.length; i++) {
-                const tid = layout.nodes[i];
-                if (!techTree[tid]) continue;
-                nodePos[tid] = { x: bx, y: 50 + i * (nodeH + gapY) };
+        // Баннер исследования
+        if (activeResearch) {
+            const rt = techTree[activeResearch.techId];
+            if (rt) {
+                html += `<div style="background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;padding:10px;margin-bottom:16px;text-align:center;">
+                    <div style="color:#60a5fa;font-size:10px;">ИССЛЕДУЕТСЯ</div>
+                    <div style="font-weight:bold;font-size:14px;margin:4px 0;">${rt.icon} ${rt.name}</div>
+                    <div style="color:#9ca3af;font-size:11px;">Осталось ${activeResearch.daysLeft} дней</div>
+                </div>`;
             }
         }
 
-        // Определяем границы карты
-        let maxX = 0, maxY = 0;
-        for (const p of Object.values(nodePos)) {
-            maxX = Math.max(maxX, p.x + nodeW);
-            maxY = Math.max(maxY, p.y + nodeH);
-        }
-        const mapW = maxX + 20;
-        const mapH = maxY + 20;
-
-        // SVG для линий связей
-        let svg = `<svg style="position:absolute;top:0;left:0;width:${mapW}px;height:${mapH}px;pointer-events:none;">`;
-
-        for (const t of Object.values(techTree)) {
-            if (!nodePos[t.id]) continue;
-            for (const preId of t.prereqs) {
-                if (!nodePos[preId]) continue;
-                const from = nodePos[preId];
-                const to = nodePos[t.id];
-                const x1 = from.x + nodeW / 2;
-                const y1 = from.y + nodeH;
-                const x2 = to.x + nodeW / 2;
-                const y2 = to.y;
-
-                const preUnlocked = unlocked.has(preId);
-                const color = preUnlocked ? '#22c55e' : '#374151';
-                svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2" stroke-dasharray="${preUnlocked ? '' : '4,4'}"/>`;
-                // Стрелка
-                svg += `<polygon points="${x2-4},${y2-2} ${x2+4},${y2-2} ${x2},${y2+4}" fill="${color}"/>`;
-            }
-        }
-        svg += `</svg>`;
-
-        // Ноды
-        let nodes = '';
-        for (const [techId, pos] of Object.entries(nodePos)) {
-            const t = techTree[techId];
-            if (!t) continue;
-
-            const isUnlocked = unlocked.has(techId);
-            const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
-            const isResearching = activeResearch && activeResearch.techId === techId;
-
-            let bg = '#111827', border = '#374151', text = '#6b7280';
-            if (isUnlocked)     { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
-            if (isResearching)  { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
-            if (canResearch)    { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
-
-            const click = canResearch ? `onclick="window.startResearch('${techId}')"` : '';
-            const hover = canResearch ? 'onmouseover="this.style.transform=\'scale(1.08)\';this.style.boxShadow=\'0 0 12px rgba(234,179,8,0.4)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'"' : '';
-
-            nodes += `<div ${click} ${hover} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:10px;padding:8px;text-align:center;cursor:${canResearch?'pointer':'default'};transition:all 0.15s;${canResearch?'transform:scale(1.05);':''}">`;
-            nodes += `<div style="font-size:24px;">${t.icon}</div>`;
-            nodes += `<div style="font-size:11px;font-weight:bold;color:${text};line-height:1.2;margin-top:4px;">${t.name}</div>`;
-            nodes += `<div style="font-size:9px;color:#9ca3af;margin-top:2px;">${t.desc}</div>`;
-
-            if (isUnlocked)     nodes += `<div style="font-size:9px;color:#22c55e;margin-top:3px;">✓ Изучено</div>`;
-            else if (isResearching) nodes += `<div style="font-size:9px;color:#3b82f6;margin-top:3px;">⏳ ${activeResearch.daysLeft}д</div>`;
-            else if (canResearch)   nodes += `<div style="font-size:9px;color:#eab308;margin-top:3px;">🔬 ${t.cost}д</div>`;
-            else                    nodes += `<div style="font-size:9px;color:#6b7280;margin-top:3px;">🔒</div>`;
-
-            nodes += `</div>`;
-        }
-
-        // Заголовки веток
-        let headers = '';
+        // Ветки горизонтально
         const branchInfo = {
             industry: { name: 'ПРОМЫШЛЕННОСТЬ', color: '#3b82f6', icon: '🏭' },
             infantry: { name: 'ПЕХОТА', color: '#22c55e', icon: '💂' },
@@ -221,32 +150,51 @@ export class WindowsManager {
             air:      { name: 'АВИАЦИЯ', color: '#8b5cf6', icon: '✈️' },
             navy:     { name: 'ФЛОТ', color: '#06b6d4', icon: '⚓' },
         };
-        for (const [bid, layout] of Object.entries(layouts)) {
-            const bi = branchInfo[bid];
-            headers += `<div style="position:absolute;left:${layout.x}px;top:8px;width:${nodeW}px;text-align:center;color:${bi.color};font-size:13px;font-weight:bold;">${bi.icon} ${bi.name}</div>`;
-        }
 
-        // Баннер исследования
-        let banner = '';
-        if (activeResearch) {
-            const rt = techTree[activeResearch.techId];
-            if (rt) {
-                banner = `<div style="background:linear-gradient(90deg,#1e3a5f,#1e293b);border:1px solid #3b82f6;border-radius:8px;padding:8px;margin-bottom:8px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
-                    <span style="font-size:20px;">${rt.icon}</span>
-                    <div><div style="color:#60a5fa;font-size:9px;text-transform:uppercase;">Исследуется</div><div style="font-weight:bold;font-size:12px;">${rt.name}</div></div>
-                    <div style="background:#1e40af;padding:3px 8px;border-radius:10px;font-size:10px;color:#93c5fd;">${activeResearch.daysLeft} дн.</div>
-                </div>`;
+        html += `<div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;">`;
+
+        for (const [branchId, bi] of Object.entries(branchInfo)) {
+            const branchTechs = Object.values(techTree).filter(t => t.branch === branchId).sort((a, b) => a.tier - b.tier);
+            if (!branchTechs.length) continue;
+
+            html += `<div style="min-width:140px;flex-shrink:0;">`;
+            html += `<div style="color:${bi.color};font-weight:bold;font-size:11px;text-align:center;margin-bottom:8px;">${bi.icon} ${bi.name}</div>`;
+
+            for (let i = 0; i < branchTechs.length; i++) {
+                const t = branchTechs[i];
+                const isUnlocked = unlocked.has(t.id);
+                const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
+                const isResearching = activeResearch && activeResearch.techId === t.id;
+
+                let bg = '#1f2937', border = '#374151', text = '#9ca3af';
+                if (isUnlocked)     { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
+                if (isResearching)  { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
+                if (canResearch)    { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
+
+                const click = canResearch ? `onclick="window.startResearch('${t.id}')" style="cursor:pointer;"` : '';
+
+                // Линия-стрелка вниз
+                if (i > 0) {
+                    const prevUnlocked = unlocked.has(branchTechs[i-1].id);
+                    html += `<div style="text-align:center;color:${prevUnlocked ? '#22c55e' : '#374151'};font-size:14px;margin:2px 0;">▼</div>`;
+                }
+
+                html += `<div ${click} style="background:${bg};border:2px solid ${border};border-radius:6px;padding:8px;text-align:center;${canResearch ? 'transform:scale(1.03);' : ''}">`;
+                html += `<div style="font-size:20px;">${t.icon}</div>`;
+                html += `<div style="font-size:10px;font-weight:bold;color:${text};margin-top:3px;">${t.name}</div>`;
+                html += `<div style="font-size:8px;color:#6b7280;margin-top:2px;">${t.desc}</div>`;
+                if (isUnlocked)     html += `<div style="font-size:8px;color:#22c55e;margin-top:3px;">✓</div>`;
+                else if (isResearching) html += `<div style="font-size:8px;color:#3b82f6;margin-top:3px;">⏳ ${activeResearch.daysLeft}д</div>`;
+                else if (canResearch)   html += `<div style="font-size:8px;color:#eab308;margin-top:3px;">🔬 ${t.cost}д</div>`;
+                else                    html += `<div style="font-size:8px;color:#6b7280;margin-top:3px;">🔒</div>`;
+                html += `</div>`;
             }
+
+            html += `</div>`;
         }
 
-        content.innerHTML = `
-            ${banner}
-            <div style="position:relative;width:${mapW}px;height:${mapH}px;overflow:auto;">
-                ${svg}
-                ${headers}
-                ${nodes}
-            </div>
-        `;
+        html += `</div></div>`;
+        content.innerHTML = html;
     }
     
     renderFocusWindow(content) {
