@@ -78,7 +78,7 @@ async function init() {
     // Инициализация UI
     notifications = new Notifications();
     topBar = new TopBar(gameState);
-    windowsManager = new WindowsManager(world, entities, gameState);
+    windowsManager = new WindowsManager(world, entities, gameState, tech);
     uiManager = new UIManager(world, entities, gameState, windowsManager, topBar);
 
     updateLoadingBar(45, 'Загрузка карты...');

@@ -4,10 +4,11 @@ import { UNIT_STATS, BUILDING_STATS } from '../data/Units.js';
 import { getCountryInfo } from '../utils/helpers.js';
 
 export class WindowsManager {
-    constructor(world, entities, gameState) {
+    constructor(world, entities, gameState, techSystem) {
         this.world = world;
         this.entities = entities;
         this.gameState = gameState;
+        this.tech = techSystem;
     }
     
     renderArmyWindow(content) {
@@ -123,8 +124,8 @@ export class WindowsManager {
     
     renderResearchWindow(content) {
         const techTree = window._TECH_TREE || {};
-        const unlocked = tech.getPlayerTech ? tech.getPlayerTech() : new Set();
-        const activeResearch = tech.getPlayerResearch ? tech.getPlayerResearch() : null;
+        const unlocked = this.tech && this.tech.getPlayerTech ? this.tech.getPlayerTech() : new Set();
+        const activeResearch = this.tech && this.tech.getPlayerResearch ? this.tech.getPlayerResearch() : null;
 
         // Позиции нод для каждой ветки (x, y)
         const layouts = {
