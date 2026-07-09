@@ -150,8 +150,7 @@ export class AIController {
             if (this.firedWars.has(i)) continue;
             const t = HISTORICAL_WARS[i];
             if (day < t.day) continue;
-            if (day > t.day + 40) { this.firedWars.add(i); continue; } // просрочено
-            if (Math.random() > t.chance) continue;
+            if (day > t.day + 5) { this.firedWars.add(i); continue; }
 
             const { a, b } = t;
             if (a === b || this.gs.isAtWar(a, b)) { this.firedWars.add(i); continue; }
@@ -159,6 +158,13 @@ export class AIController {
                 this.firedWars.add(i); continue;
             }
 
+            // Собираем войска к границе перед войной (за 5 дней до)
+            if (day >= t.day - 5 && day < t.day) {
+                this._gatherToBorder(a, b);
+                continue;
+            }
+
+            // Объявляем войну
             this.gs.addWar(a, b);
             this._pullAllies(a, b);
 
@@ -168,6 +174,32 @@ export class AIController {
             else                       addNotification(`⚔️ ${label}`, 'war');
 
             this.firedWars.add(i);
+        }
+    }
+
+    _gatherToBorder(countryId, targetId) {
+        const border = this.world.getBorderWith(countryId, targetId);
+        if (!border.length) return;
+
+        const units = this.entities.getEntitiesByOwner(countryId);
+        const borderPts = border.map(b => { const [x,y] = b.split(',').map(Number); return {x,y}; });
+
+        for (let i = 0; i < units.length; i++) {
+            const uid = units[i];
+            if (this.entities.inCombat[uid]) continue;
+            const target = borderPts[i % borderPts.length];
+
+            const ux = this.entities.x[uid], uy = this.entities.y[uid];
+            if (ux === target.x && uy === target.y) continue;
+
+            const dx = Math.sign(target.x - ux);
+            const dy = Math.sign(target.y - uy);
+            const nx = ux + dx;
+            const ny = uy + dy;
+
+            if (this.world.getCell(nx, ny) !== 0 && !this.entities.getUnitAt(nx, ny)) {
+                this.entities.moveTo(uid, nx, ny);
+            }
         }
     }
 
@@ -273,24 +305,47 @@ export class AIController {
 
     _build(id, cells, profile) {
         const mem = this.mem.get(id);
-        if (Date.now() - mem.lastBuild < 18000) return;
+        if (Date.now() - mem.lastBuild < 15000) return;
 
         const targetFact = Math.min(
             profile.power >= 70 ? 15 : profile.power >= 40 ? 8 : 4,
             Math.floor(cells.size / 12)
         );
         let factCount = 0;
-        const available = [];
+        let portCount = 0;
+        const availableFact = [];
+        const availablePort = [];
+
         for (const c of cells) {
             const [x, y] = c.split(',').map(Number);
             if (this.world.hasBuilding(x, y, 'factory')) factCount++;
-            else available.push([x, y]);
-        }
-        if (factCount >= targetFact || !available.length) return;
+            else availableFact.push([x, y]);
 
-        const [x, y] = available[Math.floor(Math.random() * available.length)];
-        this.world.addBuilding(x, y, 'factory');
+            if (this.world.hasBuilding(x, y, 'port')) portCount++;
+            else if (this._isCoastal(x, y)) availablePort.push([x, y]);
+        }
+
+        // Строим заводы
+        if (factCount < targetFact && availableFact.length) {
+            const [x, y] = availableFact[Math.floor(Math.random() * availableFact.length)];
+            this.world.addBuilding(x, y, 'factory');
+        }
+
+        // Строим порты (макс 3 на крупную страну)
+        const targetPorts = Math.min(3, Math.floor(cells.size / 20));
+        if (portCount < targetPorts && availablePort.length) {
+            const [x, y] = availablePort[Math.floor(Math.random() * availablePort.length)];
+            this.world.addBuilding(x, y, 'port');
+        }
+
         mem.lastBuild = Date.now();
+    }
+
+    _isCoastal(x, y) {
+        for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            if (this.world.getCell(x+dx, y+dy) === 0) return true;
+        }
+        return false;
     }
 
     // ── Дипломатия ────────────────────────────────────────────────────────────

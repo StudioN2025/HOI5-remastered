@@ -229,14 +229,14 @@ export class RendererWebGL {
             const owner = entities.owner[i];
             const unitType = entities.type[i];
 
-            // Мобильный — только эмодзи, без изображений и деталей
+            // Мобильный — эмодзи без PNG и HP-баров
             if (this.isMobile) {
                 ctx.fillStyle = owner === gameState.myCountryId ? '#fff'
                     : (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, owner)) ? '#ff6666' : '#ccc';
-                ctx.font = `${Math.max(10, size * 0.6)}px sans-serif`;
+                ctx.font = `${Math.max(12, size * 0.7)}px "Segoe UI Emoji", sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(unitType === 0 ? '●' : '■', screenX + size / 2, screenY + size / 2);
+                ctx.fillText(unitType === 0 ? '💂' : '🚜', screenX + size / 2, screenY + size / 2);
                 unitsDrawn++;
                 continue;
             }
