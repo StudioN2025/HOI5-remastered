@@ -1033,6 +1033,15 @@ body {
         font-size: 8px;
     }
     
+    #info-window {
+        width: 95vw;
+        height: 90vh;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        max-width: none;
+    }
+    
     #info-window,
     #info-sidebar {
         left: 8px;
@@ -1059,6 +1068,30 @@ body {
     .btn-recruit {
         text-align: center;
         margin-top: 8px;
+    }
+    
+    #army-panel {
+        left: 4px;
+        right: 4px;
+        transform: none;
+        max-width: none;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .army-card {
+        padding: 4px 6px;
+        font-size: 9px;
+        min-height: 28px;
+    }
+    
+    .army-card-name {
+        font-size: 9px;
+    }
+    
+    #btn-create-army {
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
     }
 }
 

@@ -187,6 +187,92 @@ function setupEvents() {
             }
         });
         canvas.addEventListener('mouseup', () => { shiftDragging = false; });
+
+        // ===== МОБИЛЬНОЕ УПРАВЛЕНИЕ =====
+        let touchStartX = 0, touchStartY = 0;
+        let touchStartTime = 0;
+        let isTouchDragging = false;
+        let lastPinchDist = 0;
+        let touchMoved = false;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchStartTime = Date.now();
+                isTouchDragging = true;
+                touchMoved = false;
+            } else if (e.touches.length === 2) {
+                // Пинч-зум
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1 && isTouchDragging) {
+                const dx = e.touches[0].clientX - touchStartX;
+                const dy = e.touches[0].clientY - touchStartY;
+
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    touchMoved = true;
+                }
+
+                // Двигаем камеру
+                renderer.camera.x -= dx / renderer.camera.zoom;
+                renderer.camera.y -= dy / renderer.camera.zoom;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                needsRender = true;
+            } else if (e.touches.length === 2) {
+                // Пинч-зум
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (lastPinchDist > 0) {
+                    const scale = dist / lastPinchDist;
+                    const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                    const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    renderer.zoom(scale > 1 ? 1 : -1, centerX, centerY);
+                }
+                lastPinchDist = dist;
+                needsRender = true;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 0) {
+                // Тап — обрабатываем как клик или долгое нажатие
+                if (!touchMoved && Date.now() - touchStartTime < 300) {
+                    // Короткий тап = клик
+                    const fakeEvent = {
+                        clientX: touchStartX,
+                        clientY: touchStartY,
+                        shiftKey: false,
+                        button: 0
+                    };
+                    handleCanvasClick(fakeEvent);
+                } else if (touchMoved) {
+                    // Свайп — ничего (камера уже двигалась)
+                }
+                // Долгое нажатие (>500мс) = контекстное меню
+                if (!touchMoved && Date.now() - touchStartTime >= 500) {
+                    const fakeEvent = {
+                        clientX: touchStartX,
+                        clientY: touchStartY,
+                        preventDefault: () => {}
+                    };
+                    handleCanvasRightClick(fakeEvent);
+                }
+                isTouchDragging = false;
+                lastPinchDist = 0;
+            }
+        }, { passive: false });
     }
     
     // Клавиши
