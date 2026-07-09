@@ -45,6 +45,7 @@ let queue = null;
 
 let animationFrameId = null;
 let lastTimestamp = 0;
+let needsRender = true; // глобальная — чтобы touch-обработчики видели
 
 async function init() {
     console.log('🚀 HOI5 Remastered v3.0');
@@ -595,10 +596,9 @@ function startGameLoop() {
     let dayAccumulator = 0;
     const BASE_DAY_MS = 3000;
     const SPEED_MULTIPLIERS = { 1: 1.0, 2: 2.5, 3: 6.0, 4: 15.0, 5: 40.0 };
-    let needsRender = true;
     let lastRenderTime = 0;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
-    const MIN_RENDER_INTERVAL = isMobile ? 1000 / 15 : 1000 / 30; // мобильные: 15fps, десктоп: 30fps
+    const MIN_RENDER_INTERVAL = isMobile ? 1000 / 15 : 1000 / 30;
 
     // Помечаем необходимость рендера при движении камеры
     window.addEventListener('keydown', () => { needsRender = true; });
