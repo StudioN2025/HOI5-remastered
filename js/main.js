@@ -570,7 +570,8 @@ function startGameLoop() {
     const SPEED_MULTIPLIERS = { 1: 1.0, 2: 2.5, 3: 6.0, 4: 15.0, 5: 40.0 };
     let needsRender = true;
     let lastRenderTime = 0;
-    const MIN_RENDER_INTERVAL = 1000 / 30; // макс 30 fps
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+    const MIN_RENDER_INTERVAL = isMobile ? 1000 / 15 : 1000 / 30; // мобильные: 15fps, десктоп: 30fps
 
     // Помечаем необходимость рендера при движении камеры
     window.addEventListener('keydown', () => { needsRender = true; });

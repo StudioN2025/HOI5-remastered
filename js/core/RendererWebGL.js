@@ -15,6 +15,9 @@ export class RendererWebGL {
         this.unitImages = {};
         this._loadImages();
 
+        // Определение мобильного
+        this.isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || window.innerWidth < 768;
+
         // Кэш цветов
         this._colorCache = new Map();
         this._initColorCache();
@@ -138,8 +141,8 @@ export class RendererWebGL {
             }
         }
 
-        // Границы (только при zoom > 0.15)
-        if (size > 4) {
+        // Границы — только на десктопе и при достаточном зуме
+        if (!this.isMobile && size > 4) {
             ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 0.5;
             const bp = new Path2D();
@@ -151,8 +154,8 @@ export class RendererWebGL {
             ctx.stroke(bp);
         }
 
-        // Здания
-        if (size > 12) {
+        // Здания — только на десктопе и при зуме > 15
+        if (!this.isMobile && size > 12) {
             const emojiSize = Math.max(8, Math.min(14, size * 0.55));
             ctx.font = `${emojiSize}px "Segoe UI Emoji"`;
             ctx.textAlign = 'left';
@@ -181,8 +184,21 @@ export class RendererWebGL {
 
             const owner = entities.owner[i];
             const unitType = entities.type[i];
-            const img = this.unitImages[owner];
 
+            // Мобильный — только эмодзи, без изображений и деталей
+            if (this.isMobile) {
+                ctx.fillStyle = owner === gameState.myCountryId ? '#fff'
+                    : (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, owner)) ? '#ff6666' : '#ccc';
+                ctx.font = `${Math.max(10, size * 0.6)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(unitType === 0 ? '●' : '■', screenX + size / 2, screenY + size / 2);
+                unitsDrawn++;
+                continue;
+            }
+
+            // Десктоп — полная отрисовка
+            const img = this.unitImages[owner];
             if (img && unitType === 0) {
                 const iconSize = size * 1.2;
                 const off = (size - iconSize) / 2;
@@ -240,21 +256,23 @@ export class RendererWebGL {
             ctx.strokeRect(sx - 2, sy - 2, size + 4, size + 4);
         }
 
-        // Очереди производства
-        const queue = production ? production.getPlayerQueue() : [];
-        if (size > 8 && queue.length) {
-            for (const item of queue) {
-                const qx = item.x * 20 * zoom + camX;
-                const qy = item.y * 20 * zoom + camY;
-                if (qx < -size || qx > W + size || qy < -size || qy > H + size) continue;
-                const isUnit = item.type === 'unit';
-                ctx.fillStyle = isUnit ? 'rgba(59,130,246,0.35)' : 'rgba(234,179,8,0.35)';
-                ctx.fillRect(qx, qy, size, size);
-                const pct = 1 - item.daysLeft / item.totalDays;
-                ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                ctx.fillRect(qx, qy + size - 4, size, 4);
-                ctx.fillStyle = isUnit ? '#3b82f6' : '#eab308';
-                ctx.fillRect(qx, qy + size - 4, size * pct, 4);
+        // Очереди производства — только на десктопе
+        if (!this.isMobile) {
+            const queue = production ? production.getPlayerQueue() : [];
+            if (size > 8 && queue.length) {
+                for (const item of queue) {
+                    const qx = item.x * 20 * zoom + camX;
+                    const qy = item.y * 20 * zoom + camY;
+                    if (qx < -size || qx > W + size || qy < -size || qy > H + size) continue;
+                    const isUnit = item.type === 'unit';
+                    ctx.fillStyle = isUnit ? 'rgba(59,130,246,0.35)' : 'rgba(234,179,8,0.35)';
+                    ctx.fillRect(qx, qy, size, size);
+                    const pct = 1 - item.daysLeft / item.totalDays;
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(qx, qy + size - 4, size, 4);
+                    ctx.fillStyle = isUnit ? '#3b82f6' : '#eab308';
+                    ctx.fillRect(qx, qy + size - 4, size * pct, 4);
+                }
             }
         }
 
