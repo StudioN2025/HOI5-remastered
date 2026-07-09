@@ -142,9 +142,23 @@ function setupEvents() {
     document.querySelectorAll('.speed-btn').forEach(btn => {
         btn.onclick = () => {
             const speed = parseInt(btn.dataset.speed);
+            if (isNaN(speed)) return;
             gameState.setGameSpeed(speed);
             updateSpeedButtons(speed);
         };
+    });
+
+    // Кнопка полноэкранного режима
+    document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
+        const el = document.documentElement;
+        if (!document.fullscreenElement) {
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(() => {});
+            else if (el.msRequestFullscreen) el.msRequestFullscreen().catch(() => {});
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen().catch(() => {});
+        }
     });
     
     // Кнопки вкладок
@@ -194,9 +208,22 @@ function setupEvents() {
         let isTouchDragging = false;
         let lastPinchDist = 0;
         let touchMoved = false;
+        let fullscreenRequested = false;
+
+        // Авто-полноэкранный режим на мобильных при первом тапе
+        function requestFullscreen() {
+            if (fullscreenRequested) return;
+            fullscreenRequested = true;
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen().catch(() => {});
+            else if (el.msRequestFullscreen) el.msRequestFullscreen().catch(() => {});
+        }
 
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            // Запрашиваем полноэкранный режим при первом тапе
+            if (isMobile) requestFullscreen();
             if (e.touches.length === 1) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
