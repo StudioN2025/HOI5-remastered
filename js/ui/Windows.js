@@ -142,19 +142,17 @@ export class WindowsManager {
             }
         }
 
-        // Ветки горизонтально
+        // Ветки
         const branchInfo = {
             industry: { name: 'ПРОМЫШЛЕННОСТЬ', color: '#3b82f6', icon: '🏭' },
             infantry: { name: 'ПЕХОТА', color: '#22c55e', icon: '💂' },
             tank:     { name: 'ТАНКИ', color: '#eab308', icon: '🚜' },
-            air:      { name: 'АВИАЦИЯ', color: '#8b5cf6', icon: '✈️' },
-            navy:     { name: 'ФЛОТ', color: '#06b6d4', icon: '⚓' },
         };
 
         html += `<div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;">`;
 
         for (const [branchId, bi] of Object.entries(branchInfo)) {
-            const branchTechs = Object.values(techTree).filter(t => t.branch === branchId).sort((a, b) => a.tier - b.tier);
+            const branchTechs = Object.values(techTree).filter(t => t.branch === branchId).sort((a, b) => a.level - b.level);
             if (!branchTechs.length) continue;
 
             html += `<div style="min-width:140px;flex-shrink:0;">`;
@@ -163,23 +161,23 @@ export class WindowsManager {
             for (let i = 0; i < branchTechs.length; i++) {
                 const t = branchTechs[i];
                 const isUnlocked = unlocked.has(t.id);
-                const canResearch = !isUnlocked && !activeResearch && t.prereqs.every(p => unlocked.has(p));
+                const prereq = t.level > 1 ? `${branchId}_${t.level - 1}` : null;
+                const canResearch = !isUnlocked && !activeResearch && (!prereq || unlocked.has(prereq));
                 const isResearching = activeResearch && activeResearch.techId === t.id;
 
                 let bg = '#1f2937', border = '#374151', text = '#9ca3af';
-                if (isUnlocked)     { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
-                if (isResearching)  { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
-                if (canResearch)    { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
+                if (isUnlocked)    { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
+                if (isResearching) { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
+                if (canResearch)   { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
 
                 const click = canResearch ? `onclick="window.startResearch('${t.id}')" style="cursor:pointer;"` : '';
 
-                // Линия-стрелка вниз
                 if (i > 0) {
-                    const prevUnlocked = unlocked.has(branchTechs[i-1].id);
-                    html += `<div style="text-align:center;color:${prevUnlocked ? '#22c55e' : '#374151'};font-size:14px;margin:2px 0;">▼</div>`;
+                    const prevOk = unlocked.has(branchTechs[i-1].id);
+                    html += `<div style="text-align:center;color:${prevOk ? '#22c55e' : '#374151'};font-size:14px;margin:2px 0;">▼</div>`;
                 }
 
-                html += `<div ${click} style="background:${bg};border:2px solid ${border};border-radius:6px;padding:8px;text-align:center;${canResearch ? 'transform:scale(1.03);' : ''}">`;
+                html += `<div ${click} style="background:${bg};border:2px solid ${border};border-radius:6px;padding:8px;text-align:center;">`;
                 html += `<div style="font-size:20px;">${t.icon}</div>`;
                 html += `<div style="font-size:10px;font-weight:bold;color:${text};margin-top:3px;">${t.name}</div>`;
                 html += `<div style="font-size:8px;color:#6b7280;margin-top:2px;">${t.desc}</div>`;
@@ -189,7 +187,6 @@ export class WindowsManager {
                 else                    html += `<div style="font-size:8px;color:#6b7280;margin-top:3px;">🔒</div>`;
                 html += `</div>`;
             }
-
             html += `</div>`;
         }
 
