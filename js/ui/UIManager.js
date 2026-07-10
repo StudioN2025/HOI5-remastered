@@ -1,5 +1,7 @@
 // UIManager.js — Управление интерфейсом (исправлен)
 
+import { getCountryInfo } from '../utils/helpers.js';
+
 export class UIManager {
     constructor(world, entities, gameState, windowsManager, topBar) {
         this.world = world;

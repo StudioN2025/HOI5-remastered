@@ -120,7 +120,7 @@ body {
     align-items: center;
     justify-content: center;
     background: radial-gradient(circle, rgba(0,0,0,0.4), rgba(0,0,0,0.9)),
-                url('../assets/uploading-screan.png') center/cover;
+                url('../assets/loading-screen.png') center/cover;
 }
 
 .select-card {
