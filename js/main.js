@@ -490,8 +490,11 @@ function handleCanvasClick(e) {
     if (gameState.selectedUnitId !== null) {
         const unitId = gameState.selectedUnitId;
 
-        if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
-            // Цель — вражеская территория: двигаемся к ней
+        // Клик по воде — морской десант или выход в море
+        const isWater = world.isWater(worldPos.x, worldPos.y);
+        if (isWater) {
+            movement.giveOrder(unitId, worldPos.x, worldPos.y);
+        } else if (cellOwner !== 0 && gameState.isAtWar(gameState.myCountryId, cellOwner)) {
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
         } else if (cellOwner === gameState.myCountryId
             || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {

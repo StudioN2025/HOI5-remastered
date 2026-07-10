@@ -96,6 +96,21 @@ export class DataLoader {
         
         console.log(`✅ Загружено построек: ${factoriesLoaded} заводов, ${portsLoaded} портов`);
 
+        // Автоматически добавляем порты на побережье (если их нет)
+        if (portsLoaded === 0) {
+            for (const posKey of Object.keys(gridData)) {
+                const [x, y] = posKey.split(',').map(Number);
+                if (this.isCoastal(x, y, gridData) && !world.hasBuilding(x, y, 'port')) {
+                    // Каждая 3-я прибрежная клетка получает порт
+                    if ((x + y) % 3 === 0) {
+                        world.addBuilding(x, y, 'port');
+                        portsLoaded++;
+                    }
+                }
+            }
+            console.log(`✅ Автоматически добавлено ${portsLoaded} портов`);
+        }
+
         // Генерируем водные клетки вокруг суши (для флота)
         for (const posKey of Object.keys(gridData)) {
             const [x, y] = posKey.split(',').map(Number);
