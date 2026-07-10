@@ -122,10 +122,12 @@ export class UIManager {
             if (stats && stats.population) totalPop += stats.population;
         }
         
-        // Если нет населения в cellStats — считаем 1000 на клетку
-        if (totalPop === 0) totalPop = cells.size * 1000;
+        // Показываем реальные людские ресурсы страны
+        const actualManpower = countryId === this.gameState.myCountryId
+            ? Math.floor(this.gameState.manpower)
+            : cells.size * 1000;
         
-        if (popElem) popElem.innerText = `${totalPop.toLocaleString()} чел.`;
+        if (popElem) popElem.innerText = `${actualManpower.toLocaleString()} чел.`;
         if (factoriesElem) factoriesElem.innerText = `${totalFactories} 🏭`;
         if (buildingsElem) buildingsElem.innerText = totalPorts > 0 ? `${totalPorts} ⚓` : 'Нет портов';
         
