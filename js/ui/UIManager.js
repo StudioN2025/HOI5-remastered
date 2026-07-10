@@ -108,14 +108,26 @@ export class UIManager {
         if (leaderElem) leaderElem.innerText = countryInfo.leader;
         if (ideologyElem) ideologyElem.innerText = countryInfo.ideology;
         
-        // Получаем данные о клетке
-        const cellKey = `${pos.x},${pos.y}`;
-        const hasPort = this.world.hasBuilding(pos.x, pos.y, 'port');
-        const hasFactory = this.world.hasBuilding(pos.x, pos.y, 'factory');
+        // Считаем статистику за ВСЮ страну
+        const cells = this.world.getCountryCells(countryId);
+        let totalPop = 0;
+        let totalFactories = 0;
+        let totalPorts = 0;
         
-        if (popElem) popElem.innerText = '—';
-        if (factoriesElem) factoriesElem.innerText = hasFactory ? '1' : '0';
-        if (buildingsElem) buildingsElem.innerText = hasPort ? '⚓ Порт' : (hasFactory ? '🏭 Завод' : 'Нет построек');
+        for (const cellKey of cells) {
+            const [cx, cy] = cellKey.split(',').map(Number);
+            if (this.world.hasBuilding(cx, cy, 'factory')) totalFactories++;
+            if (this.world.hasBuilding(cx, cy, 'port')) totalPorts++;
+            const stats = this.world.cellStats.get(cellKey);
+            if (stats && stats.population) totalPop += stats.population;
+        }
+        
+        // Если нет населения в cellStats — считаем 1000 на клетку
+        if (totalPop === 0) totalPop = cells.size * 1000;
+        
+        if (popElem) popElem.innerText = `${totalPop.toLocaleString()} чел.`;
+        if (factoriesElem) factoriesElem.innerText = `${totalFactories} 🏭`;
+        if (buildingsElem) buildingsElem.innerText = totalPorts > 0 ? `${totalPorts} ⚓` : 'Нет портов';
         
         if (actionsDiv && countryId !== this.gameState.myCountryId) {
             actionsDiv.classList.remove('hidden');
