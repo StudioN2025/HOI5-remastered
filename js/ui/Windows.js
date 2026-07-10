@@ -196,8 +196,7 @@ export class WindowsManager {
     }
     
     renderFocusWindow(content) {
-        const { FOCUS_TREE } = require('../systems/FocusSystem.js') || {};
-        const focusTree = window._FOCUS_TREE || FOCUS_TREE || {};
+        const focusTree = window._FOCUS_TREE || {};
 
         const myId = this.gameState.myCountryId;
         const completed = this.gameState.completedFocuses || new Set();
