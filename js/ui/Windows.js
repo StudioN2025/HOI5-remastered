@@ -4,11 +4,12 @@ import { UNIT_STATS, BUILDING_STATS } from '../data/Units.js';
 import { getCountryInfo } from '../utils/helpers.js';
 
 export class WindowsManager {
-    constructor(world, entities, gameState, techSystem) {
+    constructor(world, entities, gameState, techSystem, focusSystem) {
         this.world = world;
         this.entities = entities;
         this.gameState = gameState;
         this.tech = techSystem;
+        this.focusSys = focusSystem;
     }
     
     renderArmyWindow(content) {
@@ -195,72 +196,120 @@ export class WindowsManager {
     }
     
     renderFocusWindow(content) {
-        const focuses = {
-            germany: [
-                { id: 'ger_rearm', name: 'Перевооружение', desc: '+1000 снаряжения', icon: '🔫' },
-                { id: 'ger_danzig', name: 'Данциг или война', desc: 'Война с Польшей', icon: '⚔️' },
-                { id: 'ger_axis', name: 'Создать Ось', desc: 'Альянс с Италией', icon: '🤝' },
-                { id: 'ger_west', name: 'Западный поход', desc: 'Война с Францией', icon: '🗺️' }
-            ],
-            ussr: [
-                { id: 'ussr_five_year', name: 'Пятилетний план', desc: '+5 заводов', icon: '🏭' },
-                { id: 'ussr_fin_war', name: 'Зимняя война', desc: 'Война с Финляндией', icon: '❄️' },
-                { id: 'ussr_defense', name: 'Великая Отечественная', desc: '+6 дивизий', icon: '🛡️' }
-            ],
-            france: [
-                { id: 'fra_maginot', name: 'Линия Мажино', desc: '+3 завода', icon: '🏰' },
-                { id: 'fra_allies', name: 'Антанта', desc: 'Альянс с Англией', icon: '🤝' }
-            ]
-        };
-        
+        const { FOCUS_TREE } = require('../systems/FocusSystem.js') || {};
+        const focusTree = window._FOCUS_TREE || FOCUS_TREE || {};
+
         const myId = this.gameState.myCountryId;
-        const countryFocuses = focuses[myId] || [];
         const completed = this.gameState.completedFocuses || new Set();
         const activeFocus = this.gameState.activeFocus;
-        
-        let html = `
-            <div class="space-y-3">
-                <div class="section-title" style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #374151;">⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ</div>
-                <div class="focus-tree">
-                    ${countryFocuses.map(focus => {
-                        const isCompleted = completed.has(focus.id);
-                        const isActive = activeFocus && activeFocus.id === focus.id;
-                        const isAvailable = !isCompleted && !isActive;
-                        const borderColor = isCompleted ? '#22c55e' : isActive ? '#fbbf24' : '#3b82f6';
-                        
-                        return `
-                            <div class="focus-card" style="background:#1f2937;padding:12px;border-radius:8px;margin-bottom:8px;border-left:4px solid ${borderColor};cursor:${isAvailable ? 'pointer' : 'default'};"
-                                 onclick="${isAvailable ? `window.startFocus('${focus.id}')` : ''}">
-                                <div style="display:flex;align-items:center;gap:12px;">
-                                    <div style="font-size:24px;">${focus.icon}</div>
-                                    <div style="flex:1;">
-                                        <div style="font-weight:bold;">${focus.name}</div>
-                                        <div style="font-size:11px;color:#9ca3af;">${focus.desc}</div>
-                                    </div>
-                                    ${isActive ? `<div style="font-size:12px;color:#fbbf24;">⚡</div>` : ''}
-                                    ${isCompleted ? `<div style="font-size:16px;color:#22c55e;">✓</div>` : ''}
-                                </div>
-                                ${isActive ? `<div class="progress-bar mt-2" style="width:100%;height:4px;background:#374151;border-radius:2px;overflow:hidden;"><div class="progress-fill" style="width: ${((70 - activeFocus.daysLeft) / 70) * 100}%;height:100%;background:#fbbf24;"></div></div>` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                ${activeFocus ? `
-                    <div class="bg-yellow-900/30 border border-yellow-500 p-3 rounded mt-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-yellow-500 font-bold">⚡ ${activeFocus.name}</span>
-                            <span class="text-xs text-gray-400">(${activeFocus.daysLeft} дн.)</span>
-                        </div>
-                        <div class="progress-bar mt-2" style="width:100%;height:4px;background:#374151;border-radius:2px;overflow:hidden;">
-                            <div class="progress-fill" style="width: ${((70 - activeFocus.daysLeft) / 70) * 100}%;height:100%;background:#fbbf24;"></div>
-                        </div>
-                    </div>
-                ` : ''}
-                ${countryFocuses.length === 0 ? '<div class="text-center text-gray-400 py-8">Нет доступных фокусов для этой страны</div>' : ''}
+
+        // Фильтруем фокусы страны
+        const countryFocuses = Object.values(focusTree).filter(f => f.country === myId);
+        if (!countryFocuses.length) {
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для этой страны</div>';
+            return;
+        }
+
+        // Группируем по веткам
+        const branches = {};
+        for (const f of countryFocuses) {
+            if (!branches[f.branch]) branches[f.branch] = [];
+            branches[f.branch].push(f);
+        }
+
+        const branchInfo = {
+            military:  { name: 'ВОЕННЫЕ', color: '#ef4444', icon: '⚔️' },
+            economy:   { name: 'ЭКОНОМИКА', color: '#22c55e', icon: '🏭' },
+            diplomacy: { name: 'ДИПЛОМАТИЯ', color: '#3b82f6', icon: '🤝' },
+        };
+
+        // Позиции нод
+        const nodeW = 130, nodeH = 60, gapY = 10;
+        const nodePos = {};
+
+        for (const [branchId, branch] of Object.entries(branches)) {
+            const bi = branchInfo[branchId] || { name: branchId, color: '#666', icon: '📁' };
+            branch.sort((a, b) => a.tier - b.tier);
+
+            for (let i = 0; i < branch.length; i++) {
+                const f = branch[i];
+                nodePos[f.id] = { x: 20 + Object.keys(branches).indexOf(branchId) * (nodeW + 60), y: 40 + i * (nodeH + gapY) };
+            }
+        }
+
+        let maxX = 0, maxY = 0;
+        for (const p of Object.values(nodePos)) {
+            maxX = Math.max(maxX, p.x + nodeW);
+            maxY = Math.max(maxY, p.y + nodeH);
+        }
+        const mapW = maxX + 40;
+        const mapH = maxY + 20;
+
+        // SVG линии зависимостей
+        let svg = `<svg style="position:absolute;top:0;left:0;width:${mapW}px;height:${mapH}px;pointer-events:none;">`;
+
+        for (const f of countryFocuses) {
+            if (!nodePos[f.id]) continue;
+            for (const preId of f.prereqs) {
+                if (!nodePos[preId]) continue;
+                const from = nodePos[preId];
+                const to = nodePos[f.id];
+                const x1 = from.x + nodeW / 2;
+                const y1 = from.y + nodeH;
+                const x2 = to.x + nodeW / 2;
+                const y2 = to.y;
+
+                const preOk = completed.has(preId);
+                const color = preOk ? '#22c55e' : '#374151';
+                svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2" ${preOk ? '' : 'stroke-dasharray="4,4"'}/>`;
+                svg += `<polygon points="${x2-4},${y2-2} ${x2+4},${y2-2} ${x2},${y2+4}" fill="${color}"/>`;
+            }
+        }
+        svg += `</svg>`;
+
+        // Заголовки веток
+        let headers = '';
+        for (const [branchId] of Object.entries(branches)) {
+            const bi = branchInfo[branchId] || { name: branchId, color: '#666', icon: '📁' };
+            const idx = Object.keys(branches).indexOf(branchId);
+            headers += `<div style="position:absolute;left:${20 + idx * (nodeW + 60)}px;top:10px;width:${nodeW}px;text-align:center;color:${bi.color};font-size:12px;font-weight:bold;">${bi.icon} ${bi.name}</div>`;
+        }
+
+        // Ноды
+        let nodes = '';
+        for (const f of countryFocuses) {
+            const pos = nodePos[f.id];
+            if (!pos) continue;
+
+            const isCompleted = completed.has(f.id);
+            const canStart = !isCompleted && !activeFocus && this.focusSys && this.focusSys.checkPrerequisites(f.id);
+            const isActive = activeFocus && activeFocus.id === f.id;
+
+            let bg = '#1f2937', border = '#374151', text = '#9ca3af';
+            if (isCompleted) { bg = '#052e16'; border = '#22c55e'; text = '#86efac'; }
+            if (isActive) { bg = '#0c1e3a'; border = '#3b82f6'; text = '#93c5fd'; }
+            if (canStart) { bg = '#422006'; border = '#eab308'; text = '#fde047'; }
+
+            const click = canStart ? `onclick="window.startFocus('${f.id}')" style="cursor:pointer;"` : '';
+
+            nodes += `<div ${click} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:8px;padding:6px;text-align:center;${canStart ? 'transform:scale(1.03);' : ''}">`;
+            nodes += `<div style="font-size:18px;">${f.icon}</div>`;
+            nodes += `<div style="font-size:9px;font-weight:bold;color:${text};margin-top:2px;">${f.name}</div>`;
+            nodes += `<div style="font-size:7px;color:#6b7280;margin-top:1px;">${f.desc}</div>`;
+            if (isCompleted) nodes += `<div style="font-size:7px;color:#22c55e;margin-top:2px;">✓</div>`;
+            else if (isActive) nodes += `<div style="font-size:7px;color:#3b82f6;margin-top:2px;">⏳ ${activeFocus.daysLeft}д</div>`;
+            else if (canStart) nodes += `<div style="font-size:7px;color:#eab308;margin-top:2px;">⭐ Начать</div>`;
+            else nodes += `<div style="font-size:7px;color:#6b7280;margin-top:2px;">🔒</div>`;
+            nodes += `</div>`;
+        }
+
+        content.innerHTML = `
+            <div style="position:relative;width:${mapW}px;height:${mapH}px;overflow:auto;">
+                ${svg}
+                ${headers}
+                ${nodes}
             </div>
         `;
-        
-        content.innerHTML = html;
     }
     
     renderDiplomacyWindow(content) {

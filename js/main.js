@@ -18,6 +18,7 @@ import { ArmyManager } from './systems/ArmyManager.js';
 import { SupplySystem } from './systems/SupplySystem.js';
 import { DiplomacySystem } from './systems/DiplomacySystem.js';
 import { TechSystem, TECH_TREE, TECH_BRANCHES } from './systems/TechSystem.js';
+import { FocusSystem, FOCUS_TREE } from './systems/FocusSystem.js';
 import { FocusSystem } from './systems/FocusSystem.js';
 import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
@@ -74,6 +75,7 @@ async function init() {
     combat.tech = tech;
     window._TECH_TREE = TECH_TREE;
     window._TECH_BRANCHES = TECH_BRANCHES;
+    window._FOCUS_TREE = FOCUS_TREE;
     focus = new FocusSystem(gameState, world, entities);
 
     updateLoadingBar(30, 'Инициализация UI...');
@@ -81,7 +83,7 @@ async function init() {
     // Инициализация UI
     notifications = new Notifications();
     topBar = new TopBar(gameState);
-    windowsManager = new WindowsManager(world, entities, gameState, tech);
+    windowsManager = new WindowsManager(world, entities, gameState, tech, focus);
     uiManager = new UIManager(world, entities, gameState, windowsManager, topBar);
 
     updateLoadingBar(45, 'Загрузка карты...');
