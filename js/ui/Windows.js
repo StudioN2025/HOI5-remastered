@@ -462,18 +462,20 @@ export class WindowsManager {
     }
     
     renderSaveWindow(content) {
-        let html = `
-            <div class="space-y-4">
-                <div style="display:flex;gap:8px;">
+        const slotName = localStorage.getItem('heirloom_slotName') || 'Нет сохранений';
+
+        content.innerHTML = `
+            <div style="padding:12px;">
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
                     <button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">💾 СОХРАНИТЬ</button>
                     <button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">📂 ЗАГРУЗИТЬ</button>
                 </div>
-                <div class="text-center text-gray-500 text-sm">
-                    Автосохранение каждые 30 дней
+                <div style="background:#1f2937;border:1px solid #374151;border-radius:6px;padding:10px;">
+                    <div style="font-size:10px;color:#9ca3af;margin-bottom:4px;">ПОСЛЕДНЕЕ СОХРАНЕНИЕ:</div>
+                    <div style="font-size:13px;color:#eab308;font-weight:bold;font-family:monospace;">${slotName}</div>
                 </div>
+                <div style="text-align:center;color:#6b7280;font-size:10px;margin-top:8px;">Автосохранение каждые 30 дней</div>
             </div>
         `;
-        
-        content.innerHTML = html;
     }
 }

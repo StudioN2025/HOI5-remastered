@@ -429,77 +429,30 @@ export class AIController {
     // ── Движение атакующих (с A*) ────────────────────────────────────────────
 
     _moveAttackers(id, units, target, borderPts, mem, day) {
-        const orders = mem.unitOrders;
-
         for (let i = 0; i < units.length; i++) {
             const uid = units[i];
             if (this.entities.inCombat[uid]) continue;
 
             const ux = this.entities.x[uid];
             const uy = this.entities.y[uid];
-
-            // Назначаем точку на границе (распределяем равномерно)
             const assignedBorder = borderPts[i % borderPts.length];
 
-            const dist = Math.abs(ux - assignedBorder.x) + Math.abs(uy - assignedBorder.y);
-
-            if (dist === 0) {
-                // Стоим на границе — атакуем вражескую клетку рядом
+            // Уже на границе — атакуем
+            if (ux === assignedBorder.x && uy === assignedBorder.y) {
                 this._attackAdjacent(uid, target);
                 continue;
             }
 
-            if (dist === 1) {
-                // Рядом с границей — попробуем атаковать через неё
-                const attacked = this._attackAdjacent(uid, target);
-                if (!attacked) this._stepAlongPath(uid, orders, assignedBorder, id, day);
-                continue;
+            // Ищем ближайшую клетку к цели по 4-связности
+            const dx = Math.sign(assignedBorder.x - ux);
+            const dy = Math.sign(assignedBorder.y - uy);
+            const nx = ux + dx;
+            const ny = uy + dy;
+
+            if (this.world.getCell(nx, ny) !== 0 && !this.entities.getUnitAt(nx, ny)) {
+                this.entities.moveTo(uid, nx, ny);
             }
-
-            // Двигаемся по A* к точке границы
-            this._stepAlongPath(uid, orders, assignedBorder, id, day);
         }
-    }
-
-    // Делаем один шаг по кешированному пути (или строим новый)
-    _stepAlongPath(uid, orders, goal, ownerId, day) {
-        let order = orders.get(uid);
-
-        const needRepath = !order
-            || !order.path.length
-            || order.goal.x !== goal.x || order.goal.y !== goal.y
-            || (day - (order.builtDay || 0)) > this.PATH_CACHE_TTL;
-
-        if (needRepath) {
-            const sx = this.entities.x[uid], sy = this.entities.y[uid];
-            // A* по своей + вражеской территории (передаём null как ownerId чтобы идти везде)
-            const raw = this._findPath(sx, sy, goal.x, goal.y, ownerId);
-            order = { path: raw || [], goal: { ...goal }, builtDay: day };
-            orders.set(uid, order);
-        }
-
-        if (!order.path.length) return; // путь не найден
-
-        // Берём следующую точку из пути
-        const next = order.path[0];
-        const [nx, ny] = next.split(',').map(Number);
-
-        // Клетка занята другим юнитом — пропускаем шаг (не застреваем)
-        if (this.entities.getUnitAt(nx, ny)) {
-            // Пробуем следующую точку в пути
-            if (order.path.length > 1) {
-                const [nx2, ny2] = order.path[1].split(',').map(Number);
-                if (!this.entities.getUnitAt(nx2, ny2)) {
-                    order.path.shift();
-                    this.entities.moveTo(uid, nx2, ny2);
-                    order.path.shift();
-                }
-            }
-            return;
-        }
-
-        this.entities.moveTo(uid, nx, ny);
-        order.path.shift();
     }
 
     // Атакуем соседнюю вражескую клетку (через боевую систему)

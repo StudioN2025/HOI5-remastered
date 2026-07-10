@@ -842,14 +842,23 @@ function startGame(countryId) {
 }
 
 function saveGame() {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    const slotName = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}`;
+
     const saveData = {
-        version: '3.0',
+        version: '4.0',
         timestamp: Date.now(),
+        slotName,
         world: world.serialize(),
         entities: entities.serialize(),
         gameState: gameState.serialize()
     };
     localStorage.setItem('heirloom_save', JSON.stringify(saveData));
+    localStorage.setItem('heirloom_slotName', slotName);
 }
 
 function loadGame() {
