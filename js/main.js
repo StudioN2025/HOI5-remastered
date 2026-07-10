@@ -72,6 +72,8 @@ async function init() {
     diplomacy = new DiplomacySystem(gameState, world, entities);
     tech = new TechSystem(gameState);
     combat.tech = tech;
+    window._TECH_TREE = TECH_TREE;
+    window._TECH_BRANCHES = TECH_BRANCHES;
     focus = new FocusSystem(gameState, world, entities);
 
     updateLoadingBar(30, 'Инициализация UI...');
