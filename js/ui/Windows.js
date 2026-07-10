@@ -197,17 +197,113 @@ export class WindowsManager {
     
     renderFocusWindow(content) {
         const focusTree = window._FOCUS_TREE || {};
-
         const myId = this.gameState.myCountryId;
         const completed = this.gameState.completedFocuses || new Set();
         const activeFocus = this.gameState.activeFocus;
 
-        // Фильтруем фокусы страны
         const countryFocuses = Object.values(focusTree).filter(f => f.country === myId);
         if (!countryFocuses.length) {
             content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для этой страны</div>';
             return;
         }
+
+        // Ветки и их цвета
+        const branchInfo = {
+            military:  { name: 'ВОЕННЫЕ', color: '#ef4444', icon: '⚔️' },
+            economy:   { name: 'ЭКОНОМИКА', color: '#22c55e', icon: '🏭' },
+            diplomacy: { name: 'ДИПЛОМАТИЯ', color: '#3b82f6', icon: '🤝' },
+        };
+
+        // Собираем ветки
+        const branchIds = [...new Set(countryFocuses.map(f => f.branch))];
+        const nodeW = 120, nodeH = 70, gapY = 16, gapX = 50;
+        const nodePos = {};
+
+        for (let bi = 0; bi < branchIds.length; bi++) {
+            const bId = branchIds[bi];
+            const items = countryFocuses.filter(f => f.branch === bId).sort((a, b) => a.tier - b.tier);
+            const bx = 10 + bi * (nodeW + gapX);
+
+            for (let ti = 0; ti < items.length; ti++) {
+                nodePos[items[ti].id] = { x: bx, y: 35 + ti * (nodeH + gapY) };
+            }
+        }
+
+        let mapW = 0, mapH = 0;
+        for (const p of Object.values(nodePos)) {
+            mapW = Math.max(mapW, p.x + nodeW);
+            mapH = Math.max(mapH, p.y + nodeH);
+        }
+        mapW += 20; mapH += 20;
+
+        // ── SVG: линии связей ──
+        let svg = `<svg style="position:absolute;top:0;left:0;width:${mapW}px;height:${mapH}px;pointer-events:none;">`;
+
+        for (const f of countryFocuses) {
+            if (!nodePos[f.id]) continue;
+            for (const preId of (f.prereqs || [])) {
+                if (!nodePos[preId]) continue;
+                const from = nodePos[preId];
+                const to = nodePos[f.id];
+                const x1 = from.x + nodeW / 2;
+                const y1 = from.y + nodeH;
+                const x2 = to.x + nodeW / 2;
+                const y2 = to.y;
+                const ok = completed.has(preId);
+                const c = ok ? '#22c55e' : '#374151';
+
+                // Линия
+                svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="2" ${ok ? '' : 'stroke-dasharray="5,3"'}/>`;
+                // Стрелка вниз
+                svg += `<polygon points="${x2-5},${y2-1} ${x2+5},${y2-1} ${x2},${y2+5}" fill="${c}"/>`;
+            }
+        }
+        svg += `</svg>`;
+
+        // ── Заголовки веток ──
+        let headers = '';
+        for (let bi = 0; bi < branchIds.length; bi++) {
+            const bInfo = branchInfo[branchIds[bi]] || { name: branchIds[bi], color: '#666', icon: '📁' };
+            headers += `<div style="position:absolute;left:${10 + bi * (nodeW + gapX)}px;top:8px;width:${nodeW}px;text-align:center;color:${bInfo.color};font-size:11px;font-weight:bold;letter-spacing:0.05em;">${bInfo.icon} ${bInfo.name}</div>`;
+        }
+
+        // ── Ноды (квадратные) ──
+        let nodes = '';
+        for (const f of countryFocuses) {
+            const pos = nodePos[f.id];
+            if (!pos) continue;
+
+            const done = completed.has(f.id);
+            const active = activeFocus && activeFocus.id === f.id;
+            const avail = !done && !active && this.focusSys && this.focusSys.checkPrerequisites(f.id);
+
+            let bg = '#1a1a2e', border = '#2d2d44', txt = '#888';
+            if (done)   { bg = '#0a2e1a'; border = '#22c55e'; txt = '#86efac'; }
+            if (active) { bg = '#0a1a3e'; border = '#3b82f6'; txt = '#93c5fd'; }
+            if (avail)  { bg = '#2e2a0a'; border = '#eab308'; txt = '#fde047'; }
+
+            const click = avail ? `onclick="window.startFocus('${f.id}')" style="cursor:pointer;"` : '';
+            const glow = avail ? 'box-shadow:0 0 8px rgba(234,179,8,0.3);' : done ? 'box-shadow:0 0 6px rgba(34,197,94,0.2);' : '';
+
+            nodes += `<div ${click} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;${glow}">`;
+            nodes += `<div style="font-size:22px;line-height:1;">${f.icon}</div>`;
+            nodes += `<div style="font-size:9px;font-weight:bold;color:${txt};margin-top:4px;line-height:1.2;">${f.name}</div>`;
+            nodes += `<div style="font-size:7px;color:#555;margin-top:2px;line-height:1.2;">${f.desc}</div>`;
+            if (done) nodes += `<div style="font-size:8px;color:#22c55e;margin-top:3px;">✓</div>`;
+            else if (active) nodes += `<div style="font-size:8px;color:#3b82f6;margin-top:3px;">⏳ ${activeFocus.daysLeft}д</div>`;
+            else if (avail) nodes += `<div style="font-size:8px;color:#eab308;margin-top:3px;">⭐ Начать</div>`;
+            else nodes += `<div style="font-size:8px;color:#444;margin-top:3px;">🔒</div>`;
+            nodes += `</div>`;
+        }
+
+        content.innerHTML = `
+            <div style="position:relative;width:${mapW}px;height:${mapH}px;overflow:auto;padding:4px;">
+                ${svg}
+                ${headers}
+                ${nodes}
+            </div>
+        `;
+    }
 
         // Группируем по веткам
         const branches = {};
