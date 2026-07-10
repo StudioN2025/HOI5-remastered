@@ -286,14 +286,7 @@ export class WindowsManager {
         content.innerHTML = `<div style="position:relative;width:${mapW}px;height:${mapH}px;overflow:auto;padding:4px;">${svg}${nodes}</div>`;
     }
 
-        const branchInfo = {
-            root:      { name: 'СТАРТ',       color: '#eab308', icon: '📜' },
-            military:  { name: 'ВОЕННЫЕ',     color: '#ef4444', icon: '⚔️' },
-            economy:   { name: 'ЭКОНОМИКА',   color: '#22c55e', icon: '🏭' },
-            diplomacy: { name: 'ДИПЛОМАТИЯ',  color: '#3b82f6', icon: '🤝' },
-            war:       { name: 'ВОЙНЫ',       color: '#dc2626', icon: '💀' },
-            end:       { name: 'КОНЕЦ',       color: '#6b7280', icon: '🏳️' },
-        };
+    renderDiplomacyWindow(content) {
 
         // Собираем ветки
         const branchIds = [...new Set(countryFocuses.map(f => f.branch))];
