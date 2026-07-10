@@ -1,12 +1,9 @@
 // FocusSystem.js — Система фокусов
 
 import { addNotification } from '../utils/helpers.js';
-import { GERMANY_FOCUS_TREE } from '../data/FocusTree.js';
+import { FOCUS_TREE } from '../data/FocusTree.js';
 
-// Все фокусы всех стран
-export const FOCUS_TREE = {
-    ...GERMANY_FOCUS_TREE,
-};
+export { FOCUS_TREE };
 
 export class FocusSystem {
     constructor(gameState, world, entities) {
@@ -60,6 +57,7 @@ export class FocusSystem {
         if (!eff) return;
 
         if (eff.equipment) this.gameState.equipment += eff.equipment;
+        if (eff.manpower) this.gameState.manpower = Math.min(this.gameState.manpower + eff.manpower, this.gameState.maxManpower || 99999);
         if (eff.factories) this._addFactories(eff.factories);
         if (eff.ports) this._addPorts(eff.ports);
         if (eff.war) this.gameState.addWar(myId, eff.war);
@@ -77,8 +75,8 @@ export class FocusSystem {
             for (let i = 0; i < eff.infantry; i++) {
                 const cells = Array.from(this.world.getCountryCells(myId));
                 if (cells.length > 0) {
-                    const [x, y] = cells[0].split(',').map(Number);
-                    this.entities.createEntity(myId, 0, x + i, y);
+                    const [x, y] = cells[Math.floor(Math.random() * cells.length)].split(',').map(Number);
+                    this.entities.createEntity(myId, 0, x + (i % 3), y + Math.floor(i / 3));
                 }
             }
         }
@@ -86,8 +84,8 @@ export class FocusSystem {
             for (let i = 0; i < eff.tanks; i++) {
                 const cells = Array.from(this.world.getCountryCells(myId));
                 if (cells.length > 0) {
-                    const [x, y] = cells[0].split(',').map(Number);
-                    this.entities.createEntity(myId, 1, x + i, y);
+                    const [x, y] = cells[Math.floor(Math.random() * cells.length)].split(',').map(Number);
+                    this.entities.createEntity(myId, 1, x + (i % 3), y + Math.floor(i / 3));
                 }
             }
         }
