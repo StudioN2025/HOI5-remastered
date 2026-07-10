@@ -111,27 +111,21 @@ export class DataLoader {
             console.log(`✅ Автоматически добавлено ${portsLoaded} портов`);
         }
 
-        // Генерируем водные клетки — всё вокруг суши (для флота)
-        // Сначала первый слой рядом с сушей
+        // Генерируем водные клетки — вся территория за 5 клеток от края карты
+        // Определяем границы карты
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (const posKey of Object.keys(gridData)) {
             const [x, y] = posKey.split(',').map(Number);
-            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]) {
-                const nx = x + dx, ny = y + dy;
-                if (!gridData[`${nx},${ny}`] && !world.isWater(nx, ny)) {
-                    world.setWater(nx, ny);
-                }
-            }
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
         }
-        // Расширяем воду ещё на 3 слоя (итого ~5 клеток от суши)
-        for (let layer = 0; layer < 3; layer++) {
-            const currentWater = [...world.waterCells];
-            for (const posKey of currentWater) {
-                const [x, y] = posKey.split(',').map(Number);
-                for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                    const nx = x + dx, ny = y + dy;
-                    if (!gridData[`${nx},${ny}`] && !world.isWater(nx, ny)) {
-                        world.setWater(nx, ny);
-                    }
+
+        // Вода — всё что дальше 5 клеток от края карты
+        const MARGIN = 5;
+        for (let x = minX - MARGIN; x <= maxX + MARGIN; x++) {
+            for (let y = minY - MARGIN; y <= maxY + MARGIN; y++) {
+                if (!gridData[`${x},${y}`]) {
+                    world.setWater(x, y);
                 }
             }
         }
