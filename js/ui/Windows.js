@@ -301,22 +301,8 @@ export class WindowsManager {
             </div>
         `;
     }
-
-        // Ветки и их цвета
-        const branchInfo = {
-            military:  { name: 'ВОЕННЫЕ', color: '#ef4444', icon: '⚔️' },
-            economy:   { name: 'ЭКОНОМИКА', color: '#22c55e', icon: '🏭' },
-            diplomacy: { name: 'ДИПЛОМАТИЯ', color: '#3b82f6', icon: '🤝' },
-        };
-
-        // Собираем ветки
-        const branchIds = [...new Set(countryFocuses.map(f => f.branch))];
-        const nodeW = 120, nodeH = 70, gapY = 16, gapX = 50;
-        const nodePos = {};
-
-        for (let bi = 0; bi < branchIds.length; bi++) {
-            const bId = branchIds[bi];
-            const items = countryFocuses.filter(f => f.branch === bId).sort((a, b) => a.tier - b.tier);
+    
+    renderDiplomacyWindow(content) {
             const bx = 10 + bi * (nodeW + gapX);
 
             for (let ti = 0; ti < items.length; ti++) {
