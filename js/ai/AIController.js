@@ -263,19 +263,18 @@ export class AIController {
     _recruit(id, cells, units, profile, atWar) {
         const mem = this.mem.get(id);
         const now = Date.now();
-        if (now - mem.lastRecruit < (atWar ? 4000 : 9000)) return;
+        if (now - mem.lastRecruit < (atWar ? 1500 : 9000)) return;
 
-        const target = Math.min(50, Math.max(5,
-            Math.floor(cells.size / (profile.power >= 70 ? 4 : profile.power >= 40 ? 6 : 9))
-            * (atWar ? 1.5 : 1)
+        const target = Math.min(80, Math.max(8,
+            Math.floor(cells.size / (profile.power >= 70 ? 3 : profile.power >= 40 ? 5 : 7))
+            * (atWar ? 2.5 : 1)
         ));
         if (units.length >= target) return;
 
-        // Проверяем людские ресурсы ИИ (восстанавливаются как у игрока)
         if (!mem.manpower) mem.manpower = cells.size * 1000;
-        mem.manpower = Math.min(cells.size * 1000, mem.manpower + 10);
+        mem.manpower = Math.min(cells.size * 1000, mem.manpower + 20);
 
-        const toSpawn = Math.min(atWar ? 3 : 1, target - units.length);
+        const toSpawn = Math.min(atWar ? 5 : 1, target - units.length);
         for (let i = 0; i < toSpawn; i++) this._spawnUnit(id, cells, profile, atWar, mem);
         mem.lastRecruit = now;
     }
@@ -410,7 +409,6 @@ export class AIController {
     // ── Военные действия ─────────────────────────────────────────────────────
 
     _military(id, units, enemies, mem, profile, day) {
-        // Выбираем цель — ближайшего слабого врага с общей границей
         if (!mem.warTarget || !enemies.includes(mem.warTarget)
             || !this.world.getCountryCells(mem.warTarget).size
             || !this.world.getBorderWith(id, mem.warTarget).length) {
@@ -422,16 +420,10 @@ export class AIController {
         const border = this.world.getBorderWith(id, target);
         if (!border.length) { mem.warTarget = null; return; }
 
-        // Парсим точки границы один раз
         const borderPts = border.map(b => { const [x,y]=b.split(',').map(Number); return {x,y}; });
 
-        // Делим юниты: 75% атакуют, 25% держат оборону
-        const attackCount = Math.max(1, Math.ceil(units.length * 0.75));
-        const attackers   = units.slice(0, attackCount);
-        const defenders   = units.slice(attackCount);
-
-        this._moveAttackers(id, attackers, target, borderPts, mem, day);
-        if (defenders.length) this._moveDefenders(id, defenders, enemies);
+        // ВСЕ юниты идут к границе врага
+        this._moveAttackers(id, units, target, borderPts, mem, day);
     }
 
     // ── Движение атакующих (с A*) ────────────────────────────────────────────
@@ -537,43 +529,6 @@ export class AIController {
             return true;
         }
         return false;
-    }
-
-    // ── Движение защитников ───────────────────────────────────────────────────
-
-    _moveDefenders(id, units, enemies) {
-        // Собираем все точки границы со всеми врагами
-        const borderPts = [];
-        for (const e of enemies) {
-            const b = this.world.getBorderWith(id, e);
-            for (const c of b.slice(0, 20)) {
-                const [x,y] = c.split(',').map(Number);
-                borderPts.push({x,y});
-            }
-        }
-        if (!borderPts.length) return;
-
-        for (let i = 0; i < units.length; i++) {
-            const uid = units[i];
-            if (this.entities.inCombat[uid]) continue;
-
-            const target = borderPts[i % borderPts.length];
-            const ux = this.entities.x[uid], uy = this.entities.y[uid];
-
-            // Если уже на границе — стоп
-            if (ux === target.x && uy === target.y) continue;
-
-            // Используем A* для движения к границе
-            const path = this._findPath(ux, uy, target.x, target.y, id);
-            if (!path || !path.length) continue;
-
-            const next = path[0];
-            const [nx, ny] = next.split(',').map(Number);
-
-            if (!this.entities.getUnitAt(nx, ny) && this.world.getCell(nx, ny) !== 0) {
-                this.entities.moveTo(uid, nx, ny);
-            }
-        }
     }
 
     // ── Мирное время ─────────────────────────────────────────────────────────
