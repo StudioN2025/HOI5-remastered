@@ -48,23 +48,25 @@ export class WindowsManager {
         content.innerHTML = html;
     }
     
-    renderFocusWindow(content) { this.renderResearchWindow(content); }
-
-    renderResearchWindow(content) {
+    renderFocusWindow(content) {
+        // Фокусное окно — свой скролл, без padding
+        content.style.padding = '0';
+        content.style.overflow = 'hidden';
         var focusTree = window._FOCUS_TREE || {};
         var myId = this.gameState.myCountryId;
         var completed = this.gameState.completedFocuses || new Set();
         var activeFocus = this.gameState.activeFocus;
         var allFocuses = Object.values(focusTree).filter(function(f) { return f.country === myId; });
 
+        console.log('[Focus] myId=' + myId + ' total=' + Object.keys(focusTree).length + ' matched=' + allFocuses.length);
+
         if (!allFocuses.length) {
-            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов</div>';
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для ' + (myId || '?') + '</div>';
             return;
         }
 
         var NW = 140, NH = 70, PAD = 10;
 
-        // Найти границы всех фокусов
         var minX = 99999, minY = 99999, maxX = 0, maxY = 0;
         for (var i = 0; i < allFocuses.length; i++) {
             var f = allFocuses[i];
@@ -76,7 +78,105 @@ export class WindowsManager {
             if (fy + NH > maxY) maxY = fy + NH;
         }
 
-        // Пересчитать координаты начиная от 0,0
+        var pos = {};
+        for (var i = 0; i < allFocuses.length; i++) {
+            var f = allFocuses[i];
+            var fx = f.x !== undefined ? f.x : 50;
+            var fy = f.y !== undefined ? f.y : 50;
+            pos[f.id] = { x: fx - minX + PAD, y: fy - minY + PAD };
+        }
+
+        var totalW = maxX - minX + PAD * 2;
+        var totalH = maxY - minY + PAD * 2;
+        if (totalW < 400) totalW = 400;
+        if (totalH < 300) totalH = 300;
+
+        var svg = '<svg style="position:absolute;top:0;left:0;width:' + totalW + 'px;height:' + totalH + 'px;pointer-events:none;z-index:1;">';
+        for (var i = 0; i < allFocuses.length; i++) {
+            var f = allFocuses[i];
+            if (!pos[f.id]) continue;
+            var prereqs = f.prereqs || [];
+            for (var j = 0; j < prereqs.length; j++) {
+                var preId = prereqs[j];
+                if (!pos[preId]) continue;
+                var a = pos[preId], b = pos[f.id];
+                var ok = completed.has(preId);
+                var clr = ok ? '#22c55e' : '#4b5563';
+                var ax = a.x + NW / 2, ay = a.y + NH;
+                var bx2 = b.x + NW / 2, by2 = b.y;
+                svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx2 + '" y2="' + by2 + '" stroke="' + clr + '" stroke-width="2" ' + (ok ? '' : 'stroke-dasharray="5,3"') + '/>';
+                var dx = bx2 - ax, dy = by2 - ay;
+                var len = Math.sqrt(dx * dx + dy * dy) || 1;
+                var ux = dx / len, uy = dy / len;
+                svg += '<polygon points="' + (bx2 - ux*5 - uy*3) + ',' + (by2 - uy*5 + ux*3) + ' ' + (bx2 - ux*5 + uy*3) + ',' + (by2 - uy*5 - ux*3) + ' ' + bx2 + ',' + by2 + '" fill="' + clr + '"/>';
+            }
+        }
+        svg += '</svg>';
+
+        var nodes = '';
+        for (var i = 0; i < allFocuses.length; i++) {
+            var f = allFocuses[i];
+            var p = pos[f.id];
+            if (!p) continue;
+            var done = completed.has(f.id);
+            var isActive = activeFocus && activeFocus.id === f.id;
+            var avail = !done && !isActive && this.focusSys && this.focusSys.checkPrerequisites(f.id);
+            var bg, border, txt;
+            if (done) { bg = '#052e16'; border = '#22c55e'; txt = '#86efac'; }
+            else if (isActive) { bg = '#0c1e3a'; border = '#3b82f6'; txt = '#93c5fd'; }
+            else if (avail) { bg = '#422006'; border = '#eab308'; txt = '#fde047'; }
+            else { bg = '#1f2937'; border = '#4b5563'; txt = '#9ca3af'; }
+            var click = avail ? ' onclick="window.startFocus(\'' + f.id + '\')"' : '';
+            nodes += '<div' + click + ' style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px;background:' + bg + ';border:2px solid ' + border + ';border-radius:6px;padding:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;' + (avail ? 'cursor:pointer;' : '') + '">';
+            nodes += '<div style="font-size:20px;">' + (f.icon || '⭐') + '</div>';
+            nodes += '<div style="font-size:10px;font-weight:bold;color:' + txt + ';margin-top:2px;line-height:1.1;">' + f.name + '</div>';
+            if (f.desc) nodes += '<div style="font-size:8px;color:#888;margin-top:1px;line-height:1.1;max-width:' + (NW - 12) + 'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f.desc + '</div>';
+            if (done) nodes += '<div style="font-size:8px;color:#22c55e;margin-top:1px;">✓</div>';
+            else if (isActive) nodes += '<div style="font-size:8px;color:#3b82f6;margin-top:1px;">⏳ ' + activeFocus.daysLeft + 'д</div>';
+            else if (avail) nodes += '<div style="font-size:8px;color:#eab308;margin-top:1px;">Начать</div>';
+            else nodes += '<div style="font-size:8px;color:#4b5563;margin-top:1px;">🔒</div>';
+            nodes += '</div>';
+        }
+
+        var html = '<div id="focus-scroll" style="width:100%;height:100%;overflow:auto;background:#0a0a0a;">';
+        html += '<div style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;min-width:100%;min-height:100%;">';
+        html += svg + nodes;
+        html += '</div></div>';
+
+        content.innerHTML = html;
+    }
+
+    renderResearchWindow(content) {
+        // Восстанавливаем стили для research-таба
+        content.style.padding = '';
+        content.style.overflow = '';
+        var myId = this.gameState.myCountryId;
+        var completed = this.gameState.completedFocuses || new Set();
+        var activeFocus = this.gameState.activeFocus;
+        var allFocuses = Object.values(focusTree).filter(function(f) { return f.country === myId; });
+
+        console.log('[FocusRender] myId=' + myId + ' total=' + Object.keys(focusTree).length + ' matched=' + allFocuses.length);
+
+        if (!allFocuses.length) {
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для ' + (myId || '?') + '</div>';
+            return;
+        }
+
+        var NW = 140, NH = 70, PAD = 10;
+
+        // Найти границы
+        var minX = 99999, minY = 99999, maxX = 0, maxY = 0;
+        for (var i = 0; i < allFocuses.length; i++) {
+            var f = allFocuses[i];
+            var fx = f.x !== undefined ? f.x : 50;
+            var fy = f.y !== undefined ? f.y : 50;
+            if (fx < minX) minX = fx;
+            if (fy < minY) minY = fy;
+            if (fx + NW > maxX) maxX = fx + NW;
+            if (fy + NH > maxY) maxY = fy + NH;
+        }
+
+        // Пересчитать начиная от 0,0
         var pos = {};
         for (var i = 0; i < allFocuses.length; i++) {
             var f = allFocuses[i];
@@ -128,7 +228,7 @@ export class WindowsManager {
             else if (avail) { bg = '#422006'; border = '#eab308'; txt = '#fde047'; }
             else { bg = '#1f2937'; border = '#4b5563'; txt = '#9ca3af'; }
             var click = avail ? ' onclick="window.startFocus(\'' + f.id + '\')"' : '';
-            nodes += '<div' + click + ' style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px;background:' + bg + ';border:2px solid ' + border + ';border-radius:6px;padding:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;' + (avail ? 'cursor:pointer;' : '') + '">';
+            nodes += '<div' + click + ' style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px;background:' + bg + ';border:2px solid ' + border + ';border-radius:6px;padding:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;' + (avail ? 'cursor:pointer;' : '') + '">';
             nodes += '<div style="font-size:20px;">' + (f.icon || '⭐') + '</div>';
             nodes += '<div style="font-size:10px;font-weight:bold;color:' + txt + ';margin-top:2px;line-height:1.1;">' + f.name + '</div>';
             if (f.desc) nodes += '<div style="font-size:8px;color:#888;margin-top:1px;line-height:1.1;max-width:' + (NW - 12) + 'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f.desc + '</div>';
@@ -139,17 +239,10 @@ export class WindowsManager {
             nodes += '</div>';
         }
 
-        // Скролл контейнер с правильным content-size
-        var html = '<div style="position:relative;width:100%;height:100%;overflow:hidden;background:#0a0a0a;">';
-        html += '<div id="focus-scroll" style="width:100%;height:calc(100% - 36px);overflow:auto;">';
-        html += '<div style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;">';
+        // Контейнер — один уровень скролла
+        var html = '<div id="focus-scroll" style="width:100%;height:100%;overflow:auto;background:#0a0a0a;">';
+        html += '<div style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;min-width:100%;min-height:100%;">';
         html += svg + nodes;
-        html += '</div></div>';
-        html += '<div style="position:absolute;bottom:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:center;gap:12px;background:#111827;border-top:1px solid #374151;">';
-        html += '<button onclick="var e=document.getElementById(\'focus-scroll\');e.scrollLeft-=200;" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">◀</button>';
-        html += '<button onclick="var e=document.getElementById(\'focus-scroll\');e.scrollLeft+=200;" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▶</button>';
-        html += '<button onclick="var e=document.getElementById(\'focus-scroll\');e.scrollTop-=150;" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▲</button>';
-        html += '<button onclick="var e=document.getElementById(\'focus-scroll\');e.scrollTop+=150;" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▼</button>';
         html += '</div></div>';
 
         content.innerHTML = html;

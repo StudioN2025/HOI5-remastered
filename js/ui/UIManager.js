@@ -34,6 +34,10 @@ export class UIManager {
         if (!win || !title || !content) return;
         
         win.classList.remove('hidden');
+
+        // Сброс стилей при переключении вкладок
+        content.style.padding = '';
+        content.style.overflow = '';
         
         const titles = {
             army: '🎖️ АРМИЯ',
