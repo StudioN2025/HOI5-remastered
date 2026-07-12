@@ -386,38 +386,16 @@ function setupEvents() {
     };
     
     window.quickSave = () => {
-        const slot = localStorage.getItem('heirloom_lastSlot') || 1;
-        saveGame(slot);
-        addNotification('💾 Игра сохранена!', 'info');
+        saveGame();
+        addNotification('💾 Файл .hrl скачан!', 'info');
     };
 
     window.quickLoad = () => {
-        const slot = localStorage.getItem('heirloom_lastSlot') || 1;
-        loadGame(slot);
-        addNotification('📂 Игра загружена!', 'info');
-        renderer.cameraInitialized = false;
+        loadGame();
     };
 
-    window.saveToSlot = (slot) => {
-        saveGame(slot);
-        // Сохраняем имя слота
-        const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = String(now.getFullYear()).slice(-2);
-        const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        const name = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}`;
-        localStorage.setItem(`heirloom_slot_${slot}_name`, name);
-        addNotification(`💾 Сохранено в слот ${slot}!`, 'info');
-        uiManager.openWindow('save');
-    };
-
-    window.loadFromSlot = (slot) => {
-        loadGame(slot);
-        addNotification(`📂 Загружено из слота ${slot}!`, 'info');
-        renderer.cameraInitialized = false;
-        uiManager.openWindow('save');
-    };
+    window.saveToSlot = window.quickSave;
+    window.loadFromSlot = window.quickLoad;
     
     window.createArmy = () => {
         if (!armyManager) return;
@@ -662,7 +640,23 @@ function startGameLoop() {
 
             needsRender = true;
 
-            if (gameState.days % 30 === 0 && gameState.days > 0) saveGame(1);
+            if (gameState.days % 30 === 0 && gameState.days > 0) {
+                // Автосохранение — тихое скачивание
+                const saveData = {
+                    version: '5.0',
+                    timestamp: Date.now(),
+                    world: world.serialize(),
+                    entities: entities.serialize(),
+                    gameState: gameState.serialize()
+                };
+                const blob = new Blob([JSON.stringify(saveData)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `autosave_${gameState.days}.hrl`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
         }
 
         // Рендер: только если нужно и прошёл минимальный интервал
@@ -852,62 +846,81 @@ function startGame(countryId) {
     startGameLoop();
 }
 
-function saveGame(slot) {
+function saveGame() {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const year = String(now.getFullYear()).slice(-2);
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-    const slotName = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}`;
-    const slotKey = `heirloom_slot_${slot || 1}`;
+    const fileName = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}.hrl`;
 
     const saveData = {
-        version: '4.0',
+        version: '5.0',
         timestamp: Date.now(),
-        slotName,
         world: world.serialize(),
         entities: entities.serialize(),
         gameState: gameState.serialize()
     };
-    localStorage.setItem(slotKey, JSON.stringify(saveData));
-    localStorage.setItem(`${slotKey}_name`, slotName);
-    localStorage.setItem('heirloom_lastSlot', slot || 1);
+
+    const blob = new Blob([JSON.stringify(saveData)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
-function loadGame(slot) {
-    const slotKey = `heirloom_slot_${slot || 1}`;
-    const raw = localStorage.getItem(slotKey);
-    if (!raw) {
-        addNotification(`Слот ${slot || 1} пуст!`, 'war');
-        return;
-    }
-    
-    try {
-        const data = JSON.parse(raw);
-        world = World.deserialize(data.world);
-        world.generateTerrain(); // заполняет рельеф для клеток без данных
-        entities = new EntityManager(50000);
-        entities.deserialize(data.entities);
-        gameState.deserialize(data.gameState);
-        
-        economy = new EconomySystem(world, entities, gameState);
-        combat = new CombatSystem(world, entities, gameState);
-        movement = new MovementSystem(world, entities, gameState);
-    armyManager = new ArmyManager(entities, gameState, world);
-        window._armyManager = armyManager;
-        supply = new SupplySystem(world, entities, gameState);
-        diplomacy = new DiplomacySystem(gameState, world, entities);
-        tech = new TechSystem(gameState);
-        combat.tech = tech;
-        window._TECH_TREE = TECH_TREE;
-        window._TECH_BRANCHES = TECH_BRANCHES;
-        focus = new FocusSystem(gameState, world, entities);
-        
-        addNotification(`📂 Игра загружена! День ${gameState.days}`, 'info');
-    } catch(e) {
-        console.error('Ошибка загрузки:', e);
-        addNotification('Ошибка загрузки сохранения!', 'war');
-    }
+function loadGame() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.hrl,.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                world = World.deserialize(data.world);
+                world.generateTerrain();
+                entities = new EntityManager(50000);
+                entities.deserialize(data.entities);
+                gameState.deserialize(data.gameState);
+
+                economy = new EconomySystem(world, entities, gameState);
+                combat = new CombatSystem(world, entities, gameState);
+                movement = new MovementSystem(world, entities, gameState);
+                armyManager = new ArmyManager(entities, gameState, world);
+                window._armyManager = armyManager;
+                supply = new SupplySystem(world, entities, gameState);
+                diplomacy = new DiplomacySystem(gameState, world, entities);
+                tech = new TechSystem(gameState);
+                combat.tech = tech;
+                focus = new FocusSystem(gameState, world, entities);
+
+                gameState.isGameActive = true;
+                gameState.setGameSpeed(1);
+
+                document.getElementById('country-select').classList.add('hidden');
+                document.getElementById('game-container').classList.remove('hidden');
+                document.getElementById('game-tabs').classList.remove('hidden');
+
+                if (renderer) renderer.cameraInitialized = false;
+                if (!animationFrameId) startGameLoop();
+                updateSpeedButtons(1);
+
+                addNotification(`📂 Игра загружена!`, 'info');
+            } catch(err) {
+                addNotification('Ошибка загрузки: ' + err.message, 'war');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+function updateSpeedButtons(speed) {
 }
 
 function showLoadingScreen() {

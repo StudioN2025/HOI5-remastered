@@ -524,28 +524,16 @@ export class WindowsManager {
     }
     
     renderSaveWindow(content) {
-        let slotsHtml = '';
-        for (let i = 1; i <= 5; i++) {
-            const name = localStorage.getItem(`heirloom_slot_${i}_name`) || 'Пусто';
-            const isEmpty = !localStorage.getItem(`heirloom_slot_${i}`);
-            slotsHtml += `
-                <div style="background:#1f2937;border:1px solid ${isEmpty ? '#374151' : '#eab308'};border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="font-size:9px;color:#9ca3af;">СЛОТ ${i}</div>
-                        <div style="font-size:11px;color:${isEmpty ? '#6b7280' : '#eab308'};font-weight:bold;font-family:monospace;">${name}</div>
-                    </div>
-                    <div style="display:flex;gap:4px;">
-                        <button onclick="window.saveToSlot(${i})" style="background:#15803d;color:white;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;">💾</button>
-                        ${!isEmpty ? `<button onclick="window.loadFromSlot(${i})" style="background:#2563eb;color:white;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;">📂</button>` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
         content.innerHTML = `
-            <div style="padding:10px;">
-                ${slotsHtml}
-                <div style="text-align:center;color:#6b7280;font-size:9px;margin-top:6px;">Автосохранение в слот 1 каждые 30 дней</div>
+            <div style="padding:12px;">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">💾 СОХРАНИТЬ (.hrl)</button>
+                    <button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">📂 ЗАГРУЗИТЬ (.hrl)</button>
+                </div>
+                <div style="background:#1f2937;border:1px solid #374151;border-radius:6px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;color:#9ca3af;">Сохранение скачивается как файл <b>.hrl</b></div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Загрузка — выберите файл .hrl или .json</div>
+                </div>
             </div>
         `;
     }
