@@ -210,7 +210,11 @@ export class AIController {
             const ny = uy + dy;
 
             if (this.world.getCell(nx, ny) !== 0 && !this.entities.getUnitAt(nx, ny)) {
-                this.entities.moveTo(uid, nx, ny);
+                const cellOwner = this.world.getCell(nx, ny);
+                const unitOwner = this.entities.owner[uid];
+                if (cellOwner === unitOwner || this.gs.areAllies && this.gs.areAllies(unitOwner, cellOwner) || this.gs.isAtWar && this.gs.isAtWar(unitOwner, cellOwner)) {
+                    this.entities.moveTo(uid, nx, ny);
+                }
             }
         }
     }
@@ -445,9 +449,13 @@ export class AIController {
             const dy = Math.sign(assignedBorder.y - uy);
             const nx = ux + dx;
             const ny = uy + dy;
+            const cellOwner = this.world.getCell(nx, ny);
 
-            if (this.world.getCell(nx, ny) !== 0 && !this.entities.getUnitAt(nx, ny)) {
-                this.entities.moveTo(uid, nx, ny);
+            if (cellOwner !== 0 && !this.entities.getUnitAt(nx, ny)) {
+                const owner = this.entities.owner[uid];
+                if (cellOwner === owner || this.gs.areAllies && this.gs.areAllies(owner, cellOwner) || this.gs.isAtWar && this.gs.isAtWar(owner, cellOwner)) {
+                    this.entities.moveTo(uid, nx, ny);
+                }
             }
         }
     }
@@ -511,9 +519,13 @@ export class AIController {
             const dy = Math.sign(target.y - uy);
             const nx = ux + dx;
             const ny = uy + (dx ? 0 : dy);
+            const cellOwner = this.world.getCell(nx, ny);
 
-            if (this.world.getCell(nx, ny) && !this.entities.getUnitAt(nx, ny)) {
-                this.entities.moveTo(uid, nx, ny);
+            if (cellOwner && !this.entities.getUnitAt(nx, ny)) {
+                const unitOwner = this.entities.owner[uid];
+                if (cellOwner === unitOwner || this.gs.areAllies && this.gs.areAllies(unitOwner, cellOwner) || this.gs.isAtWar && this.gs.isAtWar(unitOwner, cellOwner)) {
+                    this.entities.moveTo(uid, nx, ny);
+                }
             }
         }
     }
@@ -577,7 +589,7 @@ export class AIController {
         return path;
     }
 
-    // Простой A* без ограничений на владельца клетки (только вода = нельзя)
+    // A* с проверкой владельца — не ходим по чужой территории (кроме врага)
     _astarFree(sx, sy, ex, ey, maxSteps) {
         const h = (x, y) => Math.abs(x-ex)+Math.abs(y-ey);
         const open = [{ x:sx, y:sy, f:h(sx,sy), g:0 }];
@@ -585,16 +597,16 @@ export class AIController {
         const gScore = new Map();
         gScore.set(`${sx},${sy}`, 0);
 
+        const ownerId = this.gs.myCountryId;
+
         let steps = 0;
         while (open.length && steps++ < maxSteps) {
-            // Находим минимальный f
             let minI = 0;
             for (let i = 1; i < open.length; i++) if (open[i].f < open[minI].f) minI = i;
             const cur = open.splice(minI, 1)[0];
             const curKey = `${cur.x},${cur.y}`;
 
             if (cur.x === ex && cur.y === ey) {
-                // Восстанавливаем путь
                 const path = [];
                 let node = curKey;
                 while (cameFrom.has(node)) { path.unshift(node); node = cameFrom.get(node); }
@@ -605,7 +617,14 @@ export class AIController {
                 const nx = cur.x+dx, ny = cur.y+dy;
                 const nKey = `${nx},${ny}`;
                 const cell = this.world.getCell(nx, ny);
-                if (cell === 0) continue; // вода/пусто — нельзя
+                if (cell === 0) continue;
+
+                // Проверяем владельца
+                if (cell !== ownerId) {
+                    const isAllied = this.gs.areAllies && this.gs.areAllies(ownerId, cell);
+                    const isEnemy = this.gs.isAtWar && this.gs.isAtWar(ownerId, cell);
+                    if (!isAllied && !isEnemy) continue; // чужая территория — обходим
+                }
 
                 const ng = cur.g + 1;
                 if (!gScore.has(nKey) || ng < gScore.get(nKey)) {
@@ -615,7 +634,7 @@ export class AIController {
                 }
             }
         }
-        return null; // путь не найден
+        return null;
     }
 
     // ── Капитуляция ───────────────────────────────────────────────────────────

@@ -181,7 +181,7 @@ export class MovementSystem {
 
     // A* поиск пути
     _findPath(sx, sy, ex, ey, ownerId, allowWater = false) {
-        const MAX = 1000;
+        const MAX = 1500;
         const h = (x, y) => Math.abs(x - ex) + Math.abs(y - ey);
 
         const open = [{ x: sx, y: sy, g: 0, f: h(sx, sy) }];
@@ -210,13 +210,31 @@ export class MovementSystem {
                 const cellOwner = this.world.getCell(nx, ny);
                 const isWater = this.world.isWater(nx, ny);
 
-                // Пехота — только по суше (любая клетка кроме воды)
+                // Пехота — только по суше
                 if (!allowWater) {
-                    if (cellOwner === 0 && !isWater) continue; // нет_ownerа и не вода — пропускаем
-                    if (isWater) continue; // вода — пропускаем
+                    if (isWater) continue;
+                    if (cellOwner === 0 && !isWater) continue;
+
+                    // Проверка территории: можно идти по своей, союзной, нейтральной
+                    if (cellOwner !== 0 && cellOwner !== ownerId) {
+                        const isAllied = this._areAllied(ownerId, cellOwner);
+                        const isAtWar = this.gs && this.gs.isAtWar && this.gs.isAtWar(ownerId, cellOwner);
+                        if (!isAllied && !isAtWar) continue; // чужая территория — обходим
+                    }
                 }
-                // Корабль — по воде и по суше
-                // (вода разрешена, суша разрешена)
+
+                // Корабль — по воде, может заходить на сушу
+                if (allowWater && isWater) {
+                    // ок
+                } else if (allowWater && !isWater) {
+                    // Корабль на суше — только если рядом порт или высадка
+                    const hasNearPort = this.world.hasBuilding(nx, ny, 'port');
+                    if (!hasNearPort) {
+                        const isAllied2 = this._areAllied(ownerId, cellOwner);
+                        const isAtWar2 = this.gs && this.gs.isAtWar && this.gs.isAtWar(ownerId, cellOwner);
+                        if (cellOwner !== 0 && cellOwner !== ownerId && !isAllied2 && !isAtWar2) continue;
+                    }
+                }
 
                 const ng = cur.g + 1;
                 if (!best.has(nk) || ng < best.get(nk)) {
