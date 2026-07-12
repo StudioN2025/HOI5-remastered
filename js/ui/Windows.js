@@ -201,11 +201,91 @@ export class WindowsManager {
         const completed = this.gameState.completedFocuses || new Set();
         const activeFocus = this.gameState.activeFocus;
 
-        const countryFocuses = Object.values(focusTree).filter(f => f.country === myId);
-        if (!countryFocuses.length) {
-            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для этой страны</div>';
+        const focuses = Object.values(focusTree).filter(f => f.country === myId);
+        if (!focuses.length) {
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов</div>';
             return;
         }
+
+        // Карта позиций нод
+        const NW = 120, NH = 65;
+        const pos = {};
+        for (const f of focuses) {
+            pos[f.id] = { x: f.x ?? 50, y: f.y ?? 50 };
+        }
+
+        // Размер карты
+        let mW = 0, mH = 0;
+        for (const p of Object.values(pos)) {
+            mW = Math.max(mW, p.x + NW + 20);
+            mH = Math.max(mH, p.y + NH + 20);
+        }
+
+        // SVG линии (точно как в редакторе)
+        let svg = `<svg style="position:absolute;top:0;left:0;width:${mW}px;height:${mH}px;pointer-events:none;">`;
+        for (const f of focuses) {
+            if (!pos[f.id]) continue;
+            for (const preId of (f.prereqs || [])) {
+                if (!pos[preId]) continue;
+                const a = pos[preId], b = pos[f.id];
+                const ok = completed.has(preId);
+                const c = ok ? '#22c55e' : '#374151';
+                // Линия
+                svg += `<line x1="${a.x+NW/2}" y1="${a.y+NH}" x2="${b.x+NW/2}" y2="${b.y}" stroke="${c}" stroke-width="2" ${ok?'':'stroke-dasharray="5,3"'}/>`;
+                // Стрелка
+                const dx = b.x+NW/2-(a.x+NW/2), dy = b.y-(a.y+NH);
+                const len = Math.sqrt(dx*dx+dy*dy) || 1;
+                const ux = dx/len, uy = dy/len;
+                svg += `<polygon points="${b.x+NW/2-ux*5-uy*3},${b.y-uy*5+ux*3} ${b.x+NW/2-ux*5+uy*3},${b.y-uy*5-ux*3} ${b.x+NW/2},${b.y}" fill="${c}"/>`;
+            }
+        }
+        svg += `</svg>`;
+
+        // Ноды (точно как в редакторе: border-radius:6px, padding, стили)
+        let nodes = '';
+        for (const f of focuses) {
+            const p = pos[f.id];
+            if (!p) continue;
+
+            const done = completed.has(f.id);
+            const active = activeFocus && activeFocus.id === f.id;
+            const avail = !done && !active && this.focusSys && this.focusSys.checkPrerequisites(f.id);
+
+            let bg, border, txt;
+            if (done)     { bg = '#052e16'; border = '#22c55e'; txt = '#86efac'; }
+            else if (active)  { bg = '#0c1e3a'; border = '#3b82f6'; txt = '#93c5fd'; }
+            else if (avail)   { bg = '#422006'; border = '#eab308'; txt = '#fde047'; }
+            else { bg = '#1f2937'; border = '#4b5563'; txt = '#9ca3af'; }
+
+            const click = avail ? `onclick="window.startFocus('${f.id}')" style="cursor:pointer;"` : '';
+
+            // Ровно как в редакторе: border-radius:6px, padding:6px
+            nodes += `<div ${click} style="position:absolute;left:${p.x}px;top:${p.y}px;width:${NW}px;height:${NH}px;background:${bg};border:2px solid ${border};border-radius:6px;padding:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">`;
+            nodes += `<div style="font-size:20px;">${f.icon}</div>`;
+            nodes += `<div style="font-size:9px;font-weight:bold;color:${txt};margin-top:3px;line-height:1.1;">${f.name}</div>`;
+            nodes += `<div style="font-size:7px;color:#555;margin-top:2px;line-height:1.1;max-width:${NW-12}px;overflow:hidden;text-overflow:ellipsis;">${f.desc}</div>`;
+            if (done) nodes += `<div style="font-size:8px;color:#22c55e;margin-top:2px;">✓</div>`;
+            else if (active) nodes += `<div style="font-size:8px;color:#3b82f6;margin-top:2px;">⏳ ${activeFocus.daysLeft}д</div>`;
+            else if (avail) nodes += `<div style="font-size:8px;color:#eab308;margin-top:2px;">⭐ Начать</div>`;
+            else nodes += `<div style="font-size:8px;color:#4b5563;margin-top:2px;">🔒</div>`;
+            nodes += `</div>`;
+        }
+
+        content.innerHTML = `
+            <div style="position:relative;width:100%;height:100%;overflow:hidden;">
+                <div id="focus-scroll" style="position:relative;width:100%;height:calc(100% - 36px);overflow:auto;padding:4px;">
+                    ${svg}
+                    ${nodes}
+                </div>
+                <div style="position:absolute;bottom:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:center;gap:12px;background:#111827;border-top:1px solid #374151;">
+                    <button onclick="document.getElementById('focus-scroll').scrollLeft-=200" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">◀</button>
+                    <button onclick="document.getElementById('focus-scroll').scrollLeft+=200" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▶</button>
+                    <button onclick="document.getElementById('focus-scroll').scrollTop-=150" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▲</button>
+                    <button onclick="document.getElementById('focus-scroll').scrollTop+=150" style="background:#374151;color:white;padding:6px 12px;border:1px solid #4b5563;border-radius:4px;cursor:pointer;font-size:14px;">▼</button>
+                </div>
+            </div>
+        `;
+    }
 
         // Используем x/y из данных или вычисляем по tier/prereqs
         const nodeW = 110, nodeH = 55;
