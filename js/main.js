@@ -920,9 +920,6 @@ function loadGame() {
     input.click();
 }
 
-function updateSpeedButtons(speed) {
-}
-
 function showLoadingScreen() {
     const div = document.createElement('div');
     div.id = 'loading-screen';
