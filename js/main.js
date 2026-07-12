@@ -141,7 +141,11 @@ function setupEvents() {
     
     if (btnPlay) btnPlay.onclick = () => loadGameData();
     if (btnCancel) btnCancel.onclick = () => hideCountrySelection();
-    if (closeWindowBtn) closeWindowBtn.onclick = () => uiManager.closeWindow();
+    if (closeWindowBtn) closeWindowBtn.onclick = () => {
+        // Если открыто окно капитуляции — не даём закрыть без выбора
+        if (window._capitulationPending) return;
+        uiManager.closeWindow();
+    };
     if (closeSidebarBtn) closeSidebarBtn.onclick = () => uiManager.closeSidebar();
     
     // Кнопки скорости
@@ -407,7 +411,6 @@ function setupEvents() {
         var countryName = (COUNTRIES[enemyId] ? COUNTRIES[enemyId].name : enemyId).toUpperCase();
 
         if (choice === 'annex') {
-            // Все клетки переходят победителю
             for (var ci = 0; ci < cells.length; ci++) {
                 var parts = cells[ci].split(',');
                 world.setCell(parseInt(parts[0]), parseInt(parts[1]), winnerId);
@@ -418,11 +421,11 @@ function setupEvents() {
             gameState.addAlliance(winnerId, enemyId);
             addNotification('👑 ' + countryName + ' стал вассалом!', 'war');
         } else if (choice === 'release') {
-            // Ничего не делаем — территория остаётся
             addNotification('🕊️ ' + countryName + ' освобождён', 'info');
         }
 
         window._capitulationData = null;
+        window._capitulationPending = false;
         document.getElementById('info-window').classList.add('hidden');
         gameState.isGameActive = true;
     };
@@ -692,10 +695,11 @@ function startGameLoop() {
                         var threshold = gameState.getCapitulationThreshold(countryInfo.ideology);
                         var progress = gameState.getWarProgress(enemyId, world);
                         if (gameState.days % 30 === 0) console.log('[Cap] ' + enemyId + ': ' + progress + '%/' + threshold + '% start=' + gameState.warStartCells[enemyId] + ' cur=' + world.getCountryCells(enemyId).size);
-                        if (progress >= threshold) {
+                        if (progress >= threshold && !window._capitulationPending) {
                             var cells = Array.from(world.getCountryCells(enemyId));
                             // Если это игрок — показываем окно выбора
                             if (winnerId === gameState.myCountryId) {
+                                window._capitulationPending = true;
                                 gameState.isGameActive = false;
                                 windowsManager.renderCapitulationWindow(
                                     document.getElementById('window-content'),
