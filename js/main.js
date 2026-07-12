@@ -398,14 +398,37 @@ function setupEvents() {
     };
     
     window.quickSave = () => {
-        saveGame();
+        const slot = localStorage.getItem('heirloom_lastSlot') || 1;
+        saveGame(slot);
         addNotification('💾 Игра сохранена!', 'info');
     };
-    
+
     window.quickLoad = () => {
-        loadGame();
+        const slot = localStorage.getItem('heirloom_lastSlot') || 1;
+        loadGame(slot);
         addNotification('📂 Игра загружена!', 'info');
         renderer.cameraInitialized = false;
+    };
+
+    window.saveToSlot = (slot) => {
+        saveGame(slot);
+        // Сохраняем имя слота
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = String(now.getFullYear()).slice(-2);
+        const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        const name = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}`;
+        localStorage.setItem(`heirloom_slot_${slot}_name`, name);
+        addNotification(`💾 Сохранено в слот ${slot}!`, 'info');
+        uiManager.openWindow('save');
+    };
+
+    window.loadFromSlot = (slot) => {
+        loadGame(slot);
+        addNotification(`📂 Загружено из слота ${slot}!`, 'info');
+        renderer.cameraInitialized = false;
+        uiManager.openWindow('save');
     };
     
     window.createArmy = () => {
@@ -651,7 +674,7 @@ function startGameLoop() {
 
             needsRender = true;
 
-            if (gameState.days % 30 === 0 && gameState.days > 0) saveGame();
+            if (gameState.days % 30 === 0 && gameState.days > 0) saveGame(1);
         }
 
         // Рендер: только если нужно и прошёл минимальный интервал
@@ -841,13 +864,14 @@ function startGame(countryId) {
     startGameLoop();
 }
 
-function saveGame() {
+function saveGame(slot) {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const year = String(now.getFullYear()).slice(-2);
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
     const slotName = `${gameState.myCountryId.toUpperCase()}_${day}.${month}.${year}_${time}`;
+    const slotKey = `heirloom_slot_${slot || 1}`;
 
     const saveData = {
         version: '4.0',
@@ -857,14 +881,15 @@ function saveGame() {
         entities: entities.serialize(),
         gameState: gameState.serialize()
     };
-    localStorage.setItem('heirloom_save', JSON.stringify(saveData));
-    localStorage.setItem('heirloom_slotName', slotName);
+    localStorage.setItem(slotKey, JSON.stringify(saveData));
+    localStorage.setItem('heirloom_lastSlot', slot || 1);
 }
 
-function loadGame() {
-    const raw = localStorage.getItem('heirloom_save');
+function loadGame(slot) {
+    const slotKey = `heirloom_slot_${slot || 1}`;
+    const raw = localStorage.getItem(slotKey);
     if (!raw) {
-        addNotification('Нет сохранений!', 'war');
+        addNotification(`Слот ${slot || 1} пуст!`, 'war');
         return;
     }
     

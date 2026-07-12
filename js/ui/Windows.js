@@ -524,19 +524,28 @@ export class WindowsManager {
     }
     
     renderSaveWindow(content) {
-        const slotName = localStorage.getItem('heirloom_slotName') || 'Нет сохранений';
+        let slotsHtml = '';
+        for (let i = 1; i <= 3; i++) {
+            const name = localStorage.getItem(`heirloom_slot_${i}_name`) || 'Пусто';
+            const isEmpty = !localStorage.getItem(`heirloom_slot_${i}`);
+            slotsHtml += `
+                <div style="background:#1f2937;border:1px solid ${isEmpty ? '#374151' : '#eab308'};border-radius:6px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:9px;color:#9ca3af;">СЛОТ ${i}</div>
+                        <div style="font-size:12px;color:${isEmpty ? '#6b7280' : '#eab308'};font-weight:bold;font-family:monospace;">${name}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button onclick="window.saveToSlot(${i})" style="background:#15803d;color:white;padding:5px 10px;border-radius:4px;font-size:10px;cursor:pointer;">💾</button>
+                        ${!isEmpty ? `<button onclick="window.loadFromSlot(${i})" style="background:#2563eb;color:white;padding:5px 10px;border-radius:4px;font-size:10px;cursor:pointer;">📂</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
 
         content.innerHTML = `
             <div style="padding:12px;">
-                <div style="display:flex;gap:8px;margin-bottom:16px;">
-                    <button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">💾 СОХРАНИТЬ</button>
-                    <button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;flex:1;cursor:pointer;">📂 ЗАГРУЗИТЬ</button>
-                </div>
-                <div style="background:#1f2937;border:1px solid #374151;border-radius:6px;padding:10px;">
-                    <div style="font-size:10px;color:#9ca3af;margin-bottom:4px;">ПОСЛЕДНЕЕ СОХРАНЕНИЕ:</div>
-                    <div style="font-size:13px;color:#eab308;font-weight:bold;font-family:monospace;">${slotName}</div>
-                </div>
-                <div style="text-align:center;color:#6b7280;font-size:10px;margin-top:8px;">Автосохранение каждые 30 дней</div>
+                ${slotsHtml}
+                <div style="text-align:center;color:#6b7280;font-size:10px;margin-top:8px;">Автосохранение в слот 1 каждые 30 дней</div>
             </div>
         `;
     }
