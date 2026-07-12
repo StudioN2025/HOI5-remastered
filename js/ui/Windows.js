@@ -207,31 +207,21 @@ export class WindowsManager {
             return;
         }
 
-        // Определяем позиции нод по tier
-        // tier 0 = корень (сверху по центру)
-        // tier 1+ = ветки влево и вправо
         const nodeW = 110, nodeH = 55, gapY = 12, gapX = 30;
         const nodePos = {};
 
-        // Разбиваем на группы по tier
         const byTier = {};
         for (const f of countryFocuses) {
             if (!byTier[f.tier]) byTier[f.tier] = [];
             byTier[f.tier].push(f);
         }
-
         const tiers = Object.keys(byTier).map(Number).sort((a, b) => a - b);
 
         for (const tier of tiers) {
             const items = byTier[tier];
-            const colCount = items.length;
-
-            for (let i = 0; i < colCount; i++) {
+            for (let i = 0; i < items.length; i++) {
                 const f = items[i];
-                // Корень — по центру, остальные — разброс
-                const x = tier === 0 ? 200 : 10 + i * (nodeW + gapX);
-                const y = 30 + tier * (nodeH + gapY);
-                nodePos[f.id] = { x, y };
+                nodePos[f.id] = { x: tier === 0 ? 200 : 10 + i * (nodeW + gapX), y: 30 + tier * (nodeH + gapY) };
             }
         }
 
@@ -241,7 +231,6 @@ export class WindowsManager {
             mapH = Math.max(mapH, p.y + nodeH + 20);
         }
 
-        // SVG линии
         let svg = `<svg style="position:absolute;top:0;left:0;width:${mapW}px;height:${mapH}px;pointer-events:none;">`;
         for (const f of countryFocuses) {
             if (!nodePos[f.id]) continue;
@@ -257,7 +246,6 @@ export class WindowsManager {
         }
         svg += `</svg>`;
 
-        // Ноды
         let nodes = '';
         for (const f of countryFocuses) {
             const pos = nodePos[f.id];
@@ -266,14 +254,15 @@ export class WindowsManager {
             const active = activeFocus && activeFocus.id === f.id;
             const avail = !done && !active && this.focusSys && this.focusSys.checkPrerequisites(f.id);
 
-            let bg = '#1a1a2e', border = '#2d2d44', txt = '#888';
+            let bg, border, txt;
             if (done)   { bg = '#0a2e1a'; border = '#22c55e'; txt = '#86efac'; }
-            if (active) { bg = '#0a1a3e'; border = '#3b82f6'; txt = '#93c5fd'; }
-            if (avail)  { bg = '#2e2a0a'; border = '#eab308'; txt = '#fde047'; }
-            const glow = avail ? 'box-shadow:0 0 8px rgba(234,179,8,0.3);' : done ? 'box-shadow:0 0 6px rgba(34,197,94,0.2);' : '';
+            else if (active) { bg = '#0a1a3e'; border = '#3b82f6'; txt = '#93c5fd'; }
+            else if (avail)  { bg = '#2e2a0a'; border = '#eab308'; txt = '#fde047'; }
+            else { bg = '#1a1a2e'; border = '#2d2d44'; txt = '#555'; }
+
             const click = avail ? `onclick="window.startFocus('${f.id}')" style="cursor:pointer;"` : '';
 
-            nodes += `<div ${click} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:4px;padding:4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;${glow}">`;
+            nodes += `<div ${click} style="position:absolute;left:${pos.x}px;top:${pos.y}px;width:${nodeW}px;height:${nodeH}px;background:${bg};border:2px solid ${border};border-radius:4px;padding:4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">`;
             nodes += `<div style="font-size:18px;">${f.icon}</div>`;
             nodes += `<div style="font-size:8px;font-weight:bold;color:${txt};margin-top:2px;line-height:1.1;">${f.name}</div>`;
             if (done) nodes += `<div style="font-size:7px;color:#22c55e;margin-top:1px;">✓</div>`;
@@ -287,16 +276,7 @@ export class WindowsManager {
     }
 
     renderDiplomacyWindow(content) {
-
-        // Собираем ветки
-        const branchIds = [...new Set(countryFocuses.map(f => f.branch))];
-        const nodeW = 110, nodeH = 60, gapY = 14, gapX = 40;
-        const nodePos = {};
-
-        for (let bi = 0; bi < branchIds.length; bi++) {
-            const bId = branchIds[bi];
-            const items = countryFocuses.filter(f => f.branch === bId).sort((a, b) => a.tier - b.tier);
-            const bx = 10 + bi * (nodeW + gapX);
+        const myId = this.gameState.myCountryId;
 
             for (let ti = 0; ti < items.length; ti++) {
                 nodePos[items[ti].id] = { x: bx, y: 35 + ti * (nodeH + gapY) };
