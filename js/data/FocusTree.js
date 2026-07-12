@@ -140,9 +140,3 @@ export async function loadFocusTree() {
     console.log('🔑 Примеры ID:', Object.keys(FOCUS_TREE).slice(0, 5));
     return FOCUS_TREE;
 }
-    }
-
-    FOCUS_TREE = allFocuses;
-    console.log(`✅ Итого: ${Object.keys(FOCUS_TREE).length} фокусов`);
-    return FOCUS_TREE;
-}
