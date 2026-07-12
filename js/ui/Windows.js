@@ -328,49 +328,7 @@ export class WindowsManager {
 
         content.innerHTML = html;
     }
-            }
-        }
-        
-        let html = `
-            <div class="space-y-4">
-                <div class="diplo-section" style="background:#1f2937;padding:16px;border-radius:8px;">
-                    <div class="diplo-title diplo-allies" style="color:#4ade80;margin-bottom:12px;font-size:14px;font-weight:bold;">🤝 СОЮЗНИКИ (${allies.length})</div>
-                    ${allies.length === 0 ? 
-                        '<div class="text-center text-gray-500 py-4">Нет союзников. ПКМ по стране на карте чтобы предложить альянс.</div>' : 
-                        allies.map(a => `
-                            <div style="background:#374151;padding:12px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <div style="font-weight:bold;">${a.toUpperCase()}</div>
-                                </div>
-                                <div style="display:flex;gap:8px;">
-                                    <button onclick="window.callToWar('${a}')" style="background:#991b1b;color:white;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;">ПРИЗВАТЬ</button>
-                                    <button onclick="window.kickAlly('${a}')" style="background:#4b5563;color:white;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;">ИСКЛЮЧИТЬ</button>
-                                </div>
-                            </div>
-                        `).join('')
-                    }
-                </div>
-                
-                <div class="diplo-section" style="background:#1f2937;padding:16px;border-radius:8px;">
-                    <div class="diplo-title diplo-enemies" style="color:#f87171;margin-bottom:12px;font-size:14px;font-weight:bold;">⚔️ ВРАГИ (${enemies.length})</div>
-                    ${enemies.length === 0 ? 
-                        '<div class="text-center text-gray-500 py-4">Мирное время</div>' : 
-                        enemies.map(e => `
-                            <div style="background:#374151;padding:12px;border-radius:8px;margin-bottom:8px;border-left:4px solid #ef4444;display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <div style="font-weight:bold;">${e.toUpperCase()}</div>
-                                </div>
-                                <div class="diplo-status-war" style="color:#f87171;font-size:12px;">⚔️ ВОЙНА</div>
-                            </div>
-                        `).join('')
-                    }
-                </div>
-            </div>
-        `;
-        
-        content.innerHTML = html;
-    }
-    
+
     renderBuildWindow(content) {
         const resources = this.gameState;
         
