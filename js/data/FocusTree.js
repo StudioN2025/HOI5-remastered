@@ -126,12 +126,20 @@ export async function loadFocusTree() {
             const resp = await fetch(file);
             if (!resp.ok) { console.warn(`⚠️ ${file}: HTTP ${resp.status}`); continue; }
             const json = await resp.json();
+            console.log(`📂 ${file}: ключей=${Object.keys(json).length}, тип=${typeof json}`);
             const arr = convertFocusJSON(json, file);
+            console.log(`📋 ${file}: сконвертировано ${arr.length} фокусов`);
             for (const f of arr) allFocuses[f.id] = f;
-            console.log(`📋 ${file}: ${arr.length} фокусов`);
         } catch (e) {
-            console.warn(`⚠️ ${file}: ${e.message}`);
+            console.error(`❌ ${file}: ${e.message}`, e);
         }
+    }
+
+    FOCUS_TREE = allFocuses;
+    console.log(`✅ Итого: ${Object.keys(FOCUS_TREE).length} фокусов`);
+    console.log('🔑 Примеры ID:', Object.keys(FOCUS_TREE).slice(0, 5));
+    return FOCUS_TREE;
+}
     }
 
     FOCUS_TREE = allFocuses;
