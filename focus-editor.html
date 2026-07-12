@@ -315,6 +315,7 @@
                 tree[id] = {
                     id, name: n.name, desc: n.desc, icon: n.icon,
                     country: countryId, branch: n.branch, tier: Math.floor(n.y / 82),
+                    x: Math.round(n.x), y: Math.round(n.y),
                     prereqs: n.prereqs.map(p => {
                         const pn = nodes.find(nn => nn.id === p);
                         return pn ? pn.name.toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
@@ -348,8 +349,8 @@
                         for (const [key, f] of Object.entries(data)) {
                             const node = {
                                 id: nextId++,
-                                x: 50 + (f.branch === 'military' ? 0 : f.branch === 'economy' ? 180 : 360) + Math.random() * 50,
-                                y: 50 + (f.tier || 0) * 82,
+                                x: f.x !== undefined ? f.x : 50 + (f.branch === 'military' ? 0 : f.branch === 'economy' ? 180 : 360) + Math.random() * 50,
+                                y: f.y !== undefined ? f.y : 50 + (f.tier || 0) * 82,
                                 name: f.name, desc: f.desc || '', icon: f.icon || '⭐',
                                 branch: f.branch || 'military',
                                 effectType: Object.keys(f.effect || {})[0] || 'equipment',
