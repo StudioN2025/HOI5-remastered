@@ -287,9 +287,7 @@ export class WindowsManager {
         `;
     }
 
-        // Используем x/y из данных или вычисляем по tier/prereqs
-        const nodeW = 110, nodeH = 55;
-        const nodePos = {};
+    renderDiplomacyWindow(content) {
 
         for (const f of countryFocuses) {
             if (f.x !== undefined && f.y !== undefined) {
