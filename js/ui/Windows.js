@@ -155,102 +155,66 @@ export class WindowsManager {
     renderResearchWindow(content) {
         content.style.padding = '';
         content.style.overflow = '';
-        var focusTree = window._FOCUS_TREE || {};
         var myId = this.gameState.myCountryId;
-        var completed = this.gameState.completedFocuses || new Set();
-        var activeFocus = this.gameState.activeFocus;
-        var allFocuses = Object.values(focusTree).filter(function(f) { return f.country === myId; });
+        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>'; return; }
 
-        console.log('[FocusRender] myId=' + myId + ' total=' + Object.keys(focusTree).length + ' matched=' + allFocuses.length);
+        var techTree = window._TECH_TREE || {};
+        var techBranches = window._TECH_BRANCHES || {};
+        var unlocked = this.tech ? this.tech.getUnlocked(myId) : new Set();
+        var research = this.tech ? this.tech.getPlayerResearch() : null;
 
-        if (!allFocuses.length) {
-            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для ' + (myId || '?') + '</div>';
-            return;
-        }
+        var html = '<div style="padding:12px;">';
 
-        var NW = 140, NH = 70, PAD = 10;
-
-        // Найти границы
-        var minX = 99999, minY = 99999, maxX = 0, maxY = 0;
-        for (var i = 0; i < allFocuses.length; i++) {
-            var f = allFocuses[i];
-            var fx = f.x !== undefined ? f.x : 50;
-            var fy = f.y !== undefined ? f.y : 50;
-            if (fx < minX) minX = fx;
-            if (fy < minY) minY = fy;
-            if (fx + NW > maxX) maxX = fx + NW;
-            if (fy + NH > maxY) maxY = fy + NH;
-        }
-
-        // Пересчитать начиная от 0,0
-        var pos = {};
-        for (var i = 0; i < allFocuses.length; i++) {
-            var f = allFocuses[i];
-            var fx = f.x !== undefined ? f.x : 50;
-            var fy = f.y !== undefined ? f.y : 50;
-            pos[f.id] = { x: fx - minX + PAD, y: fy - minY + PAD };
-        }
-
-        var totalW = maxX - minX + PAD * 2;
-        var totalH = maxY - minY + PAD * 2;
-        if (totalW < 400) totalW = 400;
-        if (totalH < 300) totalH = 300;
-
-        // SVG линии
-        var svg = '<svg style="position:absolute;top:0;left:0;width:' + totalW + 'px;height:' + totalH + 'px;pointer-events:none;z-index:1;">';
-        for (var i = 0; i < allFocuses.length; i++) {
-            var f = allFocuses[i];
-            if (!pos[f.id]) continue;
-            var prereqs = f.prereqs || [];
-            for (var j = 0; j < prereqs.length; j++) {
-                var preId = prereqs[j];
-                if (!pos[preId]) continue;
-                var a = pos[preId], b = pos[f.id];
-                var ok = completed.has(preId);
-                var clr = ok ? '#22c55e' : '#4b5563';
-                var ax = a.x + NW / 2, ay = a.y + NH;
-                var bx2 = b.x + NW / 2, by2 = b.y;
-                svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx2 + '" y2="' + by2 + '" stroke="' + clr + '" stroke-width="2" ' + (ok ? '' : 'stroke-dasharray="5,3"') + '/>';
-                var dx = bx2 - ax, dy = by2 - ay;
-                var len = Math.sqrt(dx * dx + dy * dy) || 1;
-                var ux = dx / len, uy = dy / len;
-                svg += '<polygon points="' + (bx2 - ux*5 - uy*3) + ',' + (by2 - uy*5 + ux*3) + ' ' + (bx2 - ux*5 + uy*3) + ',' + (by2 - uy*5 - ux*3) + ' ' + bx2 + ',' + by2 + '" fill="' + clr + '"/>';
+        // Текущее исследование
+        if (research && research.techId) {
+            var rt = techTree[research.techId];
+            if (rt) {
+                var pct = Math.floor((research.daysLeft / rt.cost) * 100);
+                html += '<div style="background:#0c1e3a;border:1px solid #3b82f6;border-radius:8px;padding:12px;margin-bottom:16px;">';
+                html += '<div style="font-size:12px;font-weight:bold;color:#93c5fd;">🔬 Исследуется: ' + rt.icon + ' ' + rt.name + '</div>';
+                html += '<div style="background:#1f2937;height:8px;border-radius:4px;margin-top:8px;"><div style="width:' + pct + '%;height:100%;background:#3b82f6;border-radius:4px;"></div></div>';
+                html += '<div style="font-size:10px;color:#6b7280;margin-top:4px;">Осталось ' + research.daysLeft + ' дн.</div>';
+                html += '</div>';
             }
         }
-        svg += '</svg>';
 
-        // Ноды
-        var nodes = '';
-        for (var i = 0; i < allFocuses.length; i++) {
-            var f = allFocuses[i];
-            var p = pos[f.id];
-            if (!p) continue;
-            var done = completed.has(f.id);
-            var isActive = activeFocus && activeFocus.id === f.id;
-            var avail = !done && !isActive && this.focusSys && this.focusSys.checkPrerequisites(f.id);
-            var bg, border, txt;
-            if (done) { bg = '#052e16'; border = '#22c55e'; txt = '#86efac'; }
-            else if (isActive) { bg = '#0c1e3a'; border = '#3b82f6'; txt = '#93c5fd'; }
-            else if (avail) { bg = '#422006'; border = '#eab308'; txt = '#fde047'; }
-            else { bg = '#1f2937'; border = '#4b5563'; txt = '#9ca3af'; }
-            var click = avail ? ' onclick="window.startFocus(\'' + f.id + '\')"' : '';
-            nodes += '<div' + click + ' style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + NW + 'px;height:' + NH + 'px;background:' + bg + ';border:2px solid ' + border + ';border-radius:6px;padding:6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;' + (avail ? 'cursor:pointer;' : '') + '">';
-            nodes += '<div style="font-size:20px;">' + (f.icon || '⭐') + '</div>';
-            nodes += '<div style="font-size:10px;font-weight:bold;color:' + txt + ';margin-top:2px;line-height:1.1;">' + f.name + '</div>';
-            if (f.desc) nodes += '<div style="font-size:8px;color:#888;margin-top:1px;line-height:1.1;max-width:' + (NW - 12) + 'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f.desc + '</div>';
-            if (done) nodes += '<div style="font-size:8px;color:#22c55e;margin-top:1px;">✓</div>';
-            else if (isActive) nodes += '<div style="font-size:8px;color:#3b82f6;margin-top:1px;">⏳ ' + activeFocus.daysLeft + 'д</div>';
-            else if (avail) nodes += '<div style="font-size:8px;color:#eab308;margin-top:1px;">Начать</div>';
-            else nodes += '<div style="font-size:8px;color:#4b5563;margin-top:1px;">🔒</div>';
-            nodes += '</div>';
+        // Ветки
+        for (var bKey in techBranches) {
+            var branch = techBranches[bKey];
+            html += '<div style="margin-bottom:16px;">';
+            html += '<div style="font-size:13px;font-weight:bold;color:' + branch.color + ';margin-bottom:8px;">' + branch.icon + ' ' + branch.name + '</div>';
+
+            for (var tKey in techTree) {
+                var tech = techTree[tKey];
+                if (tech.branch !== bKey) continue;
+                var isUnlocked = unlocked.has(tech.id);
+                var isResearching = research && research.techId === tech.id;
+                var prereqDone = tech.level <= 1 || unlocked.has(tech.branch + '_' + (tech.level - 1));
+                var canResearch = !isUnlocked && !isResearching && prereqDone && !research;
+
+                var bg, border, txt;
+                if (isUnlocked) { bg = '#052e16'; border = '#22c55e'; txt = '#86efac'; }
+                else if (isResearching) { bg = '#0c1e3a'; border = '#3b82f6'; txt = '#93c5fd'; }
+                else if (canResearch) { bg = '#422006'; border = '#eab308'; txt = '#fde047'; }
+                else { bg = '#1f2937'; border = '#4b5563'; txt = '#6b7280'; }
+
+                var click = canResearch ? ' onclick="window.startResearch && window.startResearch(\'' + tech.id + '\')"' : '';
+                html += '<div' + click + ' style="background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;padding:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;' + (canResearch ? 'cursor:pointer;' : '') + '">';
+                html += '<div style="font-size:24px;">' + tech.icon + '</div>';
+                html += '<div style="flex:1;">';
+                html += '<div style="font-size:11px;font-weight:bold;color:' + txt + ';">' + tech.name + '</div>';
+                html += '<div style="font-size:9px;color:#6b7280;">' + tech.desc + '</div>';
+                html += '</div>';
+                html += '<div style="text-align:right;">';
+                if (isUnlocked) html += '<div style="font-size:10px;color:#22c55e;">✓</div>';
+                else if (isResearching) html += '<div style="font-size:10px;color:#3b82f6;">⏳</div>';
+                else html += '<div style="font-size:10px;color:#6b7280;">' + tech.cost + ' дн.</div>';
+                html += '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
         }
-
-        // Контейнер — один уровень скролла
-        var html = '<div id="focus-scroll" style="width:100%;height:100%;overflow:auto;background:#0a0a0a;">';
-        html += '<div style="position:relative;width:' + totalW + 'px;height:' + totalH + 'px;min-width:100%;min-height:100%;">';
-        html += svg + nodes;
-        html += '</div></div>';
-
+        html += '</div>';
         content.innerHTML = html;
     }
     
