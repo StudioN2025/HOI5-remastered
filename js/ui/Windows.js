@@ -318,4 +318,47 @@ export class WindowsManager {
     renderSaveWindow(content) {
         content.innerHTML = '<div style="padding:12px;"><button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:8px;">💾 СОХРАНИТЬ</button><button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;">📂 ЗАГРУЗИТЬ</button></div>';
     }
+
+    renderCapitulationWindow(content, data) {
+        // data: { enemyId, winnerId, cells, callback }
+        var enemyId = data.enemyId;
+        var winnerId = data.winnerId;
+        var cells = data.cells; // Set of cell keys "x,y"
+        var enemyName = window._COUNTRIES_MAP && window._COUNTRIES_MAP[enemyId] ? window._COUNTRIES_MAP[enemyId].name : enemyId.toUpperCase();
+        var winnerName = window._COUNTRIES_MAP && window._COUNTRIES_MAP[winnerId] ? window._COUNTRIES_MAP[winnerId].name : winnerId.toUpperCase();
+
+        var html = '<div style="padding:16px;">';
+        html += '<div style="text-align:center;margin-bottom:16px;">';
+        html += '<div style="font-size:24px;margin-bottom:8px;">🏳️</div>';
+        html += '<div style="font-size:16px;font-weight:bold;color:#eab308;">' + enemyName + ' капитулировал!</div>';
+        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Территорий: ' + cells.length + ' клеток</div>';
+        html += '</div>';
+
+        html += '<div style="font-size:12px;font-weight:bold;color:#eab308;margin-bottom:8px;">Что сделать с территорией?</div>';
+
+        // Аннексия
+        html += '<button onclick="window.capitulationChoice(\'annex\')" style="width:100%;padding:12px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:8px;margin-bottom:8px;cursor:pointer;text-align:left;">';
+        html += '<div style="font-size:13px;font-weight:bold;">🏴 Аннексировать</div>';
+        html += '<div style="font-size:10px;color:#fca5a5;">Все клетки переходят ' + winnerName + '</div>';
+        html += '</button>';
+
+        // Вассал
+        html += '<button onclick="window.capitulationChoice(\'vassal\')" style="width:100%;padding:12px;background:#1e1b4b;color:white;border:2px solid #a855f7;border-radius:8px;margin-bottom:8px;cursor:pointer;text-align:left;">';
+        html += '<div style="font-size:13px;font-weight:bold;">👑 Сделать вассалом</div>';
+        html += '<div style="font-size:10px;color:#c084fc;">' + enemyName + ' остаётся самостоятельным, но подчиняется</div>';
+        html += '</button>';
+
+        // Освободить
+        html += '<button onclick="window.capitulationChoice(\'release\')" style="width:100%;padding:12px;background:#052e16;color:white;border:2px solid #22c55e;border-radius:8px;cursor:pointer;text-align:left;">';
+        html += '<div style="font-size:13px;font-weight:bold;">🕊️ Освободить</div>';
+        html += '<div style="font-size:10px;color:#86efac;">Территория остаётся у ' + enemyName + '</div>';
+        html += '</button>';
+
+        html += '</div>';
+
+        content.innerHTML = html;
+
+        // Сохраняем данные для callback
+        window._capitulationData = data;
+    }
 }

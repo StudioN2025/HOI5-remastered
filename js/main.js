@@ -397,6 +397,35 @@ function setupEvents() {
         addNotification('👑 ' + vassalId.toUpperCase() + ' освобождён', 'info');
         uiManager.openWindow('diplomacy');
     };
+
+    window.capitulationChoice = (choice) => {
+        var data = window._capitulationData;
+        if (!data) return;
+        var enemyId = data.enemyId;
+        var winnerId = data.winnerId;
+        var cells = data.cells;
+        var countryName = (COUNTRIES[enemyId] ? COUNTRIES[enemyId].name : enemyId).toUpperCase();
+
+        if (choice === 'annex') {
+            // Все клетки переходят победителю
+            for (var ci = 0; ci < cells.length; ci++) {
+                var parts = cells[ci].split(',');
+                world.setCell(parseInt(parts[0]), parseInt(parts[1]), winnerId);
+            }
+            addNotification('🏴 ' + countryName + ' аннексирован!', 'war');
+        } else if (choice === 'vassal') {
+            gameState.addVassal(winnerId, enemyId);
+            gameState.addAlliance(winnerId, enemyId);
+            addNotification('👑 ' + countryName + ' стал вассалом!', 'war');
+        } else if (choice === 'release') {
+            // Ничего не делаем — территория остаётся
+            addNotification('🕊️ ' + countryName + ' освобождён', 'info');
+        }
+
+        window._capitulationData = null;
+        document.getElementById('info-window').classList.add('hidden');
+        gameState.isGameActive = true;
+    };
     
     window.quickSave = () => {
         saveGame();
@@ -662,9 +691,22 @@ function startGameLoop() {
                         var threshold = gameState.getCapitulationThreshold(countryInfo.ideology);
                         var progress = gameState.getWarProgress(enemyId, world);
                         if (progress >= threshold) {
-                            addNotification('🏳️ ' + enemyId.toUpperCase() + ' капитулировал! Стал вассалом ' + winnerId.toUpperCase(), 'war');
-                            gameState.addVassal(winnerId, enemyId);
-                            gameState.addAlliance(winnerId, enemyId);
+                            var cells = Array.from(world.getCountryCells(enemyId));
+                            // Если это игрок — показываем окно выбора
+                            if (winnerId === gameState.myCountryId) {
+                                gameState.isGameActive = false;
+                                windowsManager.renderCapitulationWindow(
+                                    document.getElementById('window-content'),
+                                    { enemyId: enemyId, winnerId: winnerId, cells: cells }
+                                );
+                                document.getElementById('info-window').classList.remove('hidden');
+                                document.getElementById('window-title').innerText = '🏳️ КАПИТУЛЯЦИЯ';
+                            } else {
+                                // AI автоматически делает вассалом
+                                addNotification('🏳️ ' + enemyId.toUpperCase() + ' капитулировал!', 'war');
+                                gameState.addVassal(winnerId, enemyId);
+                                gameState.addAlliance(winnerId, enemyId);
+                            }
                             warsToRemove.push(wi);
                         }
                     };
