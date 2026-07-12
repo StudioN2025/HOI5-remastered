@@ -15,11 +15,14 @@ export class FocusSystem {
 
     getFocusesForCountry(countryId) {
         const id = countryId || this.gameState.myCountryId;
-        return Object.values(FOCUS_TREE).filter(f => f.country === id);
+        // Берём из window._FOCUS_TREE (загружено из папки focuses/)
+        const tree = window._FOCUS_TREE || {};
+        return Object.values(tree).filter(f => f.country === id);
     }
 
     checkPrerequisites(focusId) {
-        const focus = FOCUS_TREE[focusId];
+        const tree = window._FOCUS_TREE || {};
+        const focus = tree[focusId];
         if (!focus) return false;
         if (!focus.prereqs || focus.prereqs.length === 0) return true;
         const completed = this.gameState.completedFocuses || new Set();
@@ -27,7 +30,8 @@ export class FocusSystem {
     }
 
     startFocus(focusId) {
-        const focus = FOCUS_TREE[focusId];
+        const tree = window._FOCUS_TREE || {};
+        const focus = tree[focusId];
         if (!focus) return false;
         const completed = this.gameState.completedFocuses || new Set();
         if (completed.has(focus.id)) return false;

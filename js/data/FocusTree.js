@@ -7,6 +7,9 @@ const FOCUS_FILES = [
     'focuses/france.json',
     'focuses/ussr.json',
     'focuses/uk.json',
+    'focuses/poland.json',
+    'focuses/italy.json',
+    'focuses/luxembourg.json',
 ];
 
 function convertFocusJSON(json) {
