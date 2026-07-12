@@ -298,30 +298,36 @@ export class WindowsManager {
             }
         }
 
-        let html = `<div style="padding:12px;">`;    renderDiplomacyWindow(content) {
-        const myId = this.gameState.myCountryId;
-        if (!myId) {
-            content.innerHTML = '<div class="text-center text-gray-400 py-8">Выберите страну</div>';
-            return;
-        }
-        
-        const allies = [];
-        const enemies = [];
-        
-        if (this.gameState.wars) {
-            for (const war of this.gameState.wars) {
-                if (war.a === myId) enemies.push(war.b);
-                if (war.b === myId) enemies.push(war.a);
+        let html = `<div style="padding:12px;">`;
+
+        // Союзники
+        html += `<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#22c55e;margin-bottom:6px;">🤝 Союзники (${allies.length})</div>`;
+        if (allies.length === 0) {
+            html += `<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Нет союзников</div>`;
+        } else {
+            for (const a of allies) {
+                html += `<div style="background:#0a2e1a;border:1px solid #22c55e;border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-weight:bold;font-size:11px;">${a.toUpperCase()}</span>
+                    <button onclick="window.kickAlly('${a}')" style="background:#991b1b;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">✕</button>
+                </div>`;
             }
         }
-        
-        if (this.gameState.alliances) {
-            for (const alliance of this.gameState.alliances) {
-                if (alliance.has(myId)) {
-                    for (const id of alliance) {
-                        if (id !== myId) allies.push(id);
-                    }
-                }
+        html += `</div>`;
+
+        html += `<div><div style="font-size:12px;font-weight:bold;color:#ef4444;margin-bottom:6px;">⚔️ Враги (${enemies.length})</div>`;
+        if (enemies.length === 0) {
+            html += `<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Мирное время</div>`;
+        } else {
+            for (const e of enemies) {
+                html += `<div style="background:#1a0a0a;border:1px solid #ef4444;border-radius:4px;padding:6px 8px;margin-bottom:4px;">
+                    <span style="font-weight:bold;font-size:11px;color:#ef4444;">${e.toUpperCase()}</span>
+                </div>`;
+            }
+        }
+        html += `</div>`;
+
+        content.innerHTML = html;
+    }
             }
         }
         
