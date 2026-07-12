@@ -12,6 +12,8 @@ const FOCUS_FILES = [
     'focuses/luxembourg.json',
 ];
 
+const nodeH = 60;
+
 function convertFocusJSON(json) {
     const result = {};
 
@@ -84,8 +86,6 @@ function convertFocusJSON(json) {
     }
     return result;
 }
-
-const nodeH = 60;
 
 export async function loadFocusTree() {
     const allFocuses = {};
