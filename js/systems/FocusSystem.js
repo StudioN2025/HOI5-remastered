@@ -64,7 +64,7 @@ export class FocusSystem {
         if (eff.manpower) this.gameState.manpower = Math.min(this.gameState.manpower + eff.manpower, this.gameState.maxManpower || 99999);
         if (eff.factories) this._addFactories(eff.factories);
         if (eff.ports) this._addPorts(eff.ports);
-        if (eff.war) this.gameState.addWar(myId, eff.war);
+        if (eff.war) this.gameState.addWar(myId, eff.war, this.world);
         if (eff.allies) eff.allies.forEach(a => this.gameState.addAlliance(myId, a));
         if (eff.annex) {
             for (const c of eff.annex) {

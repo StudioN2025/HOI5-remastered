@@ -181,7 +181,7 @@ export class AIController {
             }
 
             // ИИ объявляет войну
-            this.gs.addWar(a, b);
+            this.gs.addWar(a, b, this.world);
             this._pullAllies(a, b);
 
             addNotification(`⚔️ ${a} → ${b}`, 'war');
@@ -217,10 +217,7 @@ export class AIController {
 
     _pullAllies(attacker, defender) {
         for (const ally of this._allies(attacker)) {
-            if (!this.gs.isAtWar(ally, defender)) this.gs.addWar(ally, defender);
-        }
-        for (const ally of this._allies(defender)) {
-            if (!this.gs.isAtWar(ally, attacker)) this.gs.addWar(ally, attacker);
+            if (!this.gs.isAtWar(ally, defender)) this.gs.addWar(ally, defender, this.world);
         }
     }
 
@@ -385,7 +382,7 @@ export class AIController {
             const nbProfile = PROFILES[nb];
             const bonus = nbProfile && nbProfile.ideology !== profile.ideology ? 1.3 : 1.0;
             if (Math.random() < profile.aggression * 0.04 * bonus) {
-                this.gs.addWar(id, nb);
+                this.gs.addWar(id, nb, this.world);
                 this._pullAllies(id, nb);
                 addNotification(`⚔️ ${id} объявил войну ${nb}!`, 'war');
                 break;

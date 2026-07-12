@@ -22,6 +22,7 @@ import { FocusSystem, FOCUS_TREE } from './systems/FocusSystem.js';
 import { loadFocusTree } from './data/FocusTree.js';
 import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
+import { COUNTRIES } from './data/Countries.js';
 
 // Глобальные экземпляры
 let world = null;
@@ -70,6 +71,7 @@ async function init() {
     window._TECH_TREE = TECH_TREE;
     window._TECH_BRANCHES = TECH_BRANCHES;
     window._FOCUS_TREE = FOCUS_TREE;
+    window._COUNTRIES_MAP = COUNTRIES;
     focus = new FocusSystem(gameState, world, entities);
 
     notifications = new Notifications();
@@ -641,6 +643,38 @@ function startGameLoop() {
             if (aiController) aiController.update();
             if (tech) tech.update();
             if (focus) focus.update();
+
+            // Проверка капитуляции
+            if (gameState.wars.length > 0) {
+                var warsToRemove = [];
+                for (var wi = 0; wi < gameState.wars.length; wi++) {
+                    var war = gameState.wars[wi];
+                    var checkCapitulate = function(enemyId, winnerId) {
+                        if (!enemyId || world.getCountryCells(enemyId).size === 0) return;
+                        var countryInfo = COUNTRIES[enemyId];
+                        if (!countryInfo) return;
+                        var threshold = gameState.getCapitulationThreshold(countryInfo.ideology);
+                        var progress = gameState.getWarProgress(enemyId, world);
+                        if (progress >= threshold) {
+                            addNotification('🏳️ ' + enemyId.toUpperCase() + ' капитулировал!', 'war');
+                            var cells = Array.from(world.getCountryCells(enemyId));
+                            for (var ci = 0; ci < cells.length; ci++) {
+                                var parts = cells[ci].split(',');
+                                world.setCell(parseInt(parts[0]), parseInt(parts[1]), winnerId);
+                            }
+                            warsToRemove.push(wi);
+                        }
+                    };
+                    if (gameState.myCountryId) {
+                        if (war.a === gameState.myCountryId) checkCapitulate(war.b, war.a);
+                        if (war.b === gameState.myCountryId) checkCapitulate(war.a, war.b);
+                    }
+                }
+                for (var ri = warsToRemove.length - 1; ri >= 0; ri--) {
+                    gameState.wars.splice(warsToRemove[ri], 1);
+                }
+            }
+
             if (topBar) topBar.update();
 
             needsRender = true;

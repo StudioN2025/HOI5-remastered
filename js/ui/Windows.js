@@ -219,11 +219,11 @@ export class WindowsManager {
     }
     
     renderDiplomacyWindow(content) {
-        const myId = this.gameState.myCountryId;
+        var myId = this.gameState.myCountryId;
         if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>'; return; }
-        const allies = [], enemies = [];
-        if (this.gameState.wars) { for (var w of this.gameState.wars) { if (w.a === myId) enemies.push(w.b); if (w.b === myId) enemies.push(w.a); } }
-        if (this.gameState.alliances) { for (var a of this.gameState.alliances) { if (a.has(myId)) { for (var id of a) { if (id !== myId) allies.push(id); } } } }
+        var allies = [], enemies = [];
+        if (this.gameState.wars) { for (var w = 0; w < this.gameState.wars.length; w++) { var war = this.gameState.wars[w]; if (war.a === myId) enemies.push(war.b); if (war.b === myId) enemies.push(war.a); } }
+        if (this.gameState.alliances) { for (var ai = 0; ai < this.gameState.alliances.length; ai++) { var a = this.gameState.alliances[ai]; if (a.has(myId)) { for (var id of a) { if (id !== myId) allies.push(id); } } } }
         var html = '<div style="padding:12px;">';
         html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#22c55e;margin-bottom:6px;">🤝 Союзники (' + allies.length + ')</div>';
         if (allies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Нет союзников</div>';
@@ -231,8 +231,33 @@ export class WindowsManager {
         html += '</div>';
         html += '<div><div style="font-size:12px;font-weight:bold;color:#ef4444;margin-bottom:6px;">⚔️ Враги (' + enemies.length + ')</div>';
         if (enemies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Мирное время</div>';
-        else { for (var i = 0; i < enemies.length; i++) { html += '<div style="background:#1a0a0a;border:1px solid #ef4444;border-radius:4px;padding:6px 8px;margin-bottom:4px;"><span style="font-weight:bold;font-size:11px;color:#ef4444;">' + enemies[i].toUpperCase() + '</span></div>'; } }
-        html += '</div>';
+        else {
+            for (var i = 0; i < enemies.length; i++) {
+                var eid = enemies[i];
+                var progress = this.gameState.getWarProgress(eid, this.world);
+                var countryInfo = this.world && this.world.getAllCountries ? null : null;
+                var COUNTRIES_MOD = null;
+                try { COUNTRIES_MOD = require ? null : null; } catch(e) {}
+                var ideology = 'Демократия';
+                if (typeof window !== 'undefined' && window._COUNTRIES_MAP && window._COUNTRIES_MAP[eid]) {
+                    ideology = window._COUNTRIES_MAP[eid].ideology || 'Демократия';
+                }
+                var threshold = this.gameState.getCapitulationThreshold(ideology);
+                var color = progress >= threshold ? '#ef4444' : (progress >= threshold * 0.7 ? '#eab308' : '#3b82f6');
+
+                html += '<div style="background:#1a0a0a;border:1px solid #ef4444;border-radius:6px;padding:8px;margin-bottom:6px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+                html += '<span style="font-weight:bold;font-size:11px;color:#ef4444;">⚔️ ' + eid.toUpperCase() + '</span>';
+                html += '<span style="font-size:9px;color:#6b7280;">Капитуляция: ' + threshold + '%</span>';
+                html += '</div>';
+                html += '<div style="background:#374151;height:10px;border-radius:5px;overflow:hidden;">';
+                html += '<div style="width:' + Math.min(progress, 100) + '%;height:100%;background:' + color + ';border-radius:5px;transition:width 0.3s;"></div>';
+                html += '</div>';
+                html += '<div style="font-size:9px;color:#6b7280;margin-top:3px;">Захвачено: ' + progress + '% / ' + threshold + '%</div>';
+                html += '</div>';
+            }
+        }
+        html += '</div></div>';
         content.innerHTML = html;
     }
     

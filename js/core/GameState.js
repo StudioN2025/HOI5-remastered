@@ -22,6 +22,7 @@ export class GameState {
         
         this.wars = [];
         this.alliances = [];
+        this.warStartCells = {}; // { countryId: originalCellCount }
         
         this.activeFocus = null;
         this.completedFocuses = new Set();
@@ -59,10 +60,28 @@ export class GameState {
         return this.alliances.some(a => a.has(c1) && a.has(c2));
     }
     
-    addWar(a, b) {
+    addWar(a, b, world) {
         if (!this.isAtWar(a, b)) {
             this.wars.push({ a, b });
+            if (world) {
+                if (!this.warStartCells[a]) this.warStartCells[a] = world.getCountryCells(a).size;
+                if (!this.warStartCells[b]) this.warStartCells[b] = world.getCountryCells(b).size;
+            }
         }
+    }
+
+    getWarProgress(enemyId, world) {
+        var start = this.warStartCells[enemyId];
+        if (!start || start === 0) return 0;
+        var current = world ? world.getCountryCells(enemyId).size : start;
+        var lost = start - current;
+        return Math.max(0, Math.min(100, Math.floor((lost / start) * 100)));
+    }
+
+    getCapitulationThreshold(ideology) {
+        if (ideology === 'Фашизм' || ideology === 'Коммунизм') return 95;
+        if (ideology === 'Нейтралитет') return 80;
+        return 70; // Демократия
     }
     
     addAlliance(a, b) {

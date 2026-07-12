@@ -27,7 +27,7 @@ export class DiplomacySystem {
         }
         this.gameState.alliances = newAlliances;
         
-        this.gameState.addWar(myId, targetId);
+        this.gameState.addWar(myId, targetId, this.world);
         addNotification(`⚔️ ${myId} объявляет войну ${targetId}!`, 'war');
         
         return true;
@@ -86,7 +86,7 @@ export class DiplomacySystem {
         
         for (const enemy of myEnemies) {
             if (!this.gameState.isAtWar(allyId, enemy)) {
-                this.gameState.addWar(allyId, enemy);
+                this.gameState.addWar(allyId, enemy, this.world);
             }
         }
         
