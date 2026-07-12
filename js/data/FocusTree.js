@@ -128,8 +128,8 @@ function convertFocusJSON(json, filename) {
         if (!focuses || !focuses.length) continue;
 
         const nameToId = {};
-        for (const f of focuses) {
-            nameToId[f.name] = country + '_' + f.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        for (var fi = 0; fi < focuses.length; fi++) {
+            nameToId[focuses[fi].name] = country + '_' + fi + '_' + focuses[fi].name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
         }
 
         const depthCache = {};
