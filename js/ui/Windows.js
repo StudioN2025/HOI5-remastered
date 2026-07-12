@@ -277,10 +277,26 @@ export class WindowsManager {
 
     renderDiplomacyWindow(content) {
         const myId = this.gameState.myCountryId;
+        if (!myId) {
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>';
+            return;
+        }
 
-            for (let ti = 0; ti < items.length; ti++) {
-                nodePos[items[ti].id] = { x: bx, y: 35 + ti * (nodeH + gapY) };
+        const allies = [];
+        const enemies = [];
+        if (this.gameState.wars) {
+            for (const war of this.gameState.wars) {
+                if (war.a === myId) enemies.push(war.b);
+                if (war.b === myId) enemies.push(war.a);
             }
+        }
+        if (this.gameState.alliances) {
+            for (const alliance of this.gameState.alliances) {
+                if (alliance.has(myId)) {
+                    for (const id of alliance) { if (id !== myId) allies.push(id); }
+                }
+            }
+        }
         }
 
         let mapW = 0, mapH = 0;
