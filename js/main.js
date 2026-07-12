@@ -972,6 +972,13 @@ function loadGame() {
         reader.onload = (ev) => {
             try {
                 const data = JSON.parse(ev.target.result);
+
+                // Проверяем наличие обязательных полей
+                if (!data.world || !data.entities || !data.gameState) {
+                    addNotification('Ошибка: неверный формат файла', 'war');
+                    return;
+                }
+
                 world = World.deserialize(data.world);
                 world.generateTerrain();
                 entities = new EntityManager(50000);
@@ -1005,7 +1012,16 @@ function loadGame() {
 
                 addNotification(`📂 Игра загружена!`, 'info');
             } catch(err) {
-                addNotification('Ошибка загрузки: ' + err.message, 'war');
+                console.error('[LoadError]', err.message, err.stack);
+                // Показываем ошибку в окне чтобы можно было прочитать
+                var errWin = document.getElementById('info-window');
+                var errContent = document.getElementById('window-content');
+                var errTitle = document.getElementById('window-title');
+                if (errWin && errContent && errTitle) {
+                    errTitle.innerText = '❌ ОШИБКА ЗАГРУЗКИ';
+                    errContent.innerHTML = '<div style="padding:16px;color:#ef4444;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;">' + err.message + '\n\n' + (err.stack || '') + '</div>';
+                    errWin.classList.remove('hidden');
+                }
             }
         };
         reader.readAsText(file);
