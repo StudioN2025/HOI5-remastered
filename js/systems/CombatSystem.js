@@ -102,12 +102,11 @@ export class CombatSystem {
                         addNotification(`${t} Бой: ${e.owner[attacker]} атакует ${e.owner[defender]}!`, 'war');
                     }
 
-                    // Битва за столицу?
+                    // Битва на клетке столицы?
                     if (this.world.capitals) {
-                        const [bx, by] = battleCell.split(',').map(Number);
                         for (const [cid, cap] of Object.entries(this.world.capitals)) {
-                            if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2) {
-                                addNotification(`🔥 БИТВА ЗА СТОЛИЦУ ${cap.name}!`, 'war');
+                            if (cap.x === e.x[defender] && cap.y === e.y[defender]) {
+                                addNotification(`🔥 Бой за столицу ${cap.name}!`, 'war');
                                 break;
                             }
                         }
@@ -166,17 +165,17 @@ export class CombatSystem {
             const aPenalty = this._getCapitulationPenalty(b.attackerCountry);
             const dPenalty = this._getCapitulationPenalty(b.defenderCountry);
 
-            // Бонус столицы — защитники получают +40% защиту и +20% атаку
+            // Бонус столицы — защитники на клетке столицы получают +40% защиту и +20% атаку
             let capitalBonus = 1.0;
             if (this.world.capitals) {
                 const [bx, by] = b.cell.split(',').map(Number);
                 for (const [cid, cap] of Object.entries(this.world.capitals)) {
-                    if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2 && cid === b.defenderCountry) {
+                    if (cap.x === bx && cap.y === by && cid === b.defenderCountry) {
                         capitalBonus = 1.4;
                         break;
                     }
-                    if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2 && cid === b.attackerCountry) {
-                        capitalBonus = 0.85; // Атакующий на вражескую столицу получает штраф
+                    if (cap.x === bx && cap.y === by && cid === b.attackerCountry) {
+                        capitalBonus = 0.85;
                         break;
                     }
                 }

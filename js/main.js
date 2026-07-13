@@ -415,6 +415,13 @@ function setupEvents() {
                 var parts = cells[ci].split(',');
                 world.setCell(parseInt(parts[0]), parseInt(parts[1]), winnerId);
             }
+            // Удаляем войска врага
+            var enemyUnits = entities.getEntitiesByOwner(enemyId);
+            for (var ui = 0; ui < enemyUnits.length; ui++) {
+                entities.removeEntity(enemyUnits[ui]);
+            }
+            // Удаляем столицу врага
+            delete world.capitals[enemyId];
             addNotification('🏴 ' + countryName + ' аннексирован!', 'war');
         } else if (choice === 'vassal') {
             gameState.addVassal(winnerId, enemyId);
@@ -794,6 +801,11 @@ function startGameLoop() {
                                 addNotification('🏳️ ' + enemyId.toUpperCase() + ' капитулировал!', 'war');
                                 gameState.addVassal(winnerId, enemyId);
                                 gameState.addAlliance(winnerId, enemyId);
+                                // Убираем лишние войска врага (оставляем минимум 3)
+                                var enemyU = entities.getEntitiesByOwner(enemyId);
+                                for (var eu = enemyU.length - 1; eu >= 3; eu--) {
+                                    entities.removeEntity(enemyU[eu]);
+                                }
                             }
                             warsToRemove.push(wi);
                         }
