@@ -48,7 +48,7 @@ export class RendererWebGL {
         // Флаги
         this.flags = {};
         const flagCountries = [
-            'austria','belgium','bulgaria','czechoslovakia','denmark',
+            'austria','albania','belgium','bulgaria','czechoslovakia','denmark',
             'estonia','finland','france','germany','greece','hungary',
             'iran','iraq','ireland','italy','latvia','lithuania',
             'luxembourg','netherlands','norway','poland','portugal',
