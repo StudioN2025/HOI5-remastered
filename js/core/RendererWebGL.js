@@ -366,6 +366,83 @@ export class RendererWebGL {
             }
         }
 
+        // Битвы за столицы — эпичные эффекты
+        if (world.capitals && size > 4) {
+            const frame = this.frameCount || 0;
+            for (const [cid, cap] of Object.entries(world.capitals)) {
+                // Есть ли бой рядом со столицей?
+                let battleNear = false;
+                let battleIntensity = 0;
+                for (let i = 1; i < entities.nextId; i++) {
+                    if (!entities.active[i] || !entities.inCombat[i]) continue;
+                    const dx = entities.x[i] - cap.x, dy = entities.y[i] - cap.y;
+                    if (Math.abs(dx) <= 3 && Math.abs(dy) <= 3) {
+                        battleNear = true;
+                        battleIntensity++;
+                    }
+                }
+                if (!battleNear) continue;
+
+                const cpx = cap.x * 20 * zoom + camX + size / 2;
+                const cpy = cap.y * 20 * zoom + camY + size / 2;
+                if (cpx < -100 || cpx > W + 100 || cpy < -100 || cpy > H + 100) continue;
+
+                const radius = 30 * zoom * Math.min(battleIntensity, 5);
+
+                // Взрывы — красные круги
+                const numExplosions = Math.min(battleIntensity * 2, 8);
+                for (let i = 0; i < numExplosions; i++) {
+                    const angle = (frame * 0.05 + i * Math.PI * 2 / numExplosions) % (Math.PI * 2);
+                    const dist = radius * (0.3 + 0.7 * ((frame * 0.03 + i) % 1));
+                    const ex = cpx + Math.cos(angle) * dist;
+                    const ey = cpy + Math.sin(angle) * dist;
+                    const eSize = (4 + Math.sin(frame * 0.15 + i) * 2) * zoom;
+
+                    // Оранжево-красный взрыв
+                    const grad = ctx.createRadialGradient(ex, ey, 0, ex, ey, eSize * 2);
+                    grad.addColorStop(0, 'rgba(255,255,100,0.9)');
+                    grad.addColorStop(0.3, 'rgba(255,140,0,0.7)');
+                    grad.addColorStop(0.7, 'rgba(255,50,0,0.4)');
+                    grad.addColorStop(1, 'rgba(100,0,0,0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, eSize * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Дым — серые полупрозрачные круги
+                const numSmoke = Math.min(battleIntensity, 4);
+                for (let i = 0; i < numSmoke; i++) {
+                    const sx = cpx + Math.sin(frame * 0.02 + i * 1.5) * radius * 0.5;
+                    const sy = cpy - (frame * 0.5 + i * 20) % (radius * 1.5);
+                    const sSize = (8 + Math.sin(frame * 0.01 + i) * 4) * zoom;
+                    ctx.fillStyle = 'rgba(80,80,80,0.15)';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Огонь — кольцо вокруг столицы
+                ctx.beginPath();
+                ctx.arc(cpx, cpy, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,80,0,' + (0.2 + 0.15 * Math.sin(frame * 0.1)) + ')';
+                ctx.lineWidth = 3 * zoom;
+                ctx.stroke();
+
+                // Текст «БИТВА ЗА СТОЛИЦУ»
+                if (zoom > 0.6 && battleIntensity >= 3) {
+                    ctx.save();
+                    ctx.font = `bold ${Math.max(10, 12 * zoom)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const pulse = 0.7 + 0.3 * Math.sin(frame * 0.12);
+                    ctx.fillStyle = `rgba(255,50,0,${pulse})`;
+                    ctx.fillText('⚔️ БИТВА ЗА ' + cap.name.toUpperCase() + ' ⚔️', cpx, cpy - radius - 15 * zoom);
+                    ctx.restore();
+                }
+            }
+        }
+
         // Очереди производства
         const queue = production ? production.getPlayerQueue() : [];
         if (size > 6 && queue.length) {

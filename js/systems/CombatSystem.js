@@ -101,6 +101,17 @@ export class CombatSystem {
                         const t = e.isShip && e.isShip[attacker] ? '🚢' : '⚔️';
                         addNotification(`${t} Бой: ${e.owner[attacker]} атакует ${e.owner[defender]}!`, 'war');
                     }
+
+                    // Битва за столицу?
+                    if (this.world.capitals) {
+                        const [bx, by] = battleCell.split(',').map(Number);
+                        for (const [cid, cap] of Object.entries(this.world.capitals)) {
+                            if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2) {
+                                addNotification(`🔥 БИТВА ЗА СТОЛИЦУ ${cap.name}!`, 'war');
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -155,6 +166,22 @@ export class CombatSystem {
             const aPenalty = this._getCapitulationPenalty(b.attackerCountry);
             const dPenalty = this._getCapitulationPenalty(b.defenderCountry);
 
+            // Бонус столицы — защитники получают +40% защиту и +20% атаку
+            let capitalBonus = 1.0;
+            if (this.world.capitals) {
+                const [bx, by] = b.cell.split(',').map(Number);
+                for (const [cid, cap] of Object.entries(this.world.capitals)) {
+                    if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2 && cid === b.defenderCountry) {
+                        capitalBonus = 1.4;
+                        break;
+                    }
+                    if (Math.abs(cap.x - bx) <= 2 && Math.abs(cap.y - by) <= 2 && cid === b.attackerCountry) {
+                        capitalBonus = 0.85; // Атакующий на вражескую столицу получает штраф
+                        break;
+                    }
+                }
+            }
+
             // Урон защитникам
             const aRawAttack = this._totalAttack(b.attackers, b.defenders, b.cell);
             const avgDefDefense = this._avgStat(b.defenders, 'defense');
@@ -162,7 +189,7 @@ export class CombatSystem {
             if (this.tech) defTechMult += this.tech.getEffect(b.defenderCountry, 'infantryDefense');
 
             for (const uid of b.defenders) {
-                const reduction = avgDefDefense * terrainBonus * 0.12 * defTechMult;
+                const reduction = avgDefDefense * terrainBonus * 0.12 * defTechMult * capitalBonus;
                 const baseDmg = (aRawAttack / b.defenders.length) * breakthroughBonus * numAdvA * aPenalty;
                 const netDmg = Math.max(1, baseDmg - reduction) * rng();
                 this.org[uid] = Math.max(0, this.org[uid] - netDmg);
@@ -171,7 +198,7 @@ export class CombatSystem {
             }
 
             // Урон атакующим
-            const dRawAttack = this._totalAttack(b.defenders, b.attackers, b.cell);
+            const dRawAttack = this._totalAttack(b.defenders, b.attackers, b.cell) * capitalBonus;
             const avgAtkBreakthrough = this._avgStat(b.attackers, 'breakthrough');
             let atkTechMult = 1.0;
             if (this.tech) atkTechMult += this.tech.getEffect(b.attackerCountry, 'infantryAttack');

@@ -418,13 +418,62 @@ export class AIController {
         const target = mem.warTarget;
         if (!target) return;
 
+        // Проверяем угрозу столице
+        const cap = this.world.getCapital(id);
+        if (cap) {
+            const enemyBorder = this.world.getBorderWith(id, target);
+            for (const c of enemyBorder) {
+                const [bx, by] = c.split(',').map(Number);
+                if (Math.abs(bx - cap.x) <= 5 && Math.abs(by - cap.y) <= 5) {
+                    // Враг у столицы! Все войска к столице
+                    this._defendCapital(id, units, cap, day);
+                    return;
+                }
+            }
+        }
+
         const border = this.world.getBorderWith(id, target);
         if (!border.length) { mem.warTarget = null; return; }
 
         const borderPts = border.map(b => { const [x,y]=b.split(',').map(Number); return {x,y}; });
 
-        // ВСЕ юниты идут к границе врага
         this._moveAttackers(id, units, target, borderPts, mem, day);
+    }
+
+    _defendCapital(id, units, cap, day) {
+        for (let i = 0; i < units.length; i++) {
+            const uid = units[i];
+            if (this.entities.inCombat[uid]) continue;
+            const ux = this.entities.x[uid], uy = this.entities.y[uid];
+            if (ux === cap.x && uy === cap.y) continue;
+
+            // Ищем клетку рядом со столицей
+            let placed = false;
+            for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1],[0,0]]) {
+                const tx = cap.x + dx, ty = cap.y + dy;
+                const owner = this.world.getCell(tx, ty);
+                if ((owner === id) && !this.entities.getUnitAt(tx, ty)) {
+                    const ddx = Math.sign(tx - ux);
+                    const ddy = Math.sign(ty - uy);
+                    const nx = ux + ddx, ny = uy + ddy;
+                    const no = this.world.getCell(nx, ny);
+                    if (no === id && !this.entities.getUnitAt(nx, ny)) {
+                        this.entities.moveTo(uid, nx, ny);
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if (!placed) {
+                const dx = Math.sign(cap.x - ux);
+                const dy = Math.sign(cap.y - uy);
+                const nx = ux + dx, ny = uy + dy;
+                const no = this.world.getCell(nx, ny);
+                if (no && (no === id || this.gs.isAtWar && this.gs.isAtWar(id, no)) && !this.entities.getUnitAt(nx, ny)) {
+                    this.entities.moveTo(uid, nx, ny);
+                }
+            }
+        }
     }
 
     // ── Движение атакующих (с A*) ────────────────────────────────────────────
@@ -496,14 +545,63 @@ export class AIController {
         const nbs = this._neighborCountries(id);
         if (!nbs.length) return;
 
-        const borderPts = [];
-        for (const nb of nbs) {
-            const b = this.world.getBorderWith(id, nb);
-            for (const c of b.slice(0, 15)) {
-                const [x,y] = c.split(',').map(Number);
-                borderPts.push({x,y});
+        // Проверяем — столица под угрозой? (враг в 5 клетках)
+        const cap = this.world.getCapital(id);
+        let capThreat = false;
+        if (cap) {
+            for (const nb of nbs) {
+                if (!this.gs.isAtWar(id, nb)) continue;
+                const border = this.world.getBorderWith(id, nb);
+                for (const c of border) {
+                    const [bx, by] = c.split(',').map(Number);
+                    if (Math.abs(bx - cap.x) <= 5 && Math.abs(by - cap.y) <= 5) {
+                        capThreat = true;
+                        break;
+                    }
+                }
+                if (capThreat) break;
             }
         }
+
+        const borderPts = [];
+
+        // Если столица под угрозой —一半 войск идут к столице
+        if (capThreat && cap) {
+            const capBorder = [];
+            for (const [dx, dy] of [[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],
+                                    [-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],
+                                    [-2,0],[-1,0],[1,0],[2,0],
+                                    [-2,1],[-1,1],[0,1],[1,1],[2,1],
+                                    [-2,2],[-1,2],[0,2],[1,2],[2,2]]) {
+                const tx = cap.x + dx, ty = cap.y + dy;
+                const owner = this.world.getCell(tx, ty);
+                if (owner === id && !this.entities.getUnitAt(tx, ty)) {
+                    capBorder.push({ x: tx, y: ty });
+                }
+            }
+            // Первая половина юнитов — к столице
+            const half = Math.ceil(units.length / 2);
+            for (let i = 0; i < half && i < capBorder.length; i++) {
+                borderPts.push(capBorder[i % capBorder.length]);
+            }
+            // Вторая половина — к обычным границам
+            for (const nb of nbs) {
+                const b = this.world.getBorderWith(id, nb);
+                for (const c of b.slice(0, 8)) {
+                    const [x,y] = c.split(',').map(Number);
+                    borderPts.push({x,y});
+                }
+            }
+        } else {
+            for (const nb of nbs) {
+                const b = this.world.getBorderWith(id, nb);
+                for (const c of b.slice(0, 15)) {
+                    const [x,y] = c.split(',').map(Number);
+                    borderPts.push({x,y});
+                }
+            }
+        }
+
         if (!borderPts.length) return;
 
         for (let i = 0; i < units.length; i++) {
