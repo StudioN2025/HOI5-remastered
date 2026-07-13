@@ -485,11 +485,62 @@ function setupEvents() {
     gameState._selectedArmyId = null;
 }
 
+function showArmyCommandPanel(army, screenX, screenY) {
+    var panel = document.getElementById('army-command-panel');
+    if (!panel) return;
+
+    var frontLineText = army.frontLine ? 'Отвязать от ' + army.frontLine.enemyId.toUpperCase() : 'На границу...';
+    var frontLineAction = army.frontLine ? 'window.removeArmyFrontLine(' + army.id + ')' : 'window.setArmyFrontLine(' + army.id + ')';
+
+    var html = '';
+    html += '<div style="font-size:12px;font-weight:bold;color:' + army.color + ';margin-bottom:8px;">🎖️ ' + army.name + '</div>';
+    html += '<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Юнитов: ' + army.unitIds.size + '</div>';
+    html += '<button onclick="' + frontLineAction + ';window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#854d0e;color:white;border:none;border-radius:4px;margin-bottom:4px;cursor:pointer;font-size:11px;text-align:left;">🎯 ' + frontLineText + '</button>';
+    html += '<button onclick="window.giveArmyMoveOrder(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#1d4ed8;color:white;border:none;border-radius:4px;margin-bottom:4px;cursor:pointer;font-size:11px;text-align:left;">🚶 Переместить армию</button>';
+    html += '<button onclick="window.disbandArmy(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;text-align:left;">🗑️ Распустить</button>';
+
+    panel.innerHTML = html;
+    panel.style.left = Math.min(screenX + 10, window.innerWidth - 200) + 'px';
+    panel.style.top = Math.max(screenY - 120, 10) + 'px';
+    panel.classList.remove('hidden');
+}
+
+window.hideArmyCommandPanel = function() {
+    var panel = document.getElementById('army-command-panel');
+    if (panel) panel.classList.add('hidden');
+};
+
+window.removeArmyFrontLine = function(armyId) {
+    if (!armyManager) return;
+    var army = armyManager.armies.find(function(a) { return a.id === armyId; });
+    if (army) {
+        army.frontLine = null;
+        addNotification('🎖️ ' + army.name + ' отвязана от границы', 'info');
+    }
+};
+
+window.giveArmyMoveOrder = function(armyId) {
+    gameState._selectedArmyId = armyId;
+    addNotification('Кликните на карту — куда переместить армию', 'info');
+};
+
 function handleCanvasClick(e) {
     if (!gameState.isGameActive) return;
 
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
+
+    // Клик по юниту армии — показываем панель приказов (до закрытия)
+    const clickUnit = entities.getUnitAt(worldPos.x, worldPos.y);
+    if (clickUnit !== null && entities.owner[clickUnit] === gameState.myCountryId) {
+        const army = armyManager ? armyManager.getArmyForUnit(clickUnit) : null;
+        if (army) {
+            showArmyCommandPanel(army, e.clientX, e.clientY);
+            return;
+        }
+    }
+
+    window.hideArmyCommandPanel();
 
     // Режим найма
     if (window._recruitMode) {
