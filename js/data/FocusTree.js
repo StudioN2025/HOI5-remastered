@@ -10,6 +10,7 @@ const FOCUS_FILES = [
     'focuses/poland.json',
     'focuses/italy.json',
     'focuses/luxembourg.json',
+    'focuses/albania.json',
 ];
 
 // Определяет эффект по названию и описанию фокуса
@@ -98,6 +99,7 @@ function convertFocusJSON(json, filename) {
     else if (fname.includes('poland')) country = 'poland';
     else if (fname.includes('italy')) country = 'italy';
     else if (fname.includes('luxembourg')) country = 'luxembourg';
+    else if (fname.includes('albania')) country = 'albania';
     if (!country) return result;
 
     // Формат 1: Editor — плоский объект { "id": { name, x, y, prereqs, effect } }
