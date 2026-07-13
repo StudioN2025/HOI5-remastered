@@ -178,17 +178,6 @@ export class EntityManager {
         return this.paths.get(id) || [];
     }
 
-    moveTo(id, newX, newY) {
-        const oldKey = `${this.x[id]},${this.y[id]}`;
-        const newKey = `${newX},${newY}`;
-
-        this.positionIndex.delete(oldKey);
-        this.positionIndex.set(newKey, id);
-
-        this.x[id] = newX;
-        this.y[id] = newY;
-    }
-
     damage(id, amount) {
         this.hp[id] = Math.max(0, this.hp[id] - amount);
         if (this.hp[id] <= 0) {
