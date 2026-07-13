@@ -174,10 +174,15 @@ export class MovementSystem {
                     if (isLand) this.world.setCell(nx, ny, e.owner[unitId]);
                 }
 
-                // Занята другим юнитом — ждём
+                // Занята другим юнитом — разрешаем стак если союзный
                 const occupant = e.getUnitAt(nx, ny);
                 if (occupant && occupant !== unitId) {
-                    break;
+                    const occOwner = e.owner[occupant];
+                    const myOwner = e.owner[unitId];
+                    if (occOwner !== myOwner && !this._areAllied(myOwner, occOwner)) {
+                        break; // Враг — стоп
+                    }
+                    // Союзный — можно стакаться, просто двигаемся
                 }
 
                 // Делаем шаг

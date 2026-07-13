@@ -29,7 +29,7 @@ export class EntityManager {
         this.paths = new Map();
 
         // Индексы для быстрого поиска
-        this.positionIndex = new Map(); // "x,y" -> unitId
+        this.positionIndex = new Map(); // "x,y" -> Set<unitId> (стак)
         this.ownerIndex = new Map();   // ownerId -> Set<unitId>
 
         // Кэш активных ID (пересоздаётся при изменении)
@@ -73,7 +73,10 @@ export class EntityManager {
         this.inCombat[id] = 0;
         this.moveCooldown[id] = 0;
 
-        this.positionIndex.set(`${x},${y}`, id);
+        // Стак — добавляем в Set
+        const pkey = `${x},${y}`;
+        if (!this.positionIndex.has(pkey)) this.positionIndex.set(pkey, new Set());
+        this.positionIndex.get(pkey).add(id);
 
         // Owner index
         if (!this.ownerIndex.has(owner)) this.ownerIndex.set(owner, new Set());
@@ -86,9 +89,12 @@ export class EntityManager {
     removeEntity(id) {
         if (!this.active[id]) return;
 
-        // Удаляем из индексов
         const key = `${this.x[id]},${this.y[id]}`;
-        this.positionIndex.delete(key);
+        const stack = this.positionIndex.get(key);
+        if (stack) {
+            stack.delete(id);
+            if (stack.size === 0) this.positionIndex.delete(key);
+        }
 
         const ownerSet = this.ownerIndex.get(this.owner[id]);
         if (ownerSet) {
@@ -102,7 +108,39 @@ export class EntityManager {
     }
 
     getUnitAt(x, y) {
-        return this.positionIndex.get(`${x},${y}`) || null;
+        const stack = this.positionIndex.get(`${x},${y}`);
+        if (!stack) return null;
+        for (const id of stack) {
+            if (this.active[id]) return id;
+        }
+        return null;
+    }
+
+    getAllUnitsAt(x, y) {
+        const stack = this.positionIndex.get(`${x},${y}`);
+        if (!stack) return [];
+        const result = [];
+        for (const id of stack) {
+            if (this.active[id]) result.push(id);
+        }
+        return result;
+    }
+
+    moveTo(id, newX, newY) {
+        const oldKey = `${this.x[id]},${this.y[id]}`;
+        const newKey = `${newX},${newY}`;
+
+        const oldStack = this.positionIndex.get(oldKey);
+        if (oldStack) {
+            oldStack.delete(id);
+            if (oldStack.size === 0) this.positionIndex.delete(oldKey);
+        }
+
+        if (!this.positionIndex.has(newKey)) this.positionIndex.set(newKey, new Set());
+        this.positionIndex.get(newKey).add(id);
+
+        this.x[id] = newX;
+        this.y[id] = newY;
     }
 
     getEntitiesByOwner(ownerId) {
@@ -120,9 +158,11 @@ export class EntityManager {
         for (let dx = -radius; dx <= radius; dx++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 if (dx * dx + dy * dy > radius * radius) continue;
-                const uid = this.positionIndex.get(`${cx + dx},${cy + dy}`);
-                if (uid !== undefined && this.active[uid]) {
-                    result.push(uid);
+                const stack = this.positionIndex.get(`${cx + dx},${cy + dy}`);
+                if (stack) {
+                    for (const uid of stack) {
+                        if (this.active[uid]) result.push(uid);
+                    }
                 }
             }
         }
@@ -193,7 +233,9 @@ export class EntityManager {
             this.training[e.id] = e.training;
             this.inCombat[e.id] = e.inCombat;
 
-            this.positionIndex.set(`${e.x},${e.y}`, e.id);
+            const pkey = `${e.x},${e.y}`;
+            if (!this.positionIndex.has(pkey)) this.positionIndex.set(pkey, new Set());
+            this.positionIndex.get(pkey).add(e.id);
 
             if (!this.ownerIndex.has(e.owner)) this.ownerIndex.set(e.owner, new Set());
             this.ownerIndex.get(e.owner).add(e.id);

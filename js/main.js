@@ -415,15 +415,33 @@ function setupEvents() {
                 var parts = cells[ci].split(',');
                 world.setCell(parseInt(parts[0]), parseInt(parts[1]), winnerId);
             }
-            // Удаляем войска врага
             var enemyUnits = entities.getEntitiesByOwner(enemyId);
             for (var ui = 0; ui < enemyUnits.length; ui++) {
                 entities.removeEntity(enemyUnits[ui]);
             }
-            // Удаляем столицу врага
             delete world.capitals[enemyId];
             addNotification('🏴 ' + countryName + ' аннексирован!', 'war');
         } else if (choice === 'vassal') {
+            // Возвращаем вассалу его оригинальные территории
+            var originalCells = gameState.warOriginalCells ? gameState.warOriginalCells[enemyId] : null;
+            if (originalCells) {
+                for (var ci = 0; ci < cells.length; ci++) {
+                    var parts = cells[ci].split(',');
+                    var cx = parseInt(parts[0]), cy = parseInt(parts[1]);
+                    if (world.getCell(cx, cy) === winnerId) {
+                        world.setCell(cx, cy, enemyId);
+                    }
+                }
+                // Восстанавливаем клетки которые были у врага но захвачены другими
+                for (var ci = 0; ci < originalCells.length; ci++) {
+                    var parts = originalCells[ci].split(',');
+                    var cx = parseInt(parts[0]), cy = parseInt(parts[1]);
+                    if (world.getCell(cx, cy) !== enemyId) {
+                        world.setCell(cx, cy, enemyId);
+                    }
+                }
+                addNotification('🔄 ' + countryName + ' получает свои территории обратно', 'info');
+            }
             gameState.addVassal(winnerId, enemyId);
             gameState.addAlliance(winnerId, enemyId);
             addNotification('👑 ' + countryName + ' стал вассалом!', 'war');

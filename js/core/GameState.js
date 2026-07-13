@@ -67,6 +67,22 @@ export class GameState {
             if (world) {
                 if (!this.warStartCells[a]) this.warStartCells[a] = world.getCountryCells(a).size;
                 if (!this.warStartCells[b]) this.warStartCells[b] = world.getCountryCells(b).size;
+                if (!this.warOriginalCells) this.warOriginalCells = {};
+                if (!this.warOriginalCells[b]) this.warOriginalCells[b] = Array.from(world.getCountryCells(b));
+            }
+            // Вассалы лорда вступают в войну
+            for (const lord of [a, b]) {
+                const vassals = this.getVassals(lord);
+                for (const v of vassals) {
+                    const enemy = lord === a ? b : a;
+                    if (!this.isAtWar(v, enemy)) {
+                        this.wars.push({ a: v, b: enemy });
+                        if (world) {
+                            if (!this.warStartCells[v]) this.warStartCells[v] = world.getCountryCells(v).size;
+                            if (!this.warStartCells[enemy]) this.warStartCells[enemy] = world.getCountryCells(enemy).size;
+                        }
+                    }
+                }
             }
         }
     }
@@ -147,6 +163,7 @@ export class GameState {
             alliances: this.alliances.map(a => [...a]),
             vassals: { ...this.vassals },
             warStartCells: { ...this.warStartCells },
+            warOriginalCells: this.warOriginalCells || {},
             activeFocus: this.activeFocus ? { ...this.activeFocus } : null,
             completedFocuses: [...this.completedFocuses],
             selectedUnitId: this.selectedUnitId,
@@ -174,6 +191,7 @@ export class GameState {
         this.alliances = (data.alliances || []).map(a => new Set(a));
         this.vassals = data.vassals || {};
         this.warStartCells = data.warStartCells || {};
+        this.warOriginalCells = data.warOriginalCells || {};
         this.activeFocus = data.activeFocus;
         this.completedFocuses = new Set(data.completedFocuses || []);
         this.selectedUnitId = data.selectedUnitId;
