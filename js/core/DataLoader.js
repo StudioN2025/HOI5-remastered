@@ -122,6 +122,14 @@ export class DataLoader {
         }
         console.log(`✅ Водных клеток: ${world.waterCells.size}`);
 
+        // Загружаем столицы
+        if (data.capitals) {
+            for (const [cid, cap] of Object.entries(data.capitals)) {
+                world.setCapital(cid, cap.x, cap.y, cap.name);
+            }
+            console.log(`✅ Столицы: ${Object.keys(data.capitals).length}`);
+        }
+
         const totalCells = world.debugCheckCells();
         console.log(`✅ Карта загружена: ${total} клеток в JSON, ${totalCells} клеток в мире`);
         

@@ -7,11 +7,24 @@ const TERRAIN_BONUS = { plain: 1.0, forest: 1.3, mountain: 1.5, urban: 1.4, dese
 export class World {
     constructor() {
         this.cells = new Map();
-        this.waterCells = new Set(); // "x,y" — невидимые водные клетки для флота
+        this.waterCells = new Set();
         this.buildings = new Map();
         this.cellStats = new Map();
         this.countryCache = new Map();
         this.bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        this.capitals = {}; // { countryId: { x, y, name } }
+    }
+
+    setCapital(countryId, x, y, name) {
+        this.capitals[countryId] = { x: x, y: y, name: name || countryId };
+    }
+
+    getCapital(countryId) {
+        return this.capitals[countryId] || null;
+    }
+
+    getAllCapitals() {
+        return this.capitals;
     }
 
     // Добавить водную клетку (невидимая, для флота)
@@ -167,6 +180,7 @@ export class World {
             buildings: blds.join('|'),
             cellStats: stats.join('|'),
             bounds: this.bounds,
+            capitals: this.capitals,
             v: '5'
         };
     }
@@ -198,6 +212,7 @@ export class World {
             }
         }
         world.bounds = data.bounds || { minX: -50, maxX: 50, minY: -50, maxY: 50 };
+        if (data.capitals) world.capitals = data.capitals;
         return world;
     }
 }

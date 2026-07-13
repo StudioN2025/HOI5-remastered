@@ -341,6 +341,31 @@ export class RendererWebGL {
             ctx.fillText('x' + stackCount[key], px + size, py + 2);
         }
 
+        // Столицы стран
+        if (world.capitals && size > 6) {
+            for (const [cid, cap] of Object.entries(world.capitals)) {
+                const cpx = cap.x * 20 * zoom + camX;
+                const cpy = cap.y * 20 * zoom + camY;
+                if (cpx + 40 < 0 || cpx > W + 40 || cpy + 40 < 0 || cpy > H + 40) continue;
+
+                // Звезда
+                ctx.fillStyle = '#eab308';
+                ctx.font = `${Math.max(14, size * 0.8)}px "Segoe UI Emoji"`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⭐', cpx + size / 2, cpy + size / 2);
+
+                // Название столицы
+                if (zoom > 0.5) {
+                    ctx.fillStyle = '#fde047';
+                    ctx.font = `bold ${Math.max(8, size * 0.35)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(cap.name, cpx + size / 2, cpy + size + 2);
+                }
+            }
+        }
+
         // Очереди производства
         const queue = production ? production.getPlayerQueue() : [];
         if (size > 6 && queue.length) {

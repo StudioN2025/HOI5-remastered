@@ -115,6 +115,12 @@ export class UIManager {
         if (leaderElem) leaderElem.innerText = countryInfo.leader;
         if (ideologyElem) ideologyElem.innerText = countryInfo.ideology;
 
+        const capitalElem = document.getElementById('sidebar-capital');
+        if (capitalElem) {
+            const cap = this.world.getCapital(countryId);
+            capitalElem.innerText = cap ? cap.name : 'Нет';
+        }
+
         // Показываем лорда если вассал
         const overlordRow = document.getElementById('sidebar-overlord-row');
         const overlordElem = document.getElementById('sidebar-overlord');
