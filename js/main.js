@@ -530,14 +530,26 @@ function handleCanvasClick(e) {
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
 
-    // Клик по юниту армии — показываем панель приказов (до закрытия)
+    // Клик по юниту армии — панель приказов
     const clickUnit = entities.getUnitAt(worldPos.x, worldPos.y);
     if (clickUnit !== null && entities.owner[clickUnit] === gameState.myCountryId) {
         const army = armyManager ? armyManager.getArmyForUnit(clickUnit) : null;
         if (army) {
+            gameState._selectedArmyId = army.id;
             showArmyCommandPanel(army, e.clientX, e.clientY);
             return;
         }
+    }
+
+    // Клик по одиночному юниту — выделить для приказа
+    if (clickUnit !== null && entities.owner[clickUnit] === gameState.myCountryId) {
+        gameState.selectedUnitId = clickUnit;
+        const hint = document.getElementById('order-hint');
+        if (hint) {
+            hint.innerHTML = '⚔️ Юнит выбран — ЛКМ куда идти, ПКМ отмена';
+            hint.classList.remove('hidden');
+        }
+        return;
     }
 
     window.hideArmyCommandPanel();

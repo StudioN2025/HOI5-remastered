@@ -62,6 +62,97 @@ export class RendererWebGL {
         }
     }
 
+    _drawArmy(ctx, army, entities, gameState, camX, camY, zoom, baseSize, W, H, selected) {
+        const units = [...army.unitIds].filter(id => entities.active[id]);
+        if (units.length === 0) return;
+
+        // Центр армии — среднее позиций юнитов
+        let cx = 0, cy = 0, totalHp = 0, totalMaxHp = 0;
+        let hasInfantry = false, hasTanks = false;
+        for (const uid of units) {
+            cx += entities.x[uid];
+            cy += entities.y[uid];
+            totalHp += entities.hp[uid];
+            totalMaxHp += entities.maxHp[uid];
+            if (entities.type[uid] === 0) hasInfantry = true;
+            else hasTanks = true;
+        }
+        cx /= units.length;
+        cy /= units.length;
+
+        const sx = cx * 20 * zoom + camX;
+        const sy = cy * 20 * zoom + camY;
+        const armSize = Math.max(baseSize * 1.5, baseSize * (1 + Math.min(units.length, 10) * 0.1));
+        if (sx + armSize < -10 || sx > W + 10 || sy + armSize < -10 || sy > H + 10) return;
+
+        const owner = army.ownerId;
+
+        if (this.isMobile) {
+            ctx.fillStyle = army.color;
+            ctx.font = `${Math.max(14, armSize * 0.6)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🎖️', sx + armSize / 2, sy + armSize / 2);
+            return;
+        }
+
+        // Фон армии — цветной круг
+        ctx.beginPath();
+        ctx.arc(sx + armSize / 2, sy + armSize / 2, armSize / 2 + 2, 0, Math.PI * 2);
+        ctx.fillStyle = army.color + '40';
+        ctx.fill();
+        ctx.strokeStyle = army.color;
+        ctx.lineWidth = selected ? 3 : 2;
+        ctx.stroke();
+
+        // Эмодзи типа войск
+        ctx.font = `${Math.max(12, armSize * 0.5)}px "Segoe UI Emoji"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (hasInfantry && hasTanks) ctx.fillText('⚔️', sx + armSize / 2, sy + armSize / 2 - 2);
+        else if (hasTanks) ctx.fillText('🚜', sx + armSize / 2, sy + armSize / 2 - 2);
+        else ctx.fillText('💂', sx + armSize / 2, sy + armSize / 2 - 2);
+
+        // Число юнитов
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(8, armSize * 0.3)}px sans-serif`;
+        ctx.fillText(units.length, sx + armSize / 2, sy + armSize / 2 + armSize * 0.3);
+
+        // HP полоска
+        if (totalMaxHp > 0) {
+            const hp = totalHp / totalMaxHp;
+            const bw = armSize * 0.7;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(sx + (armSize - bw) / 2, sy + armSize - 4, bw, 4);
+            ctx.fillStyle = hp > 0.5 ? '#22c55e' : hp > 0.25 ? '#eab308' : '#ef4444';
+            ctx.fillRect(sx + (armSize - bw) / 2, sy + armSize - 4, bw * hp, 4);
+        }
+
+        // Флаг страны
+        const flag = this.flags[owner];
+        if (flag && flag.complete && flag.naturalWidth > 0) {
+            const fSize = Math.max(10, Math.floor(armSize * 0.35));
+            ctx.drawImage(flag, sx + armSize - fSize - 2, sy + 2, fSize, Math.floor(fSize * 0.67));
+        }
+
+        // Линия фронта — пунктир
+        if (army.frontLine) {
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#eab308';
+            ctx.lineWidth = 1;
+            const fl = army.frontLine.cells;
+            if (fl.length > 0) {
+                const fx = fl[0].x * 20 * zoom + camX + 10;
+                const fy = fl[0].y * 20 * zoom + camY + 10;
+                ctx.beginPath();
+                ctx.moveTo(sx + armSize / 2, sy + armSize / 2);
+                ctx.lineTo(fx, fy);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+        }
+    }
+
     _initColorCache() {
         const colors = {
             germany:'#3a3a3a',ussr:'#990000',poland:'#ffc0cb',france:'#3b82f6',
@@ -234,18 +325,32 @@ export class RendererWebGL {
             }
         }
 
-        // ── ЮНИТЫ ──
+        // ── АРМИИ (группы юнитов) ──
         let unitsDrawn = 0;
+        const renderedArmies = new Set();
+
         for (let i = 1; i < entities.nextId; i++) {
             if (!entities.active[i]) continue;
-            const screenX = entities.x[i] * 20 * zoom + camX;
-            const screenY = entities.y[i] * 20 * zoom + camY;
-            if (screenX + size < -10 || screenX > W + 10 || screenY + size < -10 || screenY > H + 10) continue;
 
             const owner = entities.owner[i];
             const unitType = entities.type[i];
 
-            // Мобильный — эмодзи без PNG и HP-баров
+            // Если юнит в армии — рисуем армию один раз, а не каждого юнита
+            if (window._armyManager && owner === gameState.myCountryId) {
+                const army = window._armyManager.getArmyForUnit(i);
+                if (army && !renderedArmies.has(army.id)) {
+                    renderedArmies.add(army.id);
+                    this._drawArmy(ctx, army, entities, gameState, camX, camY, zoom, size, W, H);
+                    // Пропускаем остальных юнитов этой армии
+                }
+                if (army) { unitsDrawn++; continue; }
+            }
+
+            // Одиночный юнит (не в армии)
+            const screenX = entities.x[i] * 20 * zoom + camX;
+            const screenY = entities.y[i] * 20 * zoom + camY;
+            if (screenX + size < -10 || screenX > W + 10 || screenY + size < -10 || screenY > H + 10) continue;
+
             if (this.isMobile) {
                 ctx.fillStyle = owner === gameState.myCountryId ? '#fff'
                     : (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, owner)) ? '#ff6666' : '#ccc';
@@ -258,17 +363,10 @@ export class RendererWebGL {
                 continue;
             }
 
-            // Десктоп — полная отрисовка
             const img = this.unitImages[owner];
             if (img && unitType === 0 && !entities.isShip[i]) {
                 const iconSize = size * 1.2;
                 const off = (size - iconSize) / 2;
-                if (gameState.isAtWar && gameState.isAtWar(gameState.myCountryId, owner)) {
-                    ctx.globalAlpha = 0.3;
-                    ctx.fillStyle = '#ff0000';
-                    ctx.fillRect(screenX, screenY, size, size);
-                    ctx.globalAlpha = 1;
-                }
                 ctx.drawImage(img, screenX + off, screenY + off, iconSize, iconSize);
             } else {
                 ctx.fillStyle = owner === gameState.myCountryId ? '#fff'
@@ -288,16 +386,7 @@ export class RendererWebGL {
                 ctx.fillRect(screenX + (size - bw) / 2, screenY + size - 3, bw * hp, 3);
             }
 
-            // Подсветка армии — цветная полоска снизу
-            if (window._armyManager && owner === gameState.myCountryId) {
-                const army = window._armyManager.getArmyForUnit(i);
-                if (army) {
-                    ctx.fillStyle = army.color;
-                    ctx.fillRect(screenX, screenY + size - 2, size, 3);
-                }
-            }
-
-            // Флаг страны в углу юнита
+            // Флаг в углу
             if (size > 12) {
                 const flag = this.flags[owner];
                 if (flag && flag.complete && flag.naturalWidth > 0) {
@@ -306,7 +395,6 @@ export class RendererWebGL {
                 }
             }
 
-            // Множественный выбор — жёлтая рамка
             if (gameState._selectedUnits && gameState._selectedUnits.includes(i)) {
                 ctx.strokeStyle = '#fbbf24';
                 ctx.lineWidth = 2;
@@ -316,14 +404,11 @@ export class RendererWebGL {
             unitsDrawn++;
         }
 
-        // Выделенный юнит
-        const selId = gameState.selectedUnitId;
-        if (selId && entities.active[selId]) {
-            const sx = entities.x[selId] * 20 * zoom + camX;
-            const sy = entities.y[selId] * 20 * zoom + camY;
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sx - 2, sy - 2, size + 4, size + 4);
+        // Выделенная армия
+        const selArmyId = gameState._selectedArmyId;
+        if (selArmyId && window._armyManager) {
+            const selArmy = window._armyManager.armies.find(a => a.id === selArmyId);
+            if (selArmy) this._drawArmy(ctx, selArmy, entities, gameState, camX, camY, zoom, size, W, H, true);
         }
 
         // Очереди производства
