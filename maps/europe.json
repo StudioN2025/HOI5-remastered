@@ -2662,7 +2662,7 @@
     "10,-7": "czechoslovakia",
     "10,-6": "czechoslovakia",
     "10,-5": "czechoslovakia",
-    "10,-4": "france",
+    "10,-4": "czechoslovakia",
     "10,-3": "czechoslovakia",
     "10,-2": "czechoslovakia",
     "10,-1": "germany",
@@ -2796,7 +2796,7 @@
     "13,-6": "czechoslovakia",
     "13,-5": "czechoslovakia",
     "13,-4": "czechoslovakia",
-    "13,-3": "france",
+    "13,-3": "czechoslovakia",
     "13,-2": "czechoslovakia",
     "13,-1": "austria",
     "13,0": "austria",
@@ -2877,7 +2877,7 @@
     "15,-7": "germany",
     "15,-6": "germany",
     "15,-5": "czechoslovakia",
-    "15,-4": "france",
+    "15,-4": "czechoslovakia",
     "15,-3": "czechoslovakia",
     "15,-2": "czechoslovakia",
     "15,-1": "czechoslovakia",
@@ -44780,5 +44780,5 @@
       "name": "Tehran"
     }
   },
-  "created": "2026-07-13T16:25:34.163Z"
+  "created": "2026-07-13T17:04:03.901Z"
 }
