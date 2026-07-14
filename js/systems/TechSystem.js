@@ -40,6 +40,9 @@ export class TechSystem {
     }
 
     getUnlocked(countryId) {
+        if (!this.gameState.countryTech || !(this.gameState.countryTech instanceof Map)) {
+            this.gameState.countryTech = new Map();
+        }
         if (!this.gameState.countryTech.has(countryId)) {
             this.gameState.countryTech.set(countryId, new Set(['industry_1', 'infantry_1', 'tank_1']));
         }
@@ -100,7 +103,9 @@ export class TechSystem {
 
     getEffect(countryId, effectKey) {
         let total = 0;
-        for (const techId of this.getUnlocked(countryId)) {
+        const unlocked = this.getUnlocked(countryId);
+        if (!unlocked) return 0;
+        for (const techId of unlocked) {
             const tech = TECH_TREE[techId];
             if (tech && tech.effect && tech.effect[effectKey] !== undefined) {
                 total += tech.effect[effectKey];
