@@ -52,14 +52,11 @@ export class MovementSystem {
             let targetOk = targetIsLand;
             if (targetIsWater && (e.isShip[unitId] || startPort)) targetOk = true;
             if (targetOk) {
-                const occupant = e.getUnitAt(targetX, targetY);
-                if (!occupant || occupant === unitId) {
-                    e.moveTo(unitId, targetX, targetY);
-                    if (targetIsLand) e.isShip[unitId] = 0;
-                    else if (targetIsWater && startPort) e.isShip[unitId] = 1;
-                    addNotification('Приказ выполнен', 'info');
-                    return true;
-                }
+                e.moveTo(unitId, targetX, targetY);
+                if (targetIsLand) e.isShip[unitId] = 0;
+                else if (targetIsWater && startPort) e.isShip[unitId] = 1;
+                addNotification('Приказ выполнен', 'info');
+                return true;
             }
         }
 
@@ -165,24 +162,23 @@ export class MovementSystem {
                 // Проверяем вражескую территорию (пехота)
                 if (!isShip && isLand && cellOwner !== 0 && cellOwner !== e.owner[unitId]
                     && !this._areAllied(e.owner[unitId], cellOwner)) {
-                    const enemy = e.getUnitAt(nx, ny);
-                    if (enemy && e.active[enemy] && e.owner[enemy] !== e.owner[unitId]) {
-                        addNotification('⚔️ Встреча с врагом!', 'war');
-                        this.orders.delete(unitId);
-                        break;
-                    }
-                    if (isLand) this.world.setCell(nx, ny, e.owner[unitId]);
+                    // Вражеская клетка — захватываем и идём дальше
+                    this.world.setCell(nx, ny, e.owner[unitId]);
                 }
 
-                // Занята другим юнитом — разрешаем стак если союзный
+                // Занята другим юнитом
                 const occupant = e.getUnitAt(nx, ny);
                 if (occupant && occupant !== unitId) {
                     const occOwner = e.owner[occupant];
                     const myOwner = e.owner[unitId];
                     if (occOwner !== myOwner && !this._areAllied(myOwner, occOwner)) {
-                        break; // Враг — стоп
+                        // Враг — CombatSystem сам начнёт бой, просто идём на клетку
+                        if (!e.inCombat[unitId] && !e.inCombat[occupant]) {
+                            e.moveTo(unitId, nx, ny);
+                            order.path.shift();
+                        }
+                        break;
                     }
-                    // Союзный — можно стакаться, просто двигаемся
                 }
 
                 // Делаем шаг
