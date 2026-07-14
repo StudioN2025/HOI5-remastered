@@ -189,15 +189,26 @@ function setupEvents() {
         canvas.addEventListener('contextmenu', handleCanvasRightClick);
         canvas.addEventListener('wheel', handleCanvasWheel);
 
-        // Shift+drag — рисуем как кисточкой при найме/стройке
+        // Shift+drag — выделение юнитов как кистью
         let shiftDragging = false;
         canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0 && e.shiftKey && (window._recruitMode || window._pendingBuild)) {
+            if (e.button === 0 && e.shiftKey) {
                 shiftDragging = true;
+                if (window._recruitMode || window._pendingBuild) return;
+                // Shift+drag по юнитам — выделяем как кистью
+                const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
+                const unitId = entities.getUnitAt(worldPos.x, worldPos.y);
+                if (unitId !== null && entities.owner[unitId] === gameState.myCountryId) {
+                    const sel = gameState._selectedUnits;
+                    const idx = sel.indexOf(unitId);
+                    if (idx >= 0) sel.splice(idx, 1);
+                    else sel.push(unitId);
+                }
             }
         });
         canvas.addEventListener('mousemove', (e) => {
             if (!shiftDragging) return;
+            // Режим найма/стройки — ставим клетки кистью
             if (window._recruitMode || window._pendingBuild) {
                 const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
                 const cellOwner = world.getCell(worldPos.x, worldPos.y);
@@ -208,9 +219,23 @@ function setupEvents() {
                         production.enqueueBuilding(worldPos.x, worldPos.y, window._pendingBuild);
                     }
                 }
+                return;
+            }
+            // Обычный режим — выделяем юниты кистью
+            const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
+            const unitId = entities.getUnitAt(worldPos.x, worldPos.y);
+            if (unitId !== null && entities.owner[unitId] === gameState.myCountryId) {
+                const sel = gameState._selectedUnits;
+                if (sel.indexOf(unitId) === -1) sel.push(unitId);
             }
         });
-        canvas.addEventListener('mouseup', () => { shiftDragging = false; });
+        canvas.addEventListener('mouseup', () => {
+            shiftDragging = false;
+            if (gameState._selectedUnits.length > 0) {
+                document.getElementById('order-hint').innerHTML = '🎖️ Выделено: ' + gameState._selectedUnits.length + ' юнитов (Создать армию в КОМАНДУЮЩИЕ)';
+                document.getElementById('order-hint').classList.remove('hidden');
+            }
+        });
 
         // ===== МОБИЛЬНОЕ УПРАВЛЕНИЕ =====
         let touchStartX = 0, touchStartY = 0;
