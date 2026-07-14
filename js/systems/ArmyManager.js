@@ -263,7 +263,6 @@ export class ArmyManager {
                 if (attackCount > 0 && Math.random() < 0.05) {
                     addNotification('🎖️ ' + army.name + ': атака на ' + enemyId.toUpperCase() + '! (' + attackCount + ' юнитов)', 'war');
                 }
-                }
             } else {
                 // Мир — просто держим позицию у границы
                 let needsReposition = false;
