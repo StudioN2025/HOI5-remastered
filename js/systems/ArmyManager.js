@@ -219,38 +219,80 @@ export class ArmyManager {
         for (const army of this.armies) {
             if (!army.frontLine) continue;
 
-            // Проверяем что юниты ещё живы и не в бою
             const units = [...army.unitIds].filter(id => this.entities.active[id] && !this.entities.inCombat[id]);
             if (units.length === 0) continue;
 
-            // Проверяем что юниты ещё рядом с границей
-            let needsReposition = false;
-            for (const uid of units) {
-                const ux = this.entities.x[uid], uy = this.entities.y[uid];
-                let nearBorder = false;
-                for (const bc of army.frontLine.cells) {
-                    if (Math.abs(ux - bc.x) <= 1 && Math.abs(uy - bc.y) <= 1) {
-                        nearBorder = true;
-                        break;
+            const enemyId = army.frontLine.enemyId;
+            const atWar = enemyId && this.gs.isAtWar && this.gs.isAtWar(army.ownerId, enemyId);
+
+            if (atWar) {
+                // Война — атакуем вражеские клетки
+                const borderCells = army.frontLine.cells;
+                let attackCount = 0;
+                for (let i = 0; i < units.length; i++) {
+                    const uid = units[i];
+                    const ux = this.entities.x[uid], uy = this.entities.y[uid];
+                    const target = borderCells[i % borderCells.length];
+                    if (!target) continue;
+
+                    // Ищем вражескую клетку рядом
+                    let attacked = false;
+                    for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]) {
+                        const tx = target.x + dx, ty = target.y + dy;
+                        const cellOwner = this.world.getCell(tx, ty);
+                        if (cellOwner === enemyId) {
+                            if (movementSystem) movementSystem.giveOrder(uid, tx, ty);
+                            attacked = true;
+                            break;
+                        }
+                    }
+                    // Если не нашли вражескую — идём к границе
+                    if (!attacked) {
+                        const dx = Math.sign(target.x - ux);
+                        const dy = Math.sign(target.y - uy);
+                        const nx = ux + dx, ny = uy + dy;
+                        const no = this.world.getCell(nx, ny);
+                        if (no && (no === army.ownerId || (this.gs.areAllies && this.gs.areAllies(army.ownerId, no)))
+                            && !this.entities.getUnitAt(nx, ny)) {
+                            if (movementSystem) movementSystem.giveOrder(uid, nx, ny);
+                        }
+                    } else {
+                        attackCount++;
                     }
                 }
-                if (!nearBorder) { needsReposition = true; break; }
-            }
+                if (attackCount > 0 && Math.random() < 0.05) {
+                    addNotification('🎖️ ' + army.name + ': атака на ' + enemyId.toUpperCase() + '! (' + attackCount + ' юнитов)', 'war');
+                }
+                }
+            } else {
+                // Мир — просто держим позицию у границы
+                let needsReposition = false;
+                for (const uid of units) {
+                    const ux = this.entities.x[uid], uy = this.entities.y[uid];
+                    let nearBorder = false;
+                    for (const bc of army.frontLine.cells) {
+                        if (Math.abs(ux - bc.x) <= 1 && Math.abs(uy - bc.y) <= 1) {
+                            nearBorder = true;
+                            break;
+                        }
+                    }
+                    if (!nearBorder) { needsReposition = true; break; }
+                }
 
-            if (!needsReposition) continue;
+                if (!needsReposition) continue;
 
-            // Перестраиваем линию
-            const cells = army.frontLine.cells;
-            for (let i = 0; i < units.length; i++) {
-                const cellIdx = i % cells.length;
-                const target = cells[cellIdx];
-                for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]) {
-                    const tx = target.x + dx, ty = target.y + dy;
-                    const cellOwner = this.world.getCell(tx, ty);
-                    if ((cellOwner === army.ownerId || (this.gs.areAllies && this.gs.areAllies(army.ownerId, cellOwner)))
-                        && !this.entities.getUnitAt(tx, ty)) {
-                        if (movementSystem) movementSystem.giveOrder(units[i], tx, ty);
-                        break;
+                const cells = army.frontLine.cells;
+                for (let i = 0; i < units.length; i++) {
+                    const cellIdx = i % cells.length;
+                    const target = cells[cellIdx];
+                    for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]) {
+                        const tx = target.x + dx, ty = target.y + dy;
+                        const cellOwner = this.world.getCell(tx, ty);
+                        if ((cellOwner === army.ownerId || (this.gs.areAllies && this.gs.areAllies(army.ownerId, cellOwner)))
+                            && !this.entities.getUnitAt(tx, ty)) {
+                            if (movementSystem) movementSystem.giveOrder(units[i], tx, ty);
+                            break;
+                        }
                     }
                 }
             }
