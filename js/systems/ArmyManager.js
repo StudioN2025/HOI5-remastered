@@ -226,28 +226,26 @@ export class ArmyManager {
             const atWar = enemyId && this.gs.isAtWar && this.gs.isAtWar(army.ownerId, enemyId);
 
             if (atWar) {
-                // Война — атакуем вражеские клетки
-                const borderCells = army.frontLine.cells;
-                let attackCount = 0;
-                for (let i = 0; i < units.length; i++) {
-                    const uid = units[i];
+                // Война — находим свежие вражеские клетки рядом с юнитами
+                const enemyTargets = [];
+                for (const uid of units) {
                     const ux = this.entities.x[uid], uy = this.entities.y[uid];
-                    const target = borderCells[i % borderCells.length];
-                    if (!target) continue;
-
-                    // Ищем вражескую клетку рядом
-                    let attacked = false;
-                    for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]) {
-                        const tx = target.x + dx, ty = target.y + dy;
-                        const cellOwner = this.world.getCell(tx, ty);
-                        if (cellOwner === enemyId) {
-                            if (movementSystem) movementSystem.giveOrder(uid, tx, ty);
-                            attacked = true;
-                            break;
+                    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                        const tx = ux + dx, ty = uy + dy;
+                        if (this.world.getCell(tx, ty) === enemyId) {
+                            enemyTargets.push({ x: tx, y: ty });
                         }
                     }
-                    // Если не нашли вражескую — идём к границе
-                    if (!attacked) {
+                }
+
+                // Если нет вражеских клеток рядом — идём к оригинальной границе
+                if (enemyTargets.length === 0) {
+                    const borderCells = army.frontLine.cells;
+                    for (let i = 0; i < units.length; i++) {
+                        const uid = units[i];
+                        const ux = this.entities.x[uid], uy = this.entities.y[uid];
+                        const target = borderCells[i % borderCells.length];
+                        if (!target) continue;
                         const dx = Math.sign(target.x - ux);
                         const dy = Math.sign(target.y - uy);
                         const nx = ux + dx, ny = uy + dy;
@@ -256,12 +254,43 @@ export class ArmyManager {
                             && !this.entities.getUnitAt(nx, ny)) {
                             if (movementSystem) movementSystem.giveOrder(uid, nx, ny);
                         }
-                    } else {
-                        attackCount++;
                     }
-                }
-                if (attackCount > 0 && Math.random() < 0.05) {
-                    addNotification('🎖️ ' + army.name + ': атака на ' + enemyId.toUpperCase() + '! (' + attackCount + ' юнитов)', 'war');
+                } else {
+                    // Атакуем ближайшие вражеские клетки
+                    let attackCount = 0;
+                    for (let i = 0; i < units.length; i++) {
+                        const uid = units[i];
+                        if (this.entities.inCombat[uid]) continue;
+                        const ux = this.entities.x[uid], uy = this.entities.y[uid];
+
+                        // Находим ближайшую вражескую клетку
+                        let bestTarget = null, bestDist = Infinity;
+                        for (const t of enemyTargets) {
+                            const dist = Math.abs(t.x - ux) + Math.abs(t.y - uy);
+                            if (dist < bestDist) { bestDist = dist; bestTarget = t; }
+                        }
+                        if (bestTarget && bestDist <= 3) {
+                            if (movementSystem) movementSystem.giveOrder(uid, bestTarget.x, bestTarget.y);
+                            attackCount++;
+                        } else {
+                            // Идём к границе
+                            const borderCells = army.frontLine.cells;
+                            const target = borderCells[i % borderCells.length];
+                            if (target) {
+                                const dx = Math.sign(target.x - ux);
+                                const dy = Math.sign(target.y - uy);
+                                const nx = ux + dx, ny = uy + dy;
+                                const no = this.world.getCell(nx, ny);
+                                if (no && (no === army.ownerId || (this.gs.areAllies && this.gs.areAllies(army.ownerId, no)))
+                                    && !this.entities.getUnitAt(nx, ny)) {
+                                    if (movementSystem) movementSystem.giveOrder(uid, nx, ny);
+                                }
+                            }
+                        }
+                    }
+                    if (attackCount > 0 && Math.random() < 0.05) {
+                        addNotification('🎖️ ' + army.name + ': атака на ' + enemyId.toUpperCase() + '! (' + attackCount + ' юнитов)', 'war');
+                    }
                 }
             } else {
                 // Мир — просто держим позицию у границы
