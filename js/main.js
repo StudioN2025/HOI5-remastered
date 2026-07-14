@@ -503,8 +503,6 @@ function setupEvents() {
             gameState._selectedArmyId = null;
         } else {
             gameState._selectedArmyId = armyId;
-            const army = armyManager.armies.find(a => a.id === armyId);
-            if (army) addNotification(`🎖️ ${army.name} выбрана — ЛКМ по карте для приказа`, 'info');
         }
         gameState.selectedUnitId = null;
         updateArmyPanel();
@@ -561,13 +559,22 @@ function handleCanvasClick(e) {
     const worldPos = renderer.screenToWorld(e.clientX, e.clientY);
     const cellOwner = world.getCell(worldPos.x, worldPos.y);
 
-    // Клик по юниту армии — панель приказов
+    // Клик по юниту армии
     const clickUnit = entities.getUnitAt(worldPos.x, worldPos.y);
     if (clickUnit !== null && entities.owner[clickUnit] === gameState.myCountryId) {
         const army = armyManager ? armyManager.getArmyForUnit(clickUnit) : null;
         if (army) {
-            gameState._selectedArmyId = army.id;
-            showArmyCommandPanel(army, e.clientX, e.clientY);
+            if (e.shiftKey) {
+                // Shift+клик — выделить армию для приказа
+                gameState._selectedArmyId = army.id;
+                gameState.selectedUnitId = null;
+                document.getElementById('order-hint').innerHTML = '🎖️ Армия выбрана — ЛКМ куда переместить';
+                document.getElementById('order-hint').classList.remove('hidden');
+                updateArmyPanel();
+            } else {
+                // Обычный клик — панель приказов
+                showArmyCommandPanel(army, e.clientX, e.clientY);
+            }
             return;
         }
     }

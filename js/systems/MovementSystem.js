@@ -55,7 +55,6 @@ export class MovementSystem {
                 e.moveTo(unitId, targetX, targetY);
                 if (targetIsLand) e.isShip[unitId] = 0;
                 else if (targetIsWater && startPort) e.isShip[unitId] = 1;
-                addNotification('Приказ выполнен', 'info');
                 return true;
             }
         }
@@ -71,7 +70,6 @@ export class MovementSystem {
         }
 
         this.orders.set(unitId, { path, targetX, targetY });
-        addNotification(`Приказ выдан — ${path.length} клеток`, 'info');
         return true;
     }
 
