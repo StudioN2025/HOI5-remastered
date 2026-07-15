@@ -45,7 +45,7 @@ export class RendererWebGL {
             img.onload = () => { this.unitImages[country] = img; };
         }
 
-        // Флаги
+        // Флаги — базовые + идеологические варианты
         this.flags = {};
         const flagCountries = [
             'austria','albania','belgium','bulgaria','czechoslovakia','denmark',
@@ -55,40 +55,46 @@ export class RendererWebGL {
             'romania','saudi_arabia','slovakia','spain','sweden',
             'switzerland','turkey','uk','ussr','yugoslavia'
         ];
+        const ideologies = ['democratic', 'communist', 'neutral'];
         for (const c of flagCountries) {
             const img = new Image();
             img.src = `assets/flags/${c}.png`;
             img.onload = () => { this.flags[c] = img; };
+            for (const ideo of ideologies) {
+                const img2 = new Image();
+                img2.src = `assets/flags/${c}_${ideo}.png`;
+                const key = c + '_' + ideo;
+                img2.onload = () => { this.flags[key] = img2; };
+            }
         }
     }
 
     _initColorCache() {
-        const colors = {
-            germany:'#3a3a3a',ussr:'#990000',poland:'#ffc0cb',france:'#3b82f6',
-            uk:'#ef4444',italy:'#166534',spain:'#fbbf24',portugal:'#105d10',
-            netherlands:'#f97316',belgium:'#eab308',luxembourg:'#67e8f9',
-            switzerland:'#dc2626',romania:'#f59e0b',hungary:'#16a34a',
-            bulgaria:'#059669',finland:'#e0e7ff',norway:'#dc2626',sweden:'#2563eb',
-            denmark:'#c026d3',czechoslovakia:'#3b82f6',austria:'#ef4444',
-            yugoslavia:'#1e40af',greece:'#60a5fa',albania:'#dc2626',
-            lithuania:'#065f46',latvia:'#7f1d1d',estonia:'#1d4ed8',
-            slovakia:'#2563eb',ireland:'#16a34a',iceland:'#3b82f6',
-            turkey:'#dc2626',iraq:'#166534',iran:'#059669',
-            saudi_arabia:'#15803d',syria:'#14532d',jordan:'#065f46',
-            palestine:'#fbbf24',egypt:'#f59e0b',libya:'#7c2d12',
-            tunisia:'#c2410c',algeria:'#065f46',morocco:'#047857',
-        };
-        for (const [k, v] of Object.entries(colors)) this._colorCache.set(k, v);
+        this._colorCache = new Map();
     }
 
-    // Построение кэша полигонов — группирует клетки одной страны в Path2D
-    _buildPolygonCache(world) {
+    _getCountryColor(countryId, gameState) {
+        if (!gameState) return this._colorCache.get(countryId) || '#666666';
+        const COUNTRIES = window._COUNTRIES_MAP || {};
+        const c = COUNTRIES[countryId];
+        if (c) {
+            const ideologies = c.ideologies;
+            if (ideologies && ideologies[c.ideology]) {
+                return ideologies[c.ideology].color || c.color || '#666666';
+            }
+            return c.color || '#666666';
+        }
+        return this._colorCache.get(countryId) || '#666666';
+    }
+
+    // Построение кэша полигонов
+    _buildPolygonCache(world, gameState) {
         const cellSize = 20;
-        const colorPaths = new Map(); // color → Path2D
+        const colorPaths = new Map();
 
         for (const [posKey, owner] of world.cells) {
             const [cx, cy] = posKey.split(',').map(Number);
-            const color = this._colorCache.get(owner) || '#666666';
+            const color = this._getCountryColor(owner, gameState);
 
             if (!colorPaths.has(color)) {
                 colorPaths.set(color, new Path2D());
@@ -181,7 +187,7 @@ export class RendererWebGL {
             const screenY = wy * zoom + camY;
             if (screenX + size < -10 || screenX > W + 10 || screenY + size < -10 || screenY > H + 10) continue;
 
-            const color = this._colorCache.get(owner) || '#666666';
+            const color = this._getCountryColor(owner, gameState);
             if (!colorBuckets.has(color)) colorBuckets.set(color, []);
             colorBuckets.get(color).push(screenX, screenY);
 

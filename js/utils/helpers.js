@@ -1,13 +1,17 @@
 // helpers.js — Вспомогательные функции
 
-import { COUNTRIES } from '../data/Countries.js';
+import { COUNTRIES, getIdeologyData } from '../data/Countries.js';
 
 export function getCountryInfo(id) {
-    return COUNTRIES[id] || { 
-        name: id.toUpperCase(), 
-        color: generateColor(id), 
-        leader: "Неизвестно", 
-        ideology: "Нейтралитет" 
+    const c = COUNTRIES[id];
+    if (!c) return { name: id.toUpperCase(), color: generateColor(id), leader: "Неизвестно", ideology: "Нейтралитет" };
+    const ideData = getIdeologyData(id, c.ideology);
+    return {
+        name: c.name,
+        color: ideData.color || c.color,
+        leader: ideData.leader || c.leader || "Неизвестно",
+        ideology: c.ideology,
+        flag: ideData.flag || id,
     };
 }
 

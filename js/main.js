@@ -489,6 +489,7 @@ function setupEvents() {
         }
         gameState.ideologyChange = null;
         addNotification('⚡ Идеология изменена на ' + newIdeology + '!', 'war');
+        if (renderer) renderer._polygonCache = null;
         uiManager.openWindow('diplomacy');
     };
 
