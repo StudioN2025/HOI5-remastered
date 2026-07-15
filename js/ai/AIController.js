@@ -540,10 +540,6 @@ export class AIController {
         }
         return false;
     }
-            return true;
-        }
-        return false;
-    }
 
     // ── Мирное время ─────────────────────────────────────────────────────────
 
