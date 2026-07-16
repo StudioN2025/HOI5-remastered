@@ -1,5 +1,7 @@
 // TopBar.js — Обновление верхней панели
 
+import { getCountryInfo } from '../utils/helpers.js';
+
 export class TopBar {
     constructor(gameState) {
         this.gameState = gameState;
@@ -16,8 +18,9 @@ export class TopBar {
         const dateElem = document.getElementById('game-date');
 
         if (countryNameElem) {
-            const info = this.gameState.getCountryName ? this.gameState.getCountryName(myId) : myId;
-            countryNameElem.innerHTML = `<span class="flex items-center gap-2"><img src="assets/flags/${myId}.png" style="width:28px;height:18px;border-radius:2px;" onerror="this.style.display='none'">${myId.toUpperCase()}</span>`;
+            const info = getCountryInfo(myId);
+            const flagKey = info.flag || myId;
+            countryNameElem.innerHTML = '<span class="flex items-center gap-2"><img src="assets/flags/' + flagKey + '.png" style="width:28px;height:18px;border-radius:2px;" onerror="this.style.display=\'none\'">' + (info.name || myId.toUpperCase()) + '</span>';
         }
         if (manpowerElem) {
             const cur = Math.floor(this.gameState.manpower);
@@ -31,7 +34,6 @@ export class TopBar {
         // Индикаторы
         const researchInd = document.getElementById('research-indicator');
         const focusInd = document.getElementById('focus-indicator');
-        const buildInd = document.getElementById('build-indicator');
 
         if (researchInd) researchInd.classList.toggle('hidden', !this.gameState.activeResearch);
         if (focusInd) focusInd.classList.toggle('hidden', !this.gameState.activeFocus);
