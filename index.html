@@ -93,6 +93,20 @@
     <div id="army-command-panel" class="hidden" style="position:fixed;z-index:300;background:#1f2937;border:2px solid #eab308;border-radius:8px;padding:8px;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.5);pointer-events:auto;"></div>
     <div id="notifications"></div>
 
+    <!-- Тутор -->
+    <div id="tutorial-overlay" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:center;justify-content:center;">
+        <div style="background:#1f2937;border:2px solid #eab308;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+            <div id="tutorial-icon" style="text-align:center;font-size:48px;margin-bottom:12px;">🎮</div>
+            <div id="tutorial-title" style="text-align:center;font-size:18px;font-weight:bold;color:#eab308;margin-bottom:8px;">Добро пожаловать в Heirloom!</div>
+            <div id="tutorial-text" style="text-align:center;font-size:13px;color:#d1d5db;line-height:1.6;margin-bottom:16px;"></div>
+            <div style="text-align:center;margin-bottom:8px;font-size:10px;color:#6b7280;" id="tutorial-step">Шаг 1 / 8</div>
+            <div style="display:flex;gap:8px;justify-content:center;">
+                <button id="tutorial-skip" style="padding:8px 16px;background:#374151;color:#9ca3af;border:1px solid #4b5563;border-radius:6px;cursor:pointer;font-size:12px;">Пропустить</button>
+                <button id="tutorial-next" style="padding:8px 24px;background:#15803d;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;">Далее →</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Панель армий внизу (как в стратегиях) -->
     <div id="army-panel">
         <div id="army-panel-header">

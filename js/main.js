@@ -624,6 +624,57 @@ function setupEvents() {
     gameState._selectedArmyId = null;
 }
 
+// ── ТУТОР ─────────────────────────────────────────────────────────────
+
+var TUTORIAL_STEPS = [
+    { icon: '🎮', title: 'Добро пожаловать в Heirloom!', text: 'Стратегия в стиле Hearts of Iron. Управляйте страной, воюйте, стройте армию и меняйте ход истории!' },
+    { icon: '🗺️', title: 'Навигация по карте', text: '<b>WASD</b> или зажатая ЛКМ — движение камеры.<br><b>Колёсико мыши</b> — приближение/отдаление.<br><b>Пробел</b> — пауза/продолжить.' },
+    { icon: '🏗️', title: 'Строительство', text: 'Откройте вкладку <b>СТРОЙКА</b> и выберите тип постройки.<br>Затем кликните по клетке вашей территории на карте.<br><b>🏭 Заводы</b> — дают снаряжение. <b>⚓ Порты</b> — для флота.' },
+    { icon: '🎖️', title: 'Набор войск', text: 'Откройте <b>АРМИЯ</b> → нажмите <b>➕ ПЕХОТА</b> или <b>➕ ТАНК</b>.<br>Затем кликните по своей клетке — юнит появится там.<br>Юниты автоматически сражаются при встрече с врагом.' },
+    { icon: '⭐', title: 'Национальные фокусы', text: 'Вкладка <b>ФОКУСЫ</b> — дерево развития страны.<br>Кликните по доступному фокусу чтобы начать изучение.<br>Фокусы дают бонусы: заводы, войска, союзы.' },
+    { icon: '🤝', title: 'Дипломатия', text: 'Вкладка <b>ДИПЛОМАТИЯ</b>:<br>🤝 <b>Союзники</b> —在一起 воюют.<br>⚔️ <b>Враги</b> — прогресс капитуляции.<br>⚡ <b>Идеология</b> — смена политического строя.' },
+    { icon: '🎖️', title: 'Армии', text: '<b>ПКМ</b> по юнитам — выделение.<br><b>Создать армию</b> — объединяет юниты.<br><b>Shift+клик</b> на юните армии — выделить для приказа.<br><b>🎯 Граница</b> — автоматическая оборона/атака.' },
+    { icon: '⚔️', title: 'Готово к завоеванию!', text: 'Объявите войну через дипломатию и захватывайте территории.<br>Когда враг потеряет достаточно клеток — он капитулирует.<br>Выберите: аннексировать, сделать вассалом или освободить.<br><br>Удачи, фюрер! 🎮' },
+];
+
+var tutorialStep = 0;
+
+function startTutorial() {
+    tutorialStep = 0;
+    var overlay = document.getElementById('tutorial-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+    showTutorialStep();
+    document.getElementById('tutorial-next').onclick = nextTutorialStep;
+    document.getElementById('tutorial-skip').onclick = closeTutorial;
+}
+
+function showTutorialStep() {
+    var step = TUTORIAL_STEPS[tutorialStep];
+    if (!step) { closeTutorial(); return; }
+    document.getElementById('tutorial-icon').textContent = step.icon;
+    document.getElementById('tutorial-title').textContent = step.title;
+    document.getElementById('tutorial-text').innerHTML = step.text;
+    document.getElementById('tutorial-step').textContent = 'Шаг ' + (tutorialStep + 1) + ' / ' + TUTORIAL_STEPS.length;
+    var btn = document.getElementById('tutorial-next');
+    btn.textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? 'Начать игру! 🎮' : 'Далее →';
+}
+
+function nextTutorialStep() {
+    tutorialStep++;
+    if (tutorialStep >= TUTORIAL_STEPS.length) {
+        closeTutorial();
+    } else {
+        showTutorialStep();
+    }
+}
+
+function closeTutorial() {
+    var overlay = document.getElementById('tutorial-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    localStorage.setItem('heirloom_tutorial_done', '1');
+}
+
 function showArmyCommandPanel(army, screenX, screenY) {
     var panel = document.getElementById('army-command-panel');
     if (!panel) return;
@@ -1192,6 +1243,11 @@ function startGame(countryId) {
     
     // Запускаем игровой цикл ТОЛЬКО ПОСЛЕ выбора страны
     startGameLoop();
+
+    // Тутор при первом запуске
+    if (!localStorage.getItem('heirloom_tutorial_done')) {
+        startTutorial();
+    }
 }
 
 function saveGame() {
