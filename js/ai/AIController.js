@@ -729,7 +729,6 @@ export class AIController {
                 if (cell !== ownerId) {
                     const isAllied = this.gs.areAllies && this.gs.areAllies(ownerId, cell);
                     const isEnemy = this.gs.isAtWar && this.gs.isAtWar(ownerId, cell);
-                    const isEnemy = this.gs.isAtWar && this.gs.isAtWar(ownerId, cell);
                     if (!isAllied && !isEnemy) continue; // чужая территория — обходим
                 }
 
