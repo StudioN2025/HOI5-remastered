@@ -404,7 +404,12 @@ function setupEvents() {
     
     window.declareWarOn = (id) => {
         diplomacy.declareWar(id);
-        uiManager.closeSidebar();
+        uiManager.openWindow('diplomacy');
+    };
+
+    window.justifyWar = (id) => {
+        diplomacy.startJustification(id);
+        uiManager.openWindow('diplomacy');
     };
     
     window.proposeAlly = (id) => {
@@ -437,8 +442,8 @@ function setupEvents() {
         }
         if (enemyList.length === 1) {
             // Один враг — сразу объявляем войну
-            gameState.addWar(gameState.myCountryId, enemyList[0], world);
-            addNotification('⚔️ Вы объявили войну ' + enemyList[0].toUpperCase() + ' по призыву ' + allyId.toUpperCase(), 'war');
+            diplomacy.declareWarForced(enemyList[0]);
+            addNotification('⚔️ Вы вступили в войну по призыву ' + allyId.toUpperCase(), 'war');
             uiManager.openWindow('diplomacy');
             return;
         }
@@ -450,7 +455,7 @@ function setupEvents() {
         html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Выберите против кого объявить войну:</div></div>';
         for (var i = 0; i < enemyList.length; i++) {
             var eName = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[enemyList[i]]) ? window._COUNTRIES_MAP[enemyList[i]].name : enemyList[i].toUpperCase();
-            html += '<button onclick="window.declareWarOn(\'' + enemyList[i] + '\');document.getElementById(\'info-window\').classList.add(\'hidden\');uiManager.openWindow(\'diplomacy\')" style="width:100%;padding:10px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:6px;margin-bottom:6px;cursor:pointer;text-align:left;">';
+            html += '<button onclick="diplomacy.declareWarForced(\'' + enemyList[i] + '\');document.getElementById(\'info-window\').classList.add(\'hidden\');addNotification(\'⚔️ Вы вступили в войну!\',\'war\');uiManager.openWindow(\'diplomacy\')" style="width:100%;padding:10px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:6px;margin-bottom:6px;cursor:pointer;text-align:left;">';
             html += '<div style="font-size:12px;font-weight:bold;">⚔️ Объявить войну ' + eName.toUpperCase() + '</div></button>';
         }
         html += '<button onclick="document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:8px;background:#374151;color:white;border:1px solid #4b5563;border-radius:6px;margin-top:8px;cursor:pointer;">Отказаться</button>';
@@ -970,6 +975,16 @@ function startGameLoop() {
                 gameState.ideologyChange.daysLeft--;
                 if (gameState.ideologyChange.daysLeft <= 0) {
                     window.applyIdeologyChange(gameState.ideologyChange.target);
+                }
+            }
+
+            // Прогресс обоснования войны
+            if (gameState.justifications) {
+                gameState.justifications.daysLeft--;
+                if (gameState.justifications.daysLeft <= 0) {
+                    var jTarget = gameState.justifications.target;
+                    addNotification('📜 Обоснование войны против ' + jTarget.toUpperCase() + ' завершено!', 'info');
+                    gameState.justifications.daysLeft = 0;
                 }
             }
 

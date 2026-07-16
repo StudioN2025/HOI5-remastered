@@ -181,11 +181,34 @@ export class UIManager {
             actionsDiv.classList.remove('hidden');
             const atWar = this.gameState.isAtWar && this.gameState.isAtWar(this.gameState.myCountryId, countryId);
             const allied = this.gameState.areAllies && this.gameState.areAllies(this.gameState.myCountryId, countryId);
-            
-            actionsDiv.innerHTML = `
-                ${!atWar ? `<button onclick="window.declareWarOn('${countryId}')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>` : '<div style="color:#f87171;text-align:center;padding:10px;background:#7f1d1d30;border-radius:6px;margin-bottom:8px;">⚔️ В СОСТОЯНИИ ВОЙНЫ</div>'}
-                ${!atWar && !allied ? `<button onclick="window.proposeAlly('${countryId}')" style="width:100%;background:#15803d;color:white;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>` : allied ? '<div style="color:#4ade80;text-align:center;padding:10px;background:#16653430;border-radius:6px;">🤝 В АЛЬЯНСЕ</div>' : ''}
-            `;
+
+            // Определяем кнопку войны по идеологии
+            var warButton = '';
+            if (atWar) {
+                warButton = '<div style="color:#f87171;text-align:center;padding:10px;background:#7f1d1d30;border-radius:6px;margin-bottom:8px;">⚔️ В СОСТОЯНИИ ВОЙНЫ</div>';
+            } else {
+                var myIdeology = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[this.gameState.myCountryId]) ? window._COUNTRIES_MAP[this.gameState.myCountryId].ideology : 'Нейтралитет';
+                if (myIdeology === 'Фашизм' || myIdeology === 'Коммунизм') {
+                    warButton = '<button onclick="window.declareWarOn(\'' + countryId + '\')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>';
+                } else if (myIdeology === 'Демократия') {
+                    var just = this.gameState.justifications;
+                    if (just && just.target === countryId && just.daysLeft > 0) {
+                        var pct = Math.floor(((just.totalDays - just.daysLeft) / just.totalDays) * 100);
+                        warButton = '<div style="background:#1f2937;border-radius:6px;padding:8px;margin-bottom:8px;">';
+                        warButton += '<div style="font-size:10px;color:#9ca3af;margin-bottom:4px;">📜 Обоснование: ' + just.daysLeft + ' дн.</div>';
+                        warButton += '<div style="background:#374151;height:6px;border-radius:3px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:#3b82f6;border-radius:3px;"></div></div></div>';
+                    } else if (just && just.target === countryId && just.daysLeft <= 0) {
+                        warButton = '<button onclick="window.declareWarOn(\'' + countryId + '\')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>';
+                    } else {
+                        warButton = '<button onclick="window.justifyWar(\'' + countryId + '\')" style="width:100%;background:#854d0e;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">📜 ОБОСНОВАТЬ ВОЙНУ (30 дн.)</button>';
+                    }
+                } else {
+                    warButton = '<div style="color:#6b7280;text-align:center;padding:10px;background:#1f2937;border-radius:6px;margin-bottom:8px;font-size:11px;">🚫 Нейтралитет — война только по призыву союзника</div>';
+                }
+            }
+
+            actionsDiv.innerHTML = warButton +
+                (!atWar && !allied ? `<button onclick="window.proposeAlly('${countryId}')" style="width:100%;background:#15803d;color:white;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>` : allied ? '<div style="color:#4ade80;text-align:center;padding:10px;background:#16653430;border-radius:6px;">🤝 В АЛЬЯНСЕ</div>' : '');
         } else if (actionsDiv) {
             actionsDiv.classList.add('hidden');
         }
