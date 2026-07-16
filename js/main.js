@@ -88,6 +88,17 @@ async function init() {
 
     // Показываем меню — пользователь сам нажимает "НАЧАТЬ"
     setupEvents();
+
+    // Загружаем настройки
+    var savedScale = localStorage.getItem('heirloom_ui_scale');
+    if (savedScale) {
+        document.body.style.fontSize = (parseFloat(savedScale) * 14) + 'px';
+        document.querySelectorAll('button').forEach(function(b) { b.style.fontSize = (parseFloat(savedScale) * 11) + 'px'; });
+    }
+    var savedLang = localStorage.getItem('heirloom_lang');
+    if (savedLang && window.setLanguage) window.setLanguage(savedLang);
+    var langBtn = document.getElementById('btn-lang');
+    if (langBtn) langBtn.textContent = savedLang === 'en' ? '🇬🇧' : '🇷🇺';
 }
 
 // Загружаем ресурсы по кнопке
@@ -147,6 +158,14 @@ function setupEvents() {
     const closeSidebarBtn = document.getElementById('close-sidebar');
     
     if (btnPlay) btnPlay.onclick = () => loadGameData();
+
+    // Кнопка настроек
+    const btnSettings = document.getElementById('btn-settings');
+    if (btnSettings) btnSettings.onclick = () => {
+        document.getElementById('settings-overlay').classList.remove('hidden');
+        updateSettingsUI();
+    };
+
     if (btnCancel) btnCancel.onclick = () => hideCountrySelection();
     if (closeWindowBtn) closeWindowBtn.onclick = () => {
         // Если открыто окно капитуляции — не даём закрыть без выбора
@@ -944,6 +963,54 @@ function handleKeyDown(e) {
 }
 
 function handleKeyUp(e) {}
+
+// ── НАСТРОЙКИ ──
+function updateSettingsUI() {
+    var lang = localStorage.getItem('heirloom_lang') || 'ru';
+    var autosave = localStorage.getItem('heirloom_autosave') !== 'false';
+    var sound = localStorage.getItem('heirloom_sound') !== 'false';
+
+    var ruBtn = document.getElementById('set-lang-ru');
+    var enBtn = document.getElementById('set-lang-en');
+    if (ruBtn) { ruBtn.style.background = lang === 'ru' ? '#3b82f6' : '#374151'; ruBtn.style.border = lang === 'ru' ? 'none' : '1px solid #4b5563'; }
+    if (enBtn) { enBtn.style.background = lang === 'en' ? '#3b82f6' : '#374151'; enBtn.style.border = lang === 'en' ? 'none' : '1px solid #4b5563'; }
+
+    var asOn = document.getElementById('set-autosave-on');
+    var asOff = document.getElementById('set-autosave-off');
+    if (asOn) { asOn.style.background = autosave ? '#15803d' : '#374151'; asOn.style.border = autosave ? 'none' : '1px solid #4b5563'; }
+    if (asOff) { asOff.style.background = !autosave ? '#991b1b' : '#374151'; asOff.style.border = !autosave ? 'none' : '1px solid #4b5563'; }
+
+    var sndOn = document.getElementById('set-sound-on');
+    var sndOff = document.getElementById('set-sound-off');
+    if (sndOn) { sndOn.style.background = sound ? '#15803d' : '#374151'; sndOn.style.border = sound ? 'none' : '1px solid #4b5563'; }
+    if (sndOff) { sndOff.style.background = !sound ? '#991b1b' : '#374151'; sndOff.style.border = !sound ? 'none' : '1px solid #4b5563'; }
+}
+
+window.setGameLang = function(lang) {
+    localStorage.setItem('heirloom_lang', lang);
+    if (window.setLanguage) window.setLanguage(lang);
+    updateSettingsUI();
+    // Обновляем текст кнопки языка в топбаре
+    var langBtn = document.getElementById('btn-lang');
+    if (langBtn) langBtn.textContent = lang === 'ru' ? '🇷🇺' : '🇬🇧';
+};
+
+window.setGameAutosave = function(enabled) {
+    localStorage.setItem('heirloom_autosave', enabled ? 'true' : 'false');
+    if (gameState) gameState.autosave = enabled;
+    updateSettingsUI();
+};
+
+window.setGameSound = function(enabled) {
+    localStorage.setItem('heirloom_sound', enabled ? 'true' : 'false');
+    updateSettingsUI();
+};
+
+window.setGameUIScale = function(scale) {
+    localStorage.setItem('heirloom_ui_scale', scale);
+    document.body.style.fontSize = (scale * 14) + 'px';
+    document.querySelectorAll('button').forEach(function(b) { b.style.fontSize = (scale * 11) + 'px'; });
+};
 
 function startGameLoop() {
     if (animationFrameId) return;
