@@ -1,5 +1,6 @@
 // TopBar.js — Обновление верхней панели
 
+import { t } from '../i18n.js';
 import { getCountryInfo } from '../utils/helpers.js';
 
 export class TopBar {

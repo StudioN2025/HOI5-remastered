@@ -23,6 +23,7 @@ import { loadFocusTree } from './data/FocusTree.js';
 import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
 import { addNotification } from './utils/helpers.js';
 import { COUNTRIES } from './data/Countries.js';
+import { t, setLanguage, getCurrentLanguage } from './i18n.js';
 
 // Глобальные экземпляры
 let world = null;
@@ -50,6 +51,12 @@ let lastTimestamp = 0;
 let needsRender = true; // глобальная — чтобы touch-обработчики видели
 
 async function init() {
+    // Инициализация языка
+    const savedLang = getCurrentLanguage();
+    setLanguage(savedLang);
+    const langBtn = document.getElementById('btn-lang');
+    if (langBtn) langBtn.textContent = savedLang === 'ru' ? '🇷🇺' : '🇬🇧';
+
     console.log('🚀 Heirloom v4.0');
 
     // Минимальная инициализация — показываем меню сразу
@@ -86,27 +93,27 @@ async function init() {
 // Загружаем ресурсы по кнопке
 async function loadGameData() {
     showLoadingScreen();
-    updateLoadingBar(10, 'Загрузка карты...');
+    updateLoadingBar(10, t('loading.map'));
 
     const loader = new DataLoader();
     await loader.loadMap('maps/europe.json', world);
 
-    updateLoadingBar(50, 'Генерация рельефа...');
+    updateLoadingBar(50, t('loading.terrain'));
     world.generateTerrain();
 
-    updateLoadingBar(60, 'Загрузка фокусов...');
+    updateLoadingBar(60, t('loading.focuses'));
     const loadedFocuses = await loadFocusTree();
     window._FOCUS_TREE = loadedFocuses;
 
-    updateLoadingBar(75, 'Предзагрузка ресурсов...');
+    updateLoadingBar(75, t('loading.resources'));
     await preloadResources();
 
-    updateLoadingBar(85, 'Инициализация ИИ...');
+    updateLoadingBar(85, t('loading.ai'));
     aiController = new AIController(world, entities, gameState);
     aiController.production = production;
     await aiController.init();
 
-    updateLoadingBar(100, 'Готово!');
+    updateLoadingBar(100, t('loading.done'));
     setTimeout(() => hideLoadingScreen(), 300);
     showCountrySelection();
 }
@@ -128,7 +135,7 @@ async function preloadResources() {
     await Promise.race([loads, timeout]);
 
     if (failed.length > 0) {
-        addNotification(`⚠️ Не загрузилось: ${failed.join(', ')}. Плохой интернет или проблемы с сервером. Будут использоваться эмодзи.`, 'war');
+        addNotification(t('notifications.noLoadResources') + failed.join(', ') + t('notifications.badInternet'), 'war');
     }
 }
 
@@ -169,6 +176,15 @@ function setupEvents() {
             if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen().catch(() => {});
         }
+    });
+
+    // Кнопка смены языка
+    document.getElementById('btn-lang')?.addEventListener('click', () => {
+        const current = getCurrentLanguage();
+        const newLang = current === 'ru' ? 'en' : 'ru';
+        setLanguage(newLang);
+        const btn = document.getElementById('btn-lang');
+        if (btn) btn.textContent = newLang === 'ru' ? '🇷🇺' : '🇬🇧';
     });
     
     // Кнопки вкладок
@@ -232,7 +248,7 @@ function setupEvents() {
         canvas.addEventListener('mouseup', () => {
             shiftDragging = false;
             if (gameState._selectedUnits.length > 0) {
-                document.getElementById('order-hint').innerHTML = '🎖️ Выделено: ' + gameState._selectedUnits.length + ' юнитов (Создать армию в КОМАНДУЮЩИЕ)';
+                document.getElementById('order-hint').innerHTML = t('army.selectedUnits') + gameState._selectedUnits.length + t('army.createArmyHint');
                 document.getElementById('order-hint').classList.remove('hidden');
             }
         });
@@ -351,11 +367,11 @@ function setupEvents() {
         window._recruitMode = type;
         const hint = document.getElementById('recruit-hint');
         if (hint) {
-            const costs = { infantry: '100 снаряж. / 1000 манмощи / 30 дней', tank: '800 снаряж. / 500 манмощи / 60 дней' };
-            hint.innerHTML = `🪖 Выберите клетку (${costs[type] || type}) — ЛКМ | Shift+ЛКМ — несколько`;
+            const costs = { infantry: t('army.costInfantry'), tank: t('army.costTank') };
+            hint.innerHTML = t('army.selectProvinceHint') + ' (' + (costs[type] || type) + ')' + t('army.shiftMultiSelect');
             hint.classList.remove('hidden');
         }
-        addNotification(`Выберите провинцию для обучения ${type}`, 'info');
+        addNotification(t('notifications.recruitUnit') + type, 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
             window._recruitMode = null;
@@ -367,11 +383,11 @@ function setupEvents() {
         window._pendingBuild = type;
         const hint = document.getElementById('build-hint');
         if (hint) {
-            const costs = { factory: '500 снаряж. / 90 дней', port: '300 снаряж. / 60 дней' };
-            hint.innerHTML = `🏗️ Выберите клетку (${costs[type] || type}) — ЛКМ | Shift+ЛКМ — несколько`;
+            const costs = { factory: t('build.costFactory'), port: t('build.costPort') };
+            hint.innerHTML = t('build.selectCell') + ' (' + (costs[type] || type) + ')' + t('army.shiftMultiSelect');
             hint.classList.remove('hidden');
         }
-        addNotification(`Выберите провинцию для строительства`, 'info');
+        addNotification(t('build.selectProvince'), 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
             window._pendingBuild = null;
@@ -383,10 +399,10 @@ function setupEvents() {
         uiManager.closeWindow();
         const hint = document.getElementById('order-hint');
         if (hint) {
-            hint.innerHTML = '⚔️ Выбран юнит — ЛКМ куда идти, ПКМ отмена';
+            hint.innerHTML = t('army.unitSelected');
             hint.classList.remove('hidden');
         }
-        addNotification(`Юнит выбран — ЛКМ для указания цели`, 'info');
+        addNotification(t('army.armyMoveHint'), 'info');
         setTimeout(() => {
             if (hint) hint.classList.add('hidden');
         }, 15000);
@@ -437,13 +453,13 @@ function setupEvents() {
             }
         }
         if (enemyList.length === 0) {
-            addNotification('🤝 ' + allyId.toUpperCase() + ' не воюет', 'info');
+            addNotification('🤝 ' + allyId.toUpperCase() + t('notifications.allyNotAtWar'), 'info');
             return;
         }
         if (enemyList.length === 1) {
             // Один враг — сразу объявляем войну
             diplomacy.declareWarForced(enemyList[0]);
-            addNotification('⚔️ Вы вступили в войну по призыву ' + allyId.toUpperCase(), 'war');
+            addNotification(t('notifications.callToArmsResult') + allyId.toUpperCase(), 'war');
             uiManager.openWindow('diplomacy');
             return;
         }
@@ -451,23 +467,23 @@ function setupEvents() {
         var content = document.getElementById('window-content');
         var html = '<div style="padding:16px;">';
         html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:24px;margin-bottom:8px;">⚔️</div>';
-        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;">Призыв к оружию от ' + allyId.toUpperCase() + '</div>';
-        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Выберите против кого объявить войну:</div></div>';
+        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;">' + t('notifications.callToArmsFrom') + allyId.toUpperCase() + '</div>';
+        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">' + t('notifications.callToArmsQuestion') + '</div></div>';
         for (var i = 0; i < enemyList.length; i++) {
             var eName = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[enemyList[i]]) ? window._COUNTRIES_MAP[enemyList[i]].name : enemyList[i].toUpperCase();
             html += '<button onclick="diplomacy.declareWarForced(\'' + enemyList[i] + '\');document.getElementById(\'info-window\').classList.add(\'hidden\');addNotification(\'⚔️ Вы вступили в войну!\',\'war\');uiManager.openWindow(\'diplomacy\')" style="width:100%;padding:10px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:6px;margin-bottom:6px;cursor:pointer;text-align:left;">';
-            html += '<div style="font-size:12px;font-weight:bold;">⚔️ Объявить войну ' + eName.toUpperCase() + '</div></button>';
+            html += '<div style="font-size:12px;font-weight:bold;">' + t('notifications.declareWarTo') + eName.toUpperCase() + '</div></button>';
         }
-        html += '<button onclick="document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:8px;background:#374151;color:white;border:1px solid #4b5563;border-radius:6px;margin-top:8px;cursor:pointer;">Отказаться</button>';
+        html += '<button onclick="document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:8px;background:#374151;color:white;border:1px solid #4b5563;border-radius:6px;margin-top:8px;cursor:pointer;">' + t('notifications.refuseCall') + '</button>';
         html += '</div>';
         content.innerHTML = html;
-        document.getElementById('window-title').innerText = '⚔️ ПРИЗЫВ К ОРУЖИЮ';
+        document.getElementById('window-title').innerText = t('notifications.callToArmsTitle');
         document.getElementById('info-window').classList.remove('hidden');
     };
 
     window.releaseVassal = (vassalId) => {
         gameState.removeVassal(gameState.myCountryId, vassalId);
-        addNotification('👑 ' + vassalId.toUpperCase() + ' освобождён', 'info');
+        addNotification('👑 ' + vassalId.toUpperCase() + t('notifications.vassalFreed'), 'info');
         uiManager.openWindow('diplomacy');
     };
 
@@ -477,13 +493,13 @@ function setupEvents() {
         if (currentIdeology === 'Нейтралитет' || targetIdeology === 'Нейтралитет') days = 150;
         if (currentIdeology === targetIdeology) return;
         gameState.ideologyChange = { target: targetIdeology, daysLeft: days, totalDays: days };
-        addNotification('⚡ Смена идеологии на ' + targetIdeology + ' (' + days + ' дней)', 'info');
+        addNotification(t('notifications.ideologyChangeStarted') + targetIdeology + ' (' + days + t('diplomacy.daysRemaining'), 'info');
         uiManager.openWindow('diplomacy');
     };
 
     window.cancelIdeologyChange = () => {
         gameState.ideologyChange = null;
-        addNotification('⚡ Смена идеологии отменена', 'info');
+        addNotification(t('notifications.ideologyChangeCancelled'), 'info');
         uiManager.openWindow('diplomacy');
     };
 
@@ -501,7 +517,7 @@ function setupEvents() {
         }
         gameState.ideologyChange = null;
         if (renderer) renderer._polygonCache = null;
-        addNotification('⚡ Идеология изменена на ' + newIdeology + '!', 'war');
+        addNotification(t('notifications.ideologyChanged') + newIdeology + '!', 'war');
         if (topBar) topBar.update();
         uiManager.openWindow('diplomacy');
     };
@@ -543,7 +559,7 @@ function setupEvents() {
                 entities.removeEntity(enemyUnits[ui]);
             }
             delete world.capitals[enemyId];
-            addNotification('🏴 ' + countryName + ' аннексирован!', 'war');
+            addNotification('🏴 ' + countryName + t('capitulation.annexed'), 'war');
         } else if (choice === 'vassal') {
             // Возвращаем вассалу его оригинальные территории
             var originalCells = gameState.warOriginalCells ? gameState.warOriginalCells[enemyId] : null;
@@ -563,13 +579,13 @@ function setupEvents() {
                         world.setCell(cx, cy, enemyId);
                     }
                 }
-                addNotification('🔄 ' + countryName + ' получает свои территории обратно', 'info');
+                addNotification('🔄 ' + countryName + t('capitulation.territoriesRestored'), 'info');
             }
             gameState.addVassal(winnerId, enemyId);
             gameState.addAlliance(winnerId, enemyId);
-            addNotification('👑 ' + countryName + ' стал вассалом!', 'war');
+            addNotification('👑 ' + countryName + t('capitulation.becomeVassal'), 'war');
         } else if (choice === 'release') {
-            addNotification('🕊️ ' + countryName + ' освобождён', 'info');
+            addNotification('🕊️ ' + countryName + t('capitulation.released'), 'info');
         }
 
         window._capitulationData = null;
@@ -580,7 +596,7 @@ function setupEvents() {
     
     window.quickSave = () => {
         saveGame();
-        addNotification('💾 Файл .hrl скачан!', 'info');
+        addNotification(t('save.savedFile'), 'info');
     };
 
     window.quickLoad = () => {
@@ -592,7 +608,7 @@ function setupEvents() {
 
     window.toggleAutosave = () => {
         gameState.autosave = gameState.autosave === false ? true : false;
-        addNotification('💾 Автосохранение: ' + (gameState.autosave !== false ? 'включено' : 'выключено'), 'info');
+        addNotification(t('save.autoSaveToggle') + (gameState.autosave !== false ? t('save.autoSaveEnabled') : t('save.autoSaveDisabled')), 'info');
         uiManager.openWindow('save');
     };
     
@@ -600,7 +616,7 @@ function setupEvents() {
         if (!armyManager) return;
         const selected = gameState._selectedUnits || [];
         if (selected.length < 2) {
-            addNotification('Выделите минимум 2 юнита (ПКМ для выбора)', 'war');
+            addNotification(t('army.selectAtLeastTwo'), 'war');
             return;
         }
         armyManager.createArmy(selected);
@@ -615,7 +631,7 @@ function setupEvents() {
 
     window.setArmyFrontLine = (armyId) => {
         if (!armyManager) return;
-        addNotification('Выберите вражескую клетку на карте', 'info');
+        addNotification(t('army.selectEnemyCell'), 'info');
         window._frontLineArmyId = armyId;
         setTimeout(function() { window._frontLineArmyId = null; }, 15000);
     };
@@ -639,21 +655,25 @@ function setupEvents() {
 
 // ── ТУТОР ─────────────────────────────────────────────────────────────
 
-var TUTORIAL_STEPS = [
-    { icon: '🎮', title: 'Добро пожаловать в Heirloom!', text: 'Стратегия в стиле Hearts of Iron. Управляйте страной, воюйте, стройте армию и меняйте ход истории!' },
-    { icon: '🗺️', title: 'Навигация по карте', text: '<b>WASD</b> или зажатая ЛКМ — движение камеры.<br><b>Колёсико мыши</b> — приближение/отдаление.<br><b>Пробел</b> — пауза/продолжить.' },
-    { icon: '🏗️', title: 'Строительство', text: 'Откройте вкладку <b>СТРОЙКА</b> и выберите тип постройки.<br>Затем кликните по клетке вашей территории на карте.<br><b>🏭 Заводы</b> — дают снаряжение. <b>⚓ Порты</b> — для флота.' },
-    { icon: '🎖️', title: 'Набор войск', text: 'Откройте <b>АРМИЯ</b> → нажмите <b>➕ ПЕХОТА</b> или <b>➕ ТАНК</b>.<br>Затем кликните по своей клетке — юнит появится там.<br>Юниты автоматически сражаются при встрече с врагом.' },
-    { icon: '⭐', title: 'Национальные фокусы', text: 'Вкладка <b>ФОКУСЫ</b> — дерево развития страны.<br>Кликните по доступному фокусу чтобы начать изучение.<br>Фокусы дают бонусы: заводы, войска, союзы.' },
-    { icon: '🤝', title: 'Дипломатия', text: 'Вкладка <b>ДИПЛОМАТИЯ</b>:<br>🤝 <b>Союзники</b> —在一起 воюют.<br>⚔️ <b>Враги</b> — прогресс капитуляции.<br>⚡ <b>Идеология</b> — смена политического строя.' },
-    { icon: '🎖️', title: 'Армии', text: '<b>ПКМ</b> по юнитам — выделение.<br><b>Создать армию</b> — объединяет юниты.<br><b>Shift+клик</b> на юните армии — выделить для приказа.<br><b>🎯 Граница</b> — автоматическая оборона/атака.' },
-    { icon: '⚔️', title: 'Готово к завоеванию!', text: 'Объявите войну через дипломатию и захватывайте территории.<br>Когда враг потеряет достаточно клеток — он капитулирует.<br>Выберите: аннексировать, сделать вассалом или освободить.<br><br>Удачи, фюрер! 🎮' },
-];
+var TUTORIAL_STEPS = [];
+function initTutorialSteps() {
+    TUTORIAL_STEPS = [
+        { icon: t('tutorial.steps.0.icon'), title: t('tutorial.steps.0.title'), text: t('tutorial.steps.0.text') },
+        { icon: t('tutorial.steps.1.icon'), title: t('tutorial.steps.1.title'), text: t('tutorial.steps.1.text') },
+        { icon: t('tutorial.steps.2.icon'), title: t('tutorial.steps.2.title'), text: t('tutorial.steps.2.text') },
+        { icon: t('tutorial.steps.3.icon'), title: t('tutorial.steps.3.title'), text: t('tutorial.steps.3.text') },
+        { icon: t('tutorial.steps.4.icon'), title: t('tutorial.steps.4.title'), text: t('tutorial.steps.4.text') },
+        { icon: t('tutorial.steps.5.icon'), title: t('tutorial.steps.5.title'), text: t('tutorial.steps.5.text') },
+        { icon: t('tutorial.steps.6.icon'), title: t('tutorial.steps.6.title'), text: t('tutorial.steps.6.text') },
+        { icon: t('tutorial.steps.7.icon'), title: t('tutorial.steps.7.title'), text: t('tutorial.steps.7.text') },
+    ];
+}
 
 var tutorialStep = 0;
 
 function startTutorial() {
     tutorialStep = 0;
+    initTutorialSteps();
     var overlay = document.getElementById('tutorial-overlay');
     if (!overlay) return;
     overlay.classList.remove('hidden');
@@ -668,9 +688,9 @@ function showTutorialStep() {
     document.getElementById('tutorial-icon').textContent = step.icon;
     document.getElementById('tutorial-title').textContent = step.title;
     document.getElementById('tutorial-text').innerHTML = step.text;
-    document.getElementById('tutorial-step').textContent = 'Шаг ' + (tutorialStep + 1) + ' / ' + TUTORIAL_STEPS.length;
+    document.getElementById('tutorial-step').textContent = t('tutorial.step') + (tutorialStep + 1) + t('tutorial.of') + TUTORIAL_STEPS.length;
     var btn = document.getElementById('tutorial-next');
-    btn.textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? 'Начать игру! 🎮' : 'Далее →';
+    btn.textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? t('tutorial.startGame') : t('tutorial.next');
 }
 
 function nextTutorialStep() {
@@ -692,15 +712,15 @@ function showArmyCommandPanel(army, screenX, screenY) {
     var panel = document.getElementById('army-command-panel');
     if (!panel) return;
 
-    var frontLineText = army.frontLine ? 'Отвязать от ' + army.frontLine.enemyId.toUpperCase() : 'На границу...';
+    var frontLineText = army.frontLine ? t('army.frontlineUnbind') + army.frontLine.enemyId.toUpperCase() : t('army.frontline');
     var frontLineAction = army.frontLine ? 'window.removeArmyFrontLine(' + army.id + ')' : 'window.setArmyFrontLine(' + army.id + ')';
 
     var html = '';
     html += '<div style="font-size:12px;font-weight:bold;color:' + army.color + ';margin-bottom:8px;">🎖️ ' + army.name + '</div>';
     html += '<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Юнитов: ' + army.unitIds.size + '</div>';
     html += '<button onclick="' + frontLineAction + ';window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#854d0e;color:white;border:none;border-radius:4px;margin-bottom:4px;cursor:pointer;font-size:11px;text-align:left;">🎯 ' + frontLineText + '</button>';
-    html += '<button onclick="window.giveArmyMoveOrder(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#1d4ed8;color:white;border:none;border-radius:4px;margin-bottom:4px;cursor:pointer;font-size:11px;text-align:left;">🚶 Переместить армию</button>';
-    html += '<button onclick="window.disbandArmy(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;text-align:left;">🗑️ Распустить</button>';
+    html += '<button onclick="window.giveArmyMoveOrder(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#1d4ed8;color:white;border:none;border-radius:4px;margin-bottom:4px;cursor:pointer;font-size:11px;text-align:left;">' + t('army.moveArmy') + '</button>';
+    html += '<button onclick="window.disbandArmy(' + army.id + ');window.hideArmyCommandPanel()" style="width:100%;padding:8px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;text-align:left;">🗑️ ' + t('army.disbandArmy') + '</button>';
 
     panel.innerHTML = html;
     panel.style.left = Math.min(screenX + 10, window.innerWidth - 200) + 'px';
@@ -718,13 +738,13 @@ window.removeArmyFrontLine = function(armyId) {
     var army = armyManager.armies.find(function(a) { return a.id === armyId; });
     if (army) {
         army.frontLine = null;
-        addNotification('🎖️ ' + army.name + ' отвязана от границы', 'info');
+        addNotification('🎖️ ' + army.name + t('army.armyUnbound'), 'info');
     }
 };
 
 window.giveArmyMoveOrder = function(armyId) {
     gameState._selectedArmyId = armyId;
-    addNotification('Кликните на карту — куда переместить армию', 'info');
+    addNotification(t('army.selectForMove'), 'info');
 };
 
 function handleCanvasClick(e) {
@@ -742,7 +762,7 @@ function handleCanvasClick(e) {
                 // Shift+клик — выделить армию для приказа
                 gameState._selectedArmyId = army.id;
                 gameState.selectedUnitId = null;
-                document.getElementById('order-hint').innerHTML = '🎖️ Армия выбрана — ЛКМ куда переместить';
+                document.getElementById('order-hint').innerHTML = t('army.armySelected');
                 document.getElementById('order-hint').classList.remove('hidden');
                 updateArmyPanel();
             } else {
@@ -758,7 +778,7 @@ function handleCanvasClick(e) {
         gameState.selectedUnitId = clickUnit;
         const hint = document.getElementById('order-hint');
         if (hint) {
-            hint.innerHTML = '⚔️ Юнит выбран — ЛКМ куда идти, ПКМ отмена';
+            hint.innerHTML = t('army.unitSelected');
             hint.classList.remove('hidden');
         }
         return;
@@ -824,7 +844,7 @@ function handleCanvasClick(e) {
             || (gameState.areAllies && gameState.areAllies(gameState.myCountryId, cellOwner))) {
             movement.giveOrder(unitId, worldPos.x, worldPos.y);
         } else {
-            addNotification('Нельзя идти туда!', 'war');
+            addNotification(t('notifications.cannotMove'), 'war');
         }
 
         gameState.selectedUnitId = null;
@@ -881,7 +901,7 @@ function handleCanvasRightClick(e) {
     }
 
     if (sel.length > 0) {
-        addNotification(`Выбрано: ${sel.length} юнитов (Откройте АРМИИ → Создать)`, 'info');
+        addNotification(t('army.unitsSelected') + sel.length + t('army.openArmyTab'), 'info');
     }
 }
 
@@ -983,7 +1003,7 @@ function startGameLoop() {
                 gameState.justifications.daysLeft--;
                 if (gameState.justifications.daysLeft <= 0) {
                     var jTarget = gameState.justifications.target;
-                    addNotification('📜 Обоснование войны против ' + jTarget.toUpperCase() + ' завершено!', 'info');
+                    addNotification(t('notifications.justificationComplete') + jTarget.toUpperCase() + t('notifications.justificationFinished'), 'info');
                     gameState.justifications.daysLeft = 0;
                 }
             }
@@ -1012,10 +1032,10 @@ function startGameLoop() {
                                     { enemyId: enemyId, winnerId: winnerId, cells: cells }
                                 );
                                 document.getElementById('info-window').classList.remove('hidden');
-                                document.getElementById('window-title').innerText = '🏳️ КАПИТУЛЯЦИЯ';
+                                document.getElementById('window-title').innerText = t('capitulation.title');
                             } else {
                                 // AI автоматически делает вассалом
-                                addNotification('🏳️ ' + enemyId.toUpperCase() + ' капитулировал!', 'war');
+                                addNotification('🏳️ ' + enemyId.toUpperCase() + t('capitulation.capitulated'), 'war');
                                 gameState.addVassal(winnerId, enemyId);
                                 gameState.addAlliance(winnerId, enemyId);
                                 // Убираем лишние войска врага (оставляем минимум 3)
@@ -1047,13 +1067,13 @@ function startGameLoop() {
                     var content = document.getElementById('window-content');
                     var html = '<div style="padding:16px;">';
                     html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:24px;margin-bottom:8px;">📢</div>';
-                    html += '<div style="font-size:14px;font-weight:bold;color:#eab308;">' + fromName + ' просит о помощи!</div>';
-                    html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Объявить войну ' + enemyName + '?</div></div>';
-                    html += '<button onclick="gameState.addWar(gameState.myCountryId,\'' + inv.enemy + '\',world);gameState.isGameActive=true;document.getElementById(\'info-window\').classList.add(\'hidden\');addNotification(\'⚔️ Вы вступили в войну!\',\'war\')" style="width:100%;padding:12px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:bold;font-size:13px;">⚔️ ВСТУПИТЬ В ВОЙНУ</button>';
-                    html += '<button onclick="gameState.isGameActive=true;document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:10px;background:#374151;color:white;border:1px solid #4b5563;border-radius:8px;cursor:pointer;">ОТКАЗАТЬСЯ</button>';
+                    html += '<div style="font-size:14px;font-weight:bold;color:#eab308;">' + fromName + t('notifications.inviteFrom') + '</div>';
+                    html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">' + t('notifications.inviteQuestion') + enemyName + '?</div></div>';
+                    html += '<button onclick="gameState.addWar(gameState.myCountryId,\'' + inv.enemy + '\',world);gameState.isGameActive=true;document.getElementById(\'info-window\').classList.add(\'hidden\');addNotification(\'' + t('notifications.joinWar').replace(/'/g, "\\'") + '\',\'war\')" style="width:100%;padding:12px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:bold;font-size:13px;">' + t('notifications.joinWarBtn') + '</button>';
+                    html += '<button onclick="gameState.isGameActive=true;document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:10px;background:#374151;color:white;border:1px solid #4b5563;border-radius:8px;cursor:pointer;">' + t('notifications.refuseBtn') + '</button>';
                     html += '</div>';
                     content.innerHTML = html;
-                    document.getElementById('window-title').innerText = '📢 ПРИГЛАШЕНИЕ В ВОЙНУ';
+                    document.getElementById('window-title').innerText = t('notifications.inviteToWar');
                     document.getElementById('info-window').classList.remove('hidden');
                 }
             }
@@ -1119,7 +1139,7 @@ function updateArmyPanel() {
     const countEl = document.getElementById('army-count');
     if (!cards) return;
 
-    countEl.textContent = `${armies.length} армий`;
+    countEl.textContent = armies.length + t('army.armyCount');
 
     let html = '';
     for (const army of armies) {
@@ -1130,9 +1150,9 @@ function updateArmyPanel() {
                 <div class="army-card-color" style="background:${army.color}"></div>
                 <div class="army-card-info">
                     <div class="army-card-name">${army.name}</div>
-                    <div class="army-card-count">${unitCount} юнитов</div>
+                    <div class="army-card-count">${unitCount} ${t('army.unitCount')}</div>
                 </div>
-                <button class="army-card-disband" onclick="event.stopPropagation(); window.disbandArmy(${army.id})" title="Распустить">✕</button>
+                <button class="army-card-disband" onclick="event.stopPropagation(); window.disbandArmy(${army.id})" title="${t('army.disbandArmy')}">✕</button>
             </div>
         `;
     }
@@ -1165,7 +1185,7 @@ function showCountrySelection() {
     if (major.length) {
         const majorTitle = document.createElement('div');
         majorTitle.className = 'text-xs text-yellow-600 uppercase py-2 border-b mb-2';
-        majorTitle.innerText = 'ВЕЛИКИЕ ДЕРЖАВЫ';
+        majorTitle.innerText = t('countrySelect.greatPowers');
         list.appendChild(majorTitle);
         
         major.forEach(c => {
@@ -1188,7 +1208,7 @@ function showCountrySelection() {
     if (minor.length) {
         const minorTitle = document.createElement('div');
         minorTitle.className = 'text-xs text-gray-500 uppercase py-2 border-b mb-2 mt-4';
-        minorTitle.innerText = 'РЕГИОНАЛЬНЫЕ ДЕРЖАВЫ';
+        minorTitle.innerText = t('countrySelect.regionalPowers');
         list.appendChild(minorTitle);
         
         minor.forEach(c => {
@@ -1258,9 +1278,9 @@ function startGame(countryId) {
     updateSpeedButtons(1);
     if (topBar) topBar.update();
     
-    addNotification(`🎌 Вы играете за ${countryId.toUpperCase()}`, 'info');
-    addNotification(`🖱️ Клик по юниту → ЛКМ по врагу = АТАКА`, 'info');
-    addNotification(`⌨️ WASD — камера | Пробел — пауза`, 'info');
+    addNotification(t('notifications.playingAs') + countryId.toUpperCase(), 'info');
+    addNotification(t('notifications.attackHint'), 'info');
+    addNotification(t('notifications.controlsHint'), 'info');
     
     if (renderer) renderer.cameraInitialized = false;
     
@@ -1312,7 +1332,7 @@ function loadGame() {
 
                 // Проверяем наличие обязательных полей
                 if (!data.world || !data.entities || !data.gameState) {
-                    addNotification('Ошибка: неверный формат файла', 'war');
+                    addNotification(t('save.invalidFile'), 'war');
                     return;
                 }
 
@@ -1347,7 +1367,7 @@ function loadGame() {
                 if (!animationFrameId) startGameLoop();
                 updateSpeedButtons(1);
 
-                addNotification(`📂 Игра загружена!`, 'info');
+                addNotification(t('notifications.gameLoaded'), 'info');
             } catch(err) {
                 console.error('[LoadError]', err.message, err.stack);
                 // Показываем ошибку в окне чтобы можно было прочитать
@@ -1355,7 +1375,7 @@ function loadGame() {
                 var errContent = document.getElementById('window-content');
                 var errTitle = document.getElementById('window-title');
                 if (errWin && errContent && errTitle) {
-                    errTitle.innerText = '❌ ОШИБКА ЗАГРУЗКИ';
+                    errTitle.innerText = t('save.loadError');
                     errContent.innerHTML = '<div style="padding:16px;color:#ef4444;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;">' + err.message + '\n\n' + (err.stack || '') + '</div>';
                     errWin.classList.remove('hidden');
                 }
@@ -1377,7 +1397,7 @@ function showLoadingScreen() {
             <div style="width:300px;height:8px;background:#1f2937;border-radius:4px;overflow:hidden;border:1px solid #374151">
                 <div id="loading-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#eab308,#fbbf24);transition:width 0.4s ease"></div>
             </div>
-            <div id="loading-text" style="margin-top:16px;font-size:12px;color:#9ca3af;letter-spacing:.1em">ЗАГРУЗКА...</div>
+            <div id="loading-text" style="margin-top:16px;font-size:12px;color:#9ca3af;letter-spacing:.1em">${t('ui.loading')}</div>
         </div>
     `;
     document.body.appendChild(div);

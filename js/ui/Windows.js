@@ -2,6 +2,7 @@
 
 import { UNIT_STATS, BUILDING_STATS } from '../data/Units.js';
 import { getCountryInfo } from '../utils/helpers.js';
+import { t } from '../i18n.js';
 
 export class WindowsManager {
     constructor(world, entities, gameState, techSystem, focusSystem) {
@@ -14,33 +15,33 @@ export class WindowsManager {
     
     renderArmyWindow(content) {
         const myId = this.gameState.myCountryId;
-        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>'; return; }
+        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">' + t('ui.capital') + '</div>'; return; }
         const units = this.entities.getEntitiesByOwner(myId);
         const res = this.gameState;
         
         let html = '<div style="padding:12px;">';
         html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">';
-        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">🔫</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + Math.floor(res.equipment).toLocaleString() + '</div><div style="font-size:9px;color:#9ca3af;">СНАРЯЖЕНИЕ</div></div>';
-        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">👥</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + Math.floor(res.manpower).toLocaleString() + '</div><div style="font-size:9px;color:#9ca3af;">ЛЮДСКИЕ</div></div>';
-        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">🏭</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + (res.factories || 0) + '</div><div style="font-size:9px;color:#9ca3af;">ЗАВОДЫ</div></div>';
+        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">🔫</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + Math.floor(res.equipment).toLocaleString() + '</div><div style="font-size:9px;color:#9ca3af;">' + t('army.equipment') + '</div></div>';
+        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">👥</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + Math.floor(res.manpower).toLocaleString() + '</div><div style="font-size:9px;color:#9ca3af;">' + t('army.manpower') + '</div></div>';
+        html += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;">🏭</div><div style="font-size:18px;font-weight:bold;color:#eab308;">' + (res.factories || 0) + '</div><div style="font-size:9px;color:#9ca3af;">' + t('army.factories') + '</div></div>';
         html += '</div>';
         
-        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #374151;">⚔️ МОИ ВОЙСКА (' + units.length + ')</div>';
+        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #374151;">⚔️ ' + t('army.myTroops') + ' (' + units.length + ')</div>';
 
         html += '<div style="display:flex;gap:6px;margin-bottom:12px;">';
-        html += '<button onclick="window.recruitUnit && window.recruitUnit(\'infantry\')" style="flex:1;padding:10px;background:#15803d;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">➕ ПЕХОТА</button>';
-        html += '<button onclick="window.recruitUnit && window.recruitUnit(\'tank\')" style="flex:1;padding:10px;background:#1d4ed8;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">➕ ТАНК</button>';
-        html += '<button onclick="window.createArmy && window.createArmy()" style="flex:1;padding:10px;background:#854d0e;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">🎖️ АРМИЯ</button>';
+        html += '<button onclick="window.recruitUnit && window.recruitUnit(\'infantry\')" style="flex:1;padding:10px;background:#15803d;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">➕ ' + t('army.recruitInfantry') + '</button>';
+        html += '<button onclick="window.recruitUnit && window.recruitUnit(\'tank\')" style="flex:1;padding:10px;background:#1d4ed8;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">➕ ' + t('army.recruitTank') + '</button>';
+        html += '<button onclick="window.createArmy && window.createArmy()" style="flex:1;padding:10px;background:#854d0e;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12px;">🎖️ ' + t('army.create') + '</button>';
         html += '</div>';
         
         if (units.length === 0) {
-            html += '<div style="color:#6b7280;text-align:center;padding:20px;">Нет войск</div>';
+            html += '<div style="color:#6b7280;text-align:center;padding:20px;">' + t('army.noUnits') + '</div>';
         } else {
             for (const uId of units) {
                 const type = this.entities.type[uId];
                 const stats = UNIT_STATS[type === 0 ? 'infantry' : 'tank'];
                 const hp = Math.floor((this.entities.hp[uId] / this.entities.maxHp[uId]) * 100);
-                const status = this.entities.inCombat[uId] ? '⚔️ БОЙ' : '✅ Готов';
+                const status = this.entities.inCombat[uId] ? '⚔️ ' + t('army.statusCombat') : '✅ ' + t('army.statusReady');
                 html += '<div style="background:#1f2937;padding:10px;border-radius:6px;margin-bottom:6px;border-left:4px solid ' + (this.entities.inCombat[uId] ? '#ef4444' : '#22c55e') + ';">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
                 html += '<span style="font-weight:bold;">' + stats.icon + ' ' + stats.name + '</span>';
@@ -55,7 +56,6 @@ export class WindowsManager {
     }
     
     renderFocusWindow(content) {
-        // Фокусное окно — свой скролл, без padding
         content.style.padding = '0';
         content.style.overflow = 'hidden';
         var focusTree = window._FOCUS_TREE || {};
@@ -67,7 +67,7 @@ export class WindowsManager {
         console.log('[Focus] myId=' + myId + ' total=' + Object.keys(focusTree).length + ' matched=' + allFocuses.length);
 
         if (!allFocuses.length) {
-            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Нет фокусов для ' + (myId || '?') + '</div>';
+            content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">' + t('focus.noFocus') + '</div>';
             return;
         }
 
@@ -138,9 +138,9 @@ export class WindowsManager {
             nodes += '<div style="font-size:10px;font-weight:bold;color:' + txt + ';margin-top:2px;line-height:1.1;">' + f.name + '</div>';
             if (f.desc) nodes += '<div style="font-size:8px;color:#888;margin-top:1px;line-height:1.1;max-width:' + (NW - 12) + 'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f.desc + '</div>';
             if (done) nodes += '<div style="font-size:8px;color:#22c55e;margin-top:1px;">✓</div>';
-            else if (isActive) nodes += '<div style="font-size:8px;color:#3b82f6;margin-top:1px;">⏳ ' + activeFocus.daysLeft + 'д</div>';
-            else if (avail) nodes += '<div style="font-size:8px;color:#eab308;margin-top:1px;">Начать</div>';
-            else nodes += '<div style="font-size:8px;color:#4b5563;margin-top:1px;">🔒</div>';
+            else if (isActive) nodes += '<div style="font-size:8px;color:#3b82f6;margin-top:1px;">⏳ ' + activeFocus.daysLeft + t('diplomacy.daysRemaining') + '</div>';
+            else if (avail) nodes += '<div style="font-size:8px;color:#eab308;margin-top:1px;">' + t('focus.start') + '</div>';
+            else nodes += '<div style="font-size:8px;color:#4b5563;margin-top:1px;">' + t('focus.locked') + '</div>';
             nodes += '</div>';
         }
 
@@ -156,7 +156,7 @@ export class WindowsManager {
         content.style.padding = '';
         content.style.overflow = '';
         var myId = this.gameState.myCountryId;
-        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>'; return; }
+        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">' + t('ui.capital') + '</div>'; return; }
 
         var techTree = window._TECH_TREE || {};
         var techBranches = window._TECH_BRANCHES || {};
@@ -165,20 +165,18 @@ export class WindowsManager {
 
         var html = '<div style="padding:12px;">';
 
-        // Текущее исследование
         if (research && research.techId) {
             var rt = techTree[research.techId];
             if (rt) {
                 var pct = Math.floor((research.daysLeft / rt.cost) * 100);
                 html += '<div style="background:#0c1e3a;border:1px solid #3b82f6;border-radius:8px;padding:12px;margin-bottom:16px;">';
-                html += '<div style="font-size:12px;font-weight:bold;color:#93c5fd;">🔬 Исследуется: ' + rt.icon + ' ' + rt.name + '</div>';
+                html += '<div style="font-size:12px;font-weight:bold;color:#93c5fd;">🔬 ' + t('focus.researching') + ': ' + rt.icon + ' ' + rt.name + '</div>';
                 html += '<div style="background:#1f2937;height:8px;border-radius:4px;margin-top:8px;"><div style="width:' + pct + '%;height:100%;background:#3b82f6;border-radius:4px;"></div></div>';
-                html += '<div style="font-size:10px;color:#6b7280;margin-top:4px;">Осталось ' + research.daysLeft + ' дн.</div>';
+                html += '<div style="font-size:10px;color:#6b7280;margin-top:4px;">' + t('diplomacy.daysRemaining') + ' ' + research.daysLeft + t('diplomacy.daysRemaining') + '</div>';
                 html += '</div>';
             }
         }
 
-        // Ветки
         for (var bKey in techBranches) {
             var branch = techBranches[bKey];
             html += '<div style="margin-bottom:16px;">';
@@ -208,7 +206,7 @@ export class WindowsManager {
                 html += '<div style="text-align:right;">';
                 if (isUnlocked) html += '<div style="font-size:10px;color:#22c55e;">✓</div>';
                 else if (isResearching) html += '<div style="font-size:10px;color:#3b82f6;">⏳</div>';
-                else html += '<div style="font-size:10px;color:#6b7280;">' + tech.cost + ' дн.</div>';
+                else html += '<div style="font-size:10px;color:#6b7280;">' + tech.cost + t('diplomacy.daysRemaining') + '</div>';
                 html += '</div>';
                 html += '</div>';
             }
@@ -220,7 +218,7 @@ export class WindowsManager {
     
     renderDiplomacyWindow(content) {
         var myId = this.gameState.myCountryId;
-        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">Выберите страну</div>'; return; }
+        if (!myId) { content.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">' + t('ui.capital') + '</div>'; return; }
         var allies = [], enemies = [];
         if (this.gameState.wars) { for (var w = 0; w < this.gameState.wars.length; w++) { var war = this.gameState.wars[w]; if (war.a === myId) enemies.push(war.b); if (war.b === myId) enemies.push(war.a); } }
         if (this.gameState.alliances) { for (var ai = 0; ai < this.gameState.alliances.length; ai++) { var a = this.gameState.alliances[ai]; if (a.has(myId)) { for (var id of a) { if (id !== myId) allies.push(id); } } } }
@@ -229,39 +227,36 @@ export class WindowsManager {
 
         var html = '<div style="padding:12px;">';
 
-        // Лорд
         if (overlord) {
             html += '<div style="background:#1a0a2e;border:1px solid #a855f7;border-radius:6px;padding:8px;margin-bottom:12px;text-align:center;">';
-            html += '<span style="font-size:11px;color:#a855f7;font-weight:bold;">👑 Вы вассал ' + overlord.toUpperCase() + '</span>';
+            html += '<span style="font-size:11px;color:#a855f7;font-weight:bold;">👑 ' + t('ui.overlord') + ' ' + overlord.toUpperCase() + '</span>';
             html += '</div>';
         }
 
-        // Вассалы
         if (vassals.length > 0) {
-            html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#a855f7;margin-bottom:6px;">👑 Вассалы (' + vassals.length + ')</div>';
+            html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#a855f7;margin-bottom:6px;">👑 ' + t('diplomacy.vassals') + ' (' + vassals.length + ')</div>';
             for (var vi = 0; vi < vassals.length; vi++) {
                 html += '<div style="background:#1a0a2e;border:1px solid #a855f7;border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">';
                 html += '<span style="font-weight:bold;font-size:11px;color:#c084fc;">👑 ' + vassals[vi].toUpperCase() + '</span>';
-                html += '<button onclick="window.releaseVassal && window.releaseVassal(\'' + vassals[vi] + '\')" style="background:#7f1d1d;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">Освободить</button>';
+                html += '<button onclick="window.releaseVassal && window.releaseVassal(\'' + vassals[vi] + '\')" style="background:#7f1d1d;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">' + t('diplomacy.releaseVassal') + '</button>';
                 html += '</div>';
             }
             html += '</div>';
         }
 
-        // Идеология
         var myIdeology = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[myId]) ? window._COUNTRIES_MAP[myId].ideology : 'Нейтралитет';
         var change = this.gameState.ideologyChange;
-        html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#f97316;margin-bottom:6px;">⚡ Идеология</div>';
+        html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#f97316;margin-bottom:6px;">⚡ ' + t('diplomacy.ideology') + '</div>';
         html += '<div style="background:#1f2937;border:1px solid #374151;border-radius:6px;padding:8px;">';
         html += '<div style="font-size:11px;color:#eab308;font-weight:bold;">' + myIdeology + '</div>';
         if (change) {
             var pct = Math.floor(((change.totalDays - change.daysLeft) / change.totalDays) * 100);
             var IDENTITY_COLORS = { 'Демократия': '#3b82f6', 'Фашизм': '#ef4444', 'Коммунизм': '#990000', 'Нейтралитет': '#6b7280' };
             var tColor = IDENTITY_COLORS[change.target] || '#6b7280';
-            html += '<div style="margin-top:6px;font-size:10px;color:#9ca3af;">Смена на ' + change.target + ' (' + change.daysLeft + ' дн.)</div>';
+            html += '<div style="margin-top:6px;font-size:10px;color:#9ca3af;">' + t('diplomacy.changeIdeology') + ' ' + change.target + ' (' + change.daysLeft + t('diplomacy.daysRemaining') + ')</div>';
             html += '<div style="background:#374151;height:8px;border-radius:4px;margin-top:4px;overflow:hidden;">';
             html += '<div style="width:' + pct + '%;height:100%;background:' + tColor + ';border-radius:4px;"></div></div>';
-            html += '<button onclick="window.cancelIdeologyChange()" style="margin-top:6px;width:100%;padding:4px;background:#991b1b;color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;">Отменить</button>';
+            html += '<button onclick="window.cancelIdeologyChange()" style="margin-top:6px;width:100%;padding:4px;background:#991b1b;color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;">' + t('diplomacy.cancel') + '</button>';
         } else {
             html += '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">';
             var ideos = ['Демократия', 'Фашизм', 'Коммунизм'];
@@ -269,29 +264,27 @@ export class WindowsManager {
                 var ideo = ideos[ii];
                 if (ideo === myIdeology) continue;
                 var days = ideo === 'Нейтралитет' ? 150 : (myIdeology === 'Нейтралитет' ? 150 : 200);
-                html += '<button onclick="window.startIdeologyChange(\'' + ideo + '\')" style="flex:1;padding:5px;background:#374151;color:white;border:1px solid #4b5563;border-radius:4px;font-size:9px;cursor:pointer;">' + ideo + ' (' + days + 'д)</button>';
+                html += '<button onclick="window.startIdeologyChange(\'' + ideo + '\')" style="flex:1;padding:5px;background:#374151;color:white;border:1px solid #4b5563;border-radius:4px;font-size:9px;cursor:pointer;">' + ideo + ' (' + days + t('diplomacy.daysRemaining') + ')</button>';
             }
             html += '</div>';
         }
         html += '</div></div>';
 
-        // Союзники
-        html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#22c55e;margin-bottom:6px;">🤝 Союзники (' + allies.length + ')</div>';
-        if (allies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Нет союзников</div>';
+        html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:bold;color:#22c55e;margin-bottom:6px;">🤝 ' + t('diplomacy.allies') + ' (' + allies.length + ')</div>';
+        if (allies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">' + t('ui.noAllies') + '</div>';
         else { for (var i = 0; i < allies.length; i++) {
             var allyId = allies[i];
             var allyAtWar = this.gameState.wars.some(function(w) { return (w.a === allyId || w.b === allyId) && w.a !== myId && w.b !== myId; });
             html += '<div style="background:#0a2e1a;border:1px solid #22c55e;border-radius:4px;padding:6px 8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">';
             html += '<span style="font-weight:bold;font-size:11px;">🤝 ' + allyId.toUpperCase() + '</span>';
             html += '<div style="display:flex;gap:3px;">';
-            if (allyAtWar) html += '<button onclick="window.callToArms(\'' + allyId + '\')" style="background:#854d0e;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">⚔️ Оружие</button>';
+            if (allyAtWar) html += '<button onclick="window.callToArms(\'' + allyId + '\')" style="background:#854d0e;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">⚔️ ' + t('diplomacy.callToArms') + '</button>';
             html += '<button onclick="window.kickAlly(\'' + allyId + '\')" style="background:#991b1b;color:white;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;">✕</button>';
             html += '</div></div>'; } }
         html += '</div>';
 
-        // Враги
-        html += '<div><div style="font-size:12px;font-weight:bold;color:#ef4444;margin-bottom:6px;">⚔️ Враги (' + enemies.length + ')</div>';
-        if (enemies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">Мирное время</div>';
+        html += '<div><div style="font-size:12px;font-weight:bold;color:#ef4444;margin-bottom:6px;">⚔️ ' + t('diplomacy.enemies') + ' (' + enemies.length + ')</div>';
+        if (enemies.length === 0) html += '<div style="color:#6b7280;font-size:11px;text-align:center;padding:8px;">' + t('diplomacy.peace') + '</div>';
         else {
             for (var i = 0; i < enemies.length; i++) {
                 var eid = enemies[i];
@@ -306,12 +299,12 @@ export class WindowsManager {
                 html += '<div style="background:#1a0a0a;border:1px solid #ef4444;border-radius:6px;padding:8px;margin-bottom:6px;">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
                 html += '<span style="font-weight:bold;font-size:11px;color:#ef4444;">⚔️ ' + eid.toUpperCase() + '</span>';
-                html += '<span style="font-size:9px;color:#6b7280;">Капитуляция: ' + threshold + '%</span>';
+                html += '<span style="font-size:9px;color:#6b7280;">' + t('diplomacy.capitulationProgress') + ': ' + threshold + '%</span>';
                 html += '</div>';
                 html += '<div style="background:#374151;height:10px;border-radius:5px;overflow:hidden;">';
                 html += '<div style="width:' + Math.min(progress, 100) + '%;height:100%;background:' + color + ';border-radius:5px;transition:width 0.3s;"></div>';
                 html += '</div>';
-                html += '<div style="font-size:9px;color:#6b7280;margin-top:3px;">Захвачено: ' + progress + '% / ' + threshold + '%</div>';
+                html += '<div style="font-size:9px;color:#6b7280;margin-top:3px;">' + t('diplomacy.capitulationProgress') + ': ' + progress + '% / ' + threshold + '%</div>';
                 html += '</div>';
             }
         }
@@ -322,10 +315,10 @@ export class WindowsManager {
     renderBuildWindow(content) {
         const res = this.gameState;
         var html = '<div style="padding:12px;">';
-        html += '<div style="background:#374151;padding:12px;border-radius:8px;display:flex;justify-content:space-between;margin-bottom:12px;"><span>🔫 Снаряжение:</span><span style="color:#fbbf24;font-weight:bold;">' + Math.floor(res.equipment).toLocaleString() + '</span></div>';
-        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;">📦 ПОСТРОЙКИ</div>';
-        html += '<div style="background:#1f2937;padding:12px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:bold;">🏭 Завод</div><div style="font-size:11px;color:#9ca3af;">500 🔫 | 135 дн.</div></div><button onclick="window.selectBuildType(\'factory\')" style="padding:8px 16px;border-radius:6px;font-size:11px;font-weight:bold;background:' + (res.equipment >= 500 ? '#15803d' : '#4b5563') + ';color:white;cursor:' + (res.equipment >= 500 ? 'pointer' : 'not-allowed') + ';">ПОСТРОИТЬ</button></div>';
-        html += '<div style="background:#1f2937;padding:12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:bold;">⚓ Порт</div><div style="font-size:11px;color:#9ca3af;">300 🔫 | 90 дн.</div></div><button onclick="window.selectBuildType(\'port\')" style="padding:8px 16px;border-radius:6px;font-size:11px;font-weight:bold;background:' + (res.equipment >= 300 ? '#15803d' : '#4b5563') + ';color:white;cursor:' + (res.equipment >= 300 ? 'pointer' : 'not-allowed') + ';">ПОСТРОИТЬ</button></div>';
+        html += '<div style="background:#374151;padding:12px;border-radius:8px;display:flex;justify-content:space-between;margin-bottom:12px;"><span>🔫 ' + t('army.equipment') + ':</span><span style="color:#fbbf24;font-weight:bold;">' + Math.floor(res.equipment).toLocaleString() + '</span></div>';
+        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;margin-bottom:12px;">📦 ' + t('build.title') + '</div>';
+        html += '<div style="background:#1f2937;padding:12px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:bold;">🏭 ' + t('build.factory') + '</div><div style="font-size:11px;color:#9ca3af;">500 🔫 | 135 ' + t('diplomacy.daysRemaining') + '</div></div><button onclick="window.selectBuildType(\'factory\')" style="padding:8px 16px;border-radius:6px;font-size:11px;font-weight:bold;background:' + (res.equipment >= 500 ? '#15803d' : '#4b5563') + ';color:white;cursor:' + (res.equipment >= 500 ? 'pointer' : 'not-allowed') + ';">' + t('build.factory') + '</button></div>';
+        html += '<div style="background:#1f2937;padding:12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:bold;">⚓ ' + t('build.port') + '</div><div style="font-size:11px;color:#9ca3af;">300 🔫 | 90 ' + t('diplomacy.daysRemaining') + '</div></div><button onclick="window.selectBuildType(\'port\')" style="padding:8px 16px;border-radius:6px;font-size:11px;font-weight:bold;background:' + (res.equipment >= 300 ? '#15803d' : '#4b5563') + ';color:white;cursor:' + (res.equipment >= 300 ? 'pointer' : 'not-allowed') + ';">' + t('build.port') + '</button></div>';
         html += '</div>';
         content.innerHTML = html;
     }
@@ -334,9 +327,9 @@ export class WindowsManager {
         const myId = this.gameState.myCountryId;
         const armies = window._armyManager ? window._armyManager.getArmiesForCountry(myId) : [];
         var html = '<div style="padding:12px;">';
-        html += '<button onclick="window.createArmy()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:12px;">➕ СОЗДАТЬ АРМИЮ</button>';
+        html += '<button onclick="window.createArmy()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:12px;">➕ ' + t('army.create') + '</button>';
         if (armies.length === 0) {
-            html += '<div style="color:#6b7280;text-align:center;padding:20px;">Нет армий</div>';
+            html += '<div style="color:#6b7280;text-align:center;padding:20px;">' + t('army.noUnits') + '</div>';
         } else {
             for (var i = 0; i < armies.length; i++) {
                 var army = armies[i];
@@ -358,55 +351,50 @@ export class WindowsManager {
     renderSaveWindow(content) {
         var autosaveOn = this.gameState.autosave !== false;
         var html = '<div style="padding:12px;">';
-        html += '<button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:8px;">💾 СОХРАНИТЬ</button>';
-        html += '<button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:12px;">📂 ЗАГРУЗИТЬ</button>';
+        html += '<button onclick="window.quickSave()" style="background:#15803d;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:8px;">💾 ' + t('save.save') + '</button>';
+        html += '<button onclick="window.quickLoad()" style="background:#2563eb;color:white;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:12px;">📂 ' + t('save.load') + '</button>';
         html += '<div style="background:#1f2937;border-radius:6px;padding:10px;display:flex;justify-content:space-between;align-items:center;">';
-        html += '<span style="font-size:11px;color:#9ca3af;">Автосохранение каждые 30 дней</span>';
-        html += '<button onclick="window.toggleAutosave()" style="padding:6px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;border:none;background:' + (autosaveOn ? '#15803d' : '#991b1b') + ';color:white;">' + (autosaveOn ? 'ВКЛ' : 'ВЫКЛ') + '</button>';
+        html += '<span style="font-size:11px;color:#9ca3af;">' + t('save.autosave') + '</span>';
+        html += '<button onclick="window.toggleAutosave()" style="padding:6px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;border:none;background:' + (autosaveOn ? '#15803d' : '#991b1b') + ';color:white;">' + (autosaveOn ? t('save.on') : t('save.off')) + '</button>';
         html += '</div></div>';
         content.innerHTML = html;
     }
 
     renderCapitulationWindow(content, data) {
-        // data: { enemyId, winnerId, cells, callback }
         var enemyId = data.enemyId;
         var winnerId = data.winnerId;
-        var cells = data.cells; // Set of cell keys "x,y"
+        var cells = data.cells;
         var enemyName = window._COUNTRIES_MAP && window._COUNTRIES_MAP[enemyId] ? window._COUNTRIES_MAP[enemyId].name : enemyId.toUpperCase();
         var winnerName = window._COUNTRIES_MAP && window._COUNTRIES_MAP[winnerId] ? window._COUNTRIES_MAP[winnerId].name : winnerId.toUpperCase();
 
         var html = '<div style="padding:16px;">';
         html += '<div style="text-align:center;margin-bottom:16px;">';
         html += '<div style="font-size:24px;margin-bottom:8px;">🏳️</div>';
-        html += '<div style="font-size:16px;font-weight:bold;color:#eab308;">' + enemyName + ' капитулировал!</div>';
-        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Территорий: ' + cells.length + ' клеток</div>';
+        html += '<div style="font-size:16px;font-weight:bold;color:#eab308;">' + enemyName + ' ' + t('capitulation.title') + '</div>';
+        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">' + t('capitulation.territoryCount') + ': ' + cells.length + '</div>';
         html += '</div>';
 
-        html += '<div style="font-size:12px;font-weight:bold;color:#eab308;margin-bottom:8px;">Что сделать с территорией?</div>';
+        html += '<div style="font-size:12px;font-weight:bold;color:#eab308;margin-bottom:8px;">' + t('capitulation.chooseFate') + '</div>';
 
-        // Аннексия
         html += '<button onclick="window.capitulationChoice(\'annex\')" style="width:100%;padding:12px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:8px;margin-bottom:8px;cursor:pointer;text-align:left;">';
-        html += '<div style="font-size:13px;font-weight:bold;">🏴 Аннексировать</div>';
-        html += '<div style="font-size:10px;color:#fca5a5;">Все клетки переходят ' + winnerName + '</div>';
+        html += '<div style="font-size:13px;font-weight:bold;">🏴 ' + t('capitulation.annex') + '</div>';
+        html += '<div style="font-size:10px;color:#fca5a5;">' + winnerName + '</div>';
         html += '</button>';
 
-        // Вассал
         html += '<button onclick="window.capitulationChoice(\'vassal\')" style="width:100%;padding:12px;background:#1e1b4b;color:white;border:2px solid #a855f7;border-radius:8px;margin-bottom:8px;cursor:pointer;text-align:left;">';
-        html += '<div style="font-size:13px;font-weight:bold;">👑 Сделать вассалом</div>';
-        html += '<div style="font-size:10px;color:#c084fc;">' + enemyName + ' остаётся самостоятельным, но подчиняется</div>';
+        html += '<div style="font-size:13px;font-weight:bold;">👑 ' + t('capitulation.vassalize') + '</div>';
+        html += '<div style="font-size:10px;color:#c084fc;">' + enemyName + '</div>';
         html += '</button>';
 
-        // Освободить
         html += '<button onclick="window.capitulationChoice(\'release\')" style="width:100%;padding:12px;background:#052e16;color:white;border:2px solid #22c55e;border-radius:8px;cursor:pointer;text-align:left;">';
-        html += '<div style="font-size:13px;font-weight:bold;">🕊️ Освободить</div>';
-        html += '<div style="font-size:10px;color:#86efac;">Территория остаётся у ' + enemyName + '</div>';
+        html += '<div style="font-size:13px;font-weight:bold;">🕊️ ' + t('capitulation.release') + '</div>';
+        html += '<div style="font-size:10px;color:#86efac;">' + enemyName + '</div>';
         html += '</button>';
 
         html += '</div>';
 
         content.innerHTML = html;
 
-        // Сохраняем данные для callback
         window._capitulationData = data;
     }
 }

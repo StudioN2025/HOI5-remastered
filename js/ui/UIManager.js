@@ -1,5 +1,6 @@
 // UIManager.js — Управление интерфейсом (исправлен)
 
+import { t } from '../i18n.js';
 import { getCountryInfo } from '../utils/helpers.js';
 
 export class UIManager {
@@ -40,16 +41,16 @@ export class UIManager {
         content.style.overflow = '';
         
         const titles = {
-            army: '🎖️ АРМИЯ',
-            research: '🔬 ТЕХНОЛОГИИ',
-            focus: '⭐ НАЦИОНАЛЬНЫЕ ФОКУСЫ',
-            diplomacy: '🤝 ДИПЛОМАТИЯ',
-            build: '🏗️ СТРОИТЕЛЬСТВО',
-            commanders: '🎖️ КОМАНДУЮЩИЕ',
-            save: '💾 СОХРАНЕНИЯ'
+            army: t('army.title'),
+            research: t('research.title'),
+            focus: t('focus.title'),
+            diplomacy: t('diplomacy.title'),
+            build: t('build.title'),
+            commanders: t('army.createArmyTitle'),
+            save: t('save.title')
         };
-        
-        title.innerText = titles[tab] || 'ОКНО';
+
+        title.innerText = titles[tab] || t('ui.window');
         
         // Вызываем соответствующий метод WindowsManager
         if (this.windowsManager) {
@@ -76,10 +77,10 @@ export class UIManager {
                     this.windowsManager.renderSaveWindow(content);
                     break;
                 default:
-                    content.innerHTML = '<div class="text-center text-gray-400 py-8">В разработке...</div>';
+                    content.innerHTML = `<div class="text-center text-gray-400 py-8">${t('ui.inDevelopment')}</div>`;
             }
         } else {
-            content.innerHTML = '<div class="text-center text-gray-400 py-8">Ошибка: WindowsManager не инициализирован</div>';
+            content.innerHTML = `<div class="text-center text-gray-400 py-8">${t('ui.windowNotInit')}</div>`;
         }
     }
     
@@ -119,7 +120,7 @@ export class UIManager {
         const capitalElem = document.getElementById('sidebar-capital');
         if (capitalElem) {
             const cap = this.world.getCapital(countryId);
-            capitalElem.innerText = cap ? cap.name : 'Нет';
+            capitalElem.innerText = cap ? cap.name : '—';
         }
 
         // Показываем лорда если вассал
@@ -145,7 +146,7 @@ export class UIManager {
                 vassalRow = document.createElement('div');
                 vassalRow.className = 'sidebar-row';
                 vassalRow.id = 'sidebar-vassals-row';
-                vassalRow.innerHTML = '<span class="sidebar-label">👑 Вассалы:</span><span id="sidebar-vassals" class="sidebar-value" style="color:#c084fc;">—</span>';
+                vassalRow.innerHTML = `<span class="sidebar-label">👑 ${t('diplomacy.vassals')}:</span><span id="sidebar-vassals" class="sidebar-value" style="color:#c084fc;">—</span>`;
                 overlordRow.parentNode.insertBefore(vassalRow, overlordRow.nextSibling);
             }
             document.getElementById('sidebar-vassals').innerText = vassalNames;
@@ -173,9 +174,9 @@ export class UIManager {
             ? Math.floor(this.gameState.manpower)
             : cells.size * 1000;
         
-        if (popElem) popElem.innerText = `${actualManpower.toLocaleString()} чел.`;
+        if (popElem) popElem.innerText = `${actualManpower.toLocaleString()} ${t('ui.manpowerLabel')}`;
         if (factoriesElem) factoriesElem.innerText = `${totalFactories} 🏭`;
-        if (buildingsElem) buildingsElem.innerText = totalPorts > 0 ? `${totalPorts} ⚓` : 'Нет портов';
+        if (buildingsElem) buildingsElem.innerText = totalPorts > 0 ? `${totalPorts} ⚓` : t('ui.noPorts');
         
         if (actionsDiv && countryId !== this.gameState.myCountryId) {
             actionsDiv.classList.remove('hidden');
@@ -185,30 +186,30 @@ export class UIManager {
             // Определяем кнопку войны по идеологии
             var warButton = '';
             if (atWar) {
-                warButton = '<div style="color:#f87171;text-align:center;padding:10px;background:#7f1d1d30;border-radius:6px;margin-bottom:8px;">⚔️ В СОСТОЯНИИ ВОЙНЫ</div>';
+                warButton = `<div style="color:#f87171;text-align:center;padding:10px;background:#7f1d1d30;border-radius:6px;margin-bottom:8px;">⚔️ ${t('diplomacy.atWar')}</div>`;
             } else {
-                var myIdeology = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[this.gameState.myCountryId]) ? window._COUNTRIES_MAP[this.gameState.myCountryId].ideology : 'Нейтралитет';
-                if (myIdeology === 'Фашизм' || myIdeology === 'Коммунизм') {
-                    warButton = '<button onclick="window.declareWarOn(\'' + countryId + '\')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>';
-                } else if (myIdeology === 'Демократия') {
+                var myIdeology = (window._COUNTRIES_MAP && window._COUNTRIES_MAP[this.gameState.myCountryId]) ? window._COUNTRIES_MAP[this.gameState.myCountryId].ideology : t('diplomacy.neutral');
+                if (myIdeology === t('diplomacy.fascistCommunist') || myIdeology === t('diplomacy.communist')) {
+                    warButton = `<button onclick="window.declareWarOn('${countryId}')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ${t('diplomacy.declareWar')}</button>`;
+                } else if (myIdeology === t('diplomacy.democratic')) {
                     var just = this.gameState.justifications;
                     if (just && just.target === countryId && just.daysLeft > 0) {
                         var pct = Math.floor(((just.totalDays - just.daysLeft) / just.totalDays) * 100);
                         warButton = '<div style="background:#1f2937;border-radius:6px;padding:8px;margin-bottom:8px;">';
-                        warButton += '<div style="font-size:10px;color:#9ca3af;margin-bottom:4px;">📜 Обоснование: ' + just.daysLeft + ' дн.</div>';
+                        warButton += `<div style="font-size:10px;color:#9ca3af;margin-bottom:4px;">${t('diplomacy.justificationProgress')}${just.daysLeft}${t('diplomacy.daysRemaining')}</div>`;
                         warButton += '<div style="background:#374151;height:6px;border-radius:3px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:#3b82f6;border-radius:3px;"></div></div></div>';
                     } else if (just && just.target === countryId && just.daysLeft <= 0) {
-                        warButton = '<button onclick="window.declareWarOn(\'' + countryId + '\')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ОБЪЯВИТЬ ВОЙНУ</button>';
+                        warButton = `<button onclick="window.declareWarOn('${countryId}')" style="width:100%;background:#991b1b;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">⚔️ ${t('diplomacy.declareWar')}</button>`;
                     } else {
-                        warButton = '<button onclick="window.justifyWar(\'' + countryId + '\')" style="width:100%;background:#854d0e;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">📜 ОБОСНОВАТЬ ВОЙНУ (30 дн.)</button>';
+                        warButton = `<button onclick="window.justifyWar('${countryId}')" style="width:100%;background:#854d0e;color:white;padding:10px;border-radius:6px;margin-bottom:8px;font-weight:bold;cursor:pointer;">📜 ${t('diplomacy.justifyWar')}</button>`;
                     }
                 } else {
-                    warButton = '<div style="color:#6b7280;text-align:center;padding:10px;background:#1f2937;border-radius:6px;margin-bottom:8px;font-size:11px;">🚫 Нейтралитет — война только по призыву союзника</div>';
+                    warButton = `<div style="color:#6b7280;text-align:center;padding:10px;background:#1f2937;border-radius:6px;margin-bottom:8px;font-size:11px;">🚫 ${t('diplomacy.neutral')}</div>`;
                 }
             }
 
             actionsDiv.innerHTML = warButton +
-                (!atWar && !allied ? `<button onclick="window.proposeAlly('${countryId}')" style="width:100%;background:#15803d;color:white;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">🤝 ПРЕДЛОЖИТЬ АЛЬЯНС</button>` : allied ? '<div style="color:#4ade80;text-align:center;padding:10px;background:#16653430;border-radius:6px;">🤝 В АЛЬЯНСЕ</div>' : '');
+                (!atWar && !allied ? `<button onclick="window.proposeAlly('${countryId}')" style="width:100%;background:#15803d;color:white;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">${t('diplomacy.proposeAllyBtn')}</button>` : allied ? `<div style="color:#4ade80;text-align:center;padding:10px;background:#16653430;border-radius:6px;">${t('diplomacy.inAlliance')}</div>` : '');
         } else if (actionsDiv) {
             actionsDiv.classList.add('hidden');
         }
