@@ -234,6 +234,7 @@ export class AIController {
     // ── Страна ───────────────────────────────────────────────────────────────
 
     _processCountry(id, day) {
+        this._currentAI = id;
         const cells = this.world.getCountryCells(id);
         if (!cells.size) return;
 
@@ -444,6 +445,7 @@ export class AIController {
         for (let i = 0; i < units.length; i++) {
             const uid = units[i];
             if (this.entities.inCombat[uid]) continue;
+            if (this.entities.isShip && this.entities.isShip[uid]) continue;
             const ux = this.entities.x[uid], uy = this.entities.y[uid];
             if (ux === cap.x && uy === cap.y) continue;
 
@@ -482,6 +484,8 @@ export class AIController {
         for (let i = 0; i < units.length; i++) {
             const uid = units[i];
             if (this.entities.inCombat[uid]) continue;
+            // Корабли не участвуют в наземных атаках
+            if (this.entities.isShip && this.entities.isShip[uid]) continue;
 
             const ux = this.entities.x[uid];
             const uy = this.entities.y[uid];
@@ -610,6 +614,7 @@ export class AIController {
         for (let i = 0; i < units.length; i++) {
             const uid = units[i];
             if (this.entities.inCombat[uid]) continue;
+            if (this.entities.isShip && this.entities.isShip[uid]) continue;
             const target = borderPts[i % borderPts.length];
             if (!target) continue;
 
@@ -698,7 +703,7 @@ export class AIController {
         const gScore = new Map();
         gScore.set(`${sx},${sy}`, 0);
 
-        const ownerId = this.gs.myCountryId;
+        const ownerId = this._currentAI || this.gs.myCountryId;
 
         let steps = 0;
         while (open.length && steps++ < maxSteps) {
@@ -723,6 +728,7 @@ export class AIController {
                 // Проверяем владельца
                 if (cell !== ownerId) {
                     const isAllied = this.gs.areAllies && this.gs.areAllies(ownerId, cell);
+                    const isEnemy = this.gs.isAtWar && this.gs.isAtWar(ownerId, cell);
                     const isEnemy = this.gs.isAtWar && this.gs.isAtWar(ownerId, cell);
                     if (!isAllied && !isEnemy) continue; // чужая территория — обходим
                 }

@@ -107,57 +107,44 @@ export class MovementSystem {
                 const cellOwner = this.world.getCell(nx, ny);
                 const isLand = cellOwner !== 0;
 
-                // Пехота — только по суше (клетка с владельцем)
-                if (!isShip) {
-                    if (isWater || !isLand) {
-                        if (!hasPort || !isWater) {
-                            this.orders.delete(unitId);
-                            if (step === 0) addNotification('Путь заблокирован!', 'war');
-                            break;
-                        }
-                    }
-                }
-
-                // Корабль — только по воде, на сушу только высадка
+                // Корабль — только по воде, на сушу только высадка/возврат к порту
                 if (isShip) {
-                    if (!isWater && isLand && !(nx === order.targetX && ny === order.targetY)) {
-                        break;
-                    }
-                    if (!isWater && !isLand) {
-                        break;
-                    }
-                }
+                    if (isWater) {
+                        // по воде — ок
+                    } else if (isLand) {
+                        // На суше: проверяем можно ли высадиться
+                        const isFriendly = cellOwner === e.owner[unitId] || this._areAllied(e.owner[unitId], cellOwner);
+                        const isEnemy = cellOwner !== 0 && cellOwner !== e.owner[unitId] && !isFriendly;
+                        const hasPort = this.world.hasBuilding(nx, ny, 'port');
 
-                // Корабль выходит на сушу — высадка десанта
-                if (isShip && isLand) {
-                    const cellOwner = this.world.getCell(nx, ny);
-                    const isEnemyLand = cellOwner !== 0 && cellOwner !== e.owner[unitId]
-                        && !this._areAllied(e.owner[unitId], cellOwner);
-
-                    if (isEnemyLand) {
-                        // Захватываем вражескую клетку
-                        const enemy = e.getUnitAt(nx, ny);
-                        if (enemy && e.active[enemy] && e.owner[enemy] !== e.owner[unitId]) {
-                            addNotification('⚔️ Десант вступает в бой!', 'war');
-                            this.orders.delete(unitId);
-                            break;
+                        if (isFriendly || hasPort) {
+                            // Высадка на свою/союзную территорию или в порт
+                            e.moveTo(unitId, nx, ny);
+                            e.isShip[unitId] = 0;
+                            order.path.shift();
+                            continue;
+                        } else if (isEnemy) {
+                            // Вражеское побережье — высадка десанта
+                            const enemy = e.getUnitAt(nx, ny);
+                            if (enemy && e.active[enemy]) {
+                                this.orders.delete(unitId);
+                                break;
+                            }
+                            this.world.setCell(nx, ny, e.owner[unitId]);
+                            e.moveTo(unitId, nx, ny);
+                            e.isShip[unitId] = 0;
+                            order.path.shift();
+                            addNotification('⚓ Десант!', 'info');
+                            continue;
+                        } else {
+                            break; // Пустая клетка в море — не высаживаемся
                         }
-                        this.world.setCell(nx, ny, e.owner[unitId]);
-                    } else if (cellOwner !== 0 && cellOwner !== e.owner[unitId]) {
-                        // Союзная территория — просто высаживаемся
-                    } else if (cellOwner === 0) {
-                        // Пустая клетка — захватываем
-                        this.world.setCell(nx, ny, e.owner[unitId]);
+                    } else {
+                        break; // Ни вода ни суша
                     }
-
-                    e.moveTo(unitId, nx, ny);
-                    e.isShip[unitId] = 0;
-                    order.path.shift();
-                    addNotification('⚓ Высадка десанта!', 'info');
-                    continue;
                 }
 
-                // Проверяем вражескую территорию (пехота)
+                // Пехота — захват вражеской территории
                 if (!isShip && isLand && cellOwner !== 0 && cellOwner !== e.owner[unitId]
                     && !this._areAllied(e.owner[unitId], cellOwner)) {
                     // Вражеская клетка — захватываем и идём дальше
