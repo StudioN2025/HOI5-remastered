@@ -21,7 +21,7 @@ import { TechSystem, TECH_TREE, TECH_BRANCHES } from './systems/TechSystem.js';
 import { FocusSystem, FOCUS_TREE } from './systems/FocusSystem.js';
 import { loadFocusTree } from './data/FocusTree.js';
 import { QueueSystem, TRAIN_DEFS, BUILD_DEFS } from './systems/QueueSystem.js';
-import { addNotification } from './utils/helpers.js';
+import { addNotification, getCountryInfo } from './utils/helpers.js';
 import { COUNTRIES } from './data/Countries.js';
 import { t, setLanguage, getCurrentLanguage } from './i18n.js';
 

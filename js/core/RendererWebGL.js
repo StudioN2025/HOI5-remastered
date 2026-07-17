@@ -59,6 +59,7 @@ export class RendererWebGL {
         for (const c of flagCountries) {
             for (const ideo of ideologies) {
                 const img = new Image();
+                img.onerror = function() {};
                 img.src = `assets/flags/${c}_${ideo}.png`;
                 const key = c + '_' + ideo;
                 img.onload = () => { this.flags[key] = img; };
