@@ -99,10 +99,15 @@ export class GameState {
             for (const side of [a, b]) {
                 const enemy = side === a ? b : a;
                 if (this.areAllies(my, side) && !this.isAtWar(my, enemy)) {
-                    // Не показываем приглашение воевать против своего вассала
                     var myVassals = this.getVassals(my);
                     if (myVassals.indexOf(enemy) === -1) {
-                        this.warInvitations.push({ from: side, enemy: enemy, time: Date.now() });
+                        // Проверяем отклонённые — повторяем через 30 дней
+                        var declined = this._declinedInvites || {};
+                        var lastDeclined = declined[enemy];
+                        if (!lastDeclined || this.days >= lastDeclined) {
+                            this.warInvitations.push({ from: side, enemy: enemy, time: Date.now() });
+                        }
+                    }
                     }
                 }
             }
