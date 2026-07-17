@@ -108,7 +108,6 @@ export class GameState {
                             this.warInvitations.push({ from: side, enemy: enemy, time: Date.now() });
                         }
                     }
-                    }
                 }
             }
         }
