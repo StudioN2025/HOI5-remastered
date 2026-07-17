@@ -457,37 +457,50 @@ function setupEvents() {
         uiManager.openWindow('diplomacy');
     };
 
-    // Призыв к оружию — пригласить союзника в вашу войну
+    // ── ПРИЗЫВ К ОРУЖИЮ — пригласить союзника в ВАШУ войну ──
     window.callToArms = (allyId) => {
-        // Находим врагов игрока
-        var myEnemies = [];
-        if (gameState.wars) {
-            for (var w = 0; w < gameState.wars.length; w++) {
-                var war = gameState.wars[w];
-                if (war.a === myId) myEnemies.push(war.b);
-                if (war.b === myId) myEnemies.push(war.a);
-            }
+        var myId = gameState.myCountryId;
+        // Собираем ВАШИ текущие войны
+        var myWars = [];
+        for (var w = 0; w < gameState.wars.length; w++) {
+            var war = gameState.wars[w];
+            if (war.a === myId) myWars.push({ enemy: war.b, label: war.b });
+            if (war.b === myId) myWars.push({ enemy: war.a, label: war.a });
         }
-        if (myEnemies.length === 0) {
+        if (myWars.length === 0) {
             addNotification(t('diplomacy.noWarsToJoin'), 'info');
             return;
         }
-        // Союзник уже воюет?
-        var alreadyFighting = 0;
-        for (var i = 0; i < myEnemies.length; i++) {
-            if (gameState.isAtWar && gameState.isAtWar(allyId, myEnemies[i])) alreadyFighting++;
-        }
-        var toJoin = myEnemies.filter(function(e) { return !gameState.isAtWar(allyId, e); });
-        if (toJoin.length === 0) {
-            addNotification(allyId.toUpperCase() + ' ' + t('diplomacy.alreadyInAllWars'), 'info');
+        // Фильтруем — исключаем те, где союзник уже воюет
+        var toInvite = myWars.filter(function(w) { return !gameState.isAtWar(allyId, w.enemy); });
+        if (toInvite.length === 0) {
+            addNotification(t('diplomacy.alreadyInAllWars'), 'info');
             return;
         }
-        // Союзник вступает в ваши войны
-        for (var i = 0; i < toJoin.length; i++) {
-            gameState.addWar(allyId, toJoin[i], world);
+        // Если только одна война — сразу приглашаем
+        if (toInvite.length === 1) {
+            gameState.addWar(allyId, toInvite[0].enemy, world);
+            var eInfo = getCountryInfo(toInvite[0].enemy);
+            addNotification(allyId.toUpperCase() + ' ' + t('diplomacy.allyJoinedYourWar') + ' ' + eInfo.name.toUpperCase(), 'war');
+            uiManager.openWindow('diplomacy');
+            return;
         }
-        addNotification('📢 ' + allyId.toUpperCase() + ' ' + t('diplomacy.allyJoinedYourWar') + '!', 'war');
-        uiManager.openWindow('diplomacy');
+        // Несколько войн — окно выбора
+        var content = document.getElementById('window-content');
+        var aInfo = getCountryInfo(allyId);
+        var html = '<div style="padding:16px;">';
+        html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:24px;margin-bottom:8px;">📢</div>';
+        html += '<div style="font-size:14px;font-weight:bold;color:#eab308;">' + aInfo.name.toUpperCase() + '</div>';
+        html += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">' + t('diplomacy.allyJoinWhichWar') + '</div></div>';
+        for (var i = 0; i < toInvite.length; i++) {
+            var eInfo = getCountryInfo(toInvite[i].enemy);
+            html += '<button onclick="gameState.addWar(\'' + allyId + '\',\'' + toInvite[i].enemy + '\',world);document.getElementById(\'info-window\').classList.add(\'hidden\');addNotification(\'' + aInfo.name.toUpperCase() + ' ' + t('diplomacy.allyJoinedYourWar') + ' ' + eInfo.name.toUpperCase() + '\',\'war\');uiManager.openWindow(\'diplomacy\')" style="width:100%;padding:10px;background:#991b1b;color:white;border:2px solid #ef4444;border-radius:6px;margin-bottom:6px;cursor:pointer;text-align:left;font-weight:bold;">⚔️ ' + t('diplomacy.declareWarOn') + eInfo.name.toUpperCase() + '</button>';
+        }
+        html += '<button onclick="document.getElementById(\'info-window\').classList.add(\'hidden\')" style="width:100%;padding:8px;background:#374151;color:white;border:1px solid #4b5563;border-radius:6px;margin-top:8px;cursor:pointer;">' + t('diplomacy.decline') + '</button>';
+        html += '</div>';
+        content.innerHTML = html;
+        document.getElementById('window-title').innerText = '📢 ' + t('diplomacy.callToArms');
+        document.getElementById('info-window').classList.remove('hidden');
     };
 
     window.releaseVassal = (vassalId) => {
