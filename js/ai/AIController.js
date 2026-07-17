@@ -221,6 +221,7 @@ export class AIController {
 
     _pullAllies(attacker, defender) {
         for (const ally of this._allies(attacker)) {
+            if (ally === this.gs.myCountryId) continue; // Игрока не добавляем — через приглашение
             if (!this.gs.isAtWar(ally, defender)) this.gs.addWar(ally, defender, this.world);
         }
     }
