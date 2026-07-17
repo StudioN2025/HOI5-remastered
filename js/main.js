@@ -1135,6 +1135,43 @@ function startGameLoop() {
                 }
             }
 
+            // Повтор отклонённых приглашений через 30 дней
+            if (gameState._declinedInvites && gameState.wars) {
+                for (var enemy in gameState._declinedInvites) {
+                    if (gameState._declinedInvites[enemy] && gameState.days >= gameState._declinedInvites[enemy]) {
+                        // Проверяем — война ещё идёт и союзник всё ещё воюет с этим врагом
+                        var stillAtWar = false;
+                        for (var wi = 0; wi < gameState.wars.length; wi++) {
+                            var w = gameState.wars[wi];
+                            if ((w.a === enemy || w.b === enemy) && !gameState.isAtWar(gameState.myCountryId, enemy)) {
+                                stillAtWar = true;
+                                break;
+                            }
+                        }
+                        if (stillAtWar && !gameState.isAtWar(gameState.myCountryId, enemy)) {
+                            // Ищем союзника который воюет с этим врагом
+                            var inviter = null;
+                            for (var wi = 0; wi < gameState.wars.length; wi++) {
+                                var w = gameState.wars[wi];
+                                if (w.a === enemy || w.b === enemy) {
+                                    var candidate = w.a === enemy ? w.b : w.a;
+                                    if (gameState.areAllies(gameState.myCountryId, candidate)) {
+                                        inviter = candidate;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (inviter) {
+                                gameState.warInvitations.push({ from: inviter, enemy: enemy, time: Date.now() });
+                                delete gameState._declinedInvites[enemy];
+                            }
+                        } else if (!stillAtWar) {
+                            delete gameState._declinedInvites[enemy];
+                        }
+                    }
+                }
+            }
+
             // Проверка приглашений в войну
             if (gameState.warInvitations && gameState.warInvitations.length > 0 && !window._capitulationPending) {
                 var inv = gameState.warInvitations.shift();
