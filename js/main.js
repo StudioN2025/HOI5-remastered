@@ -521,6 +521,22 @@ function setupEvents() {
         addNotification(t('diplomacy.declinedInvite'), 'info');
     };
 
+    window._acceptAlliance = (fromId) => {
+        gameState.addAlliance(gameState.myCountryId, fromId);
+        gameState.isGameActive = true;
+        document.getElementById('info-window').classList.add('hidden');
+        addNotification('🤝 ' + t('diplomacy.allianceAccepted') + ' ' + getCountryInfo(fromId).name.toUpperCase(), 'info');
+        uiManager.openWindow('diplomacy');
+    };
+
+    window._declineAlliance = (fromId) => {
+        if (!gameState._declinedAlliance) gameState._declinedAlliance = {};
+        gameState._declinedAlliance[fromId] = gameState.days + 30;
+        gameState.isGameActive = true;
+        document.getElementById('info-window').classList.add('hidden');
+        addNotification(t('diplomacy.allianceDeclined'), 'info');
+    };
+
     window._acceptInvite = (enemyId) => {
         gameState.addWar(gameState.myCountryId, enemyId, world);
         gameState.isGameActive = true;
@@ -1202,6 +1218,26 @@ function startGameLoop() {
                     html += '</div>';
                     content.innerHTML = html;
                     document.getElementById('window-title').innerText = '📢 ' + t('diplomacy.warInvitation');
+                    document.getElementById('info-window').classList.remove('hidden');
+                }
+            }
+
+            // Проверка приглашений в альянс
+            if (gameState.allianceInvitations && gameState.allianceInvitations.length > 0 && !window._capitulationPending && !gameState.isGameActive === false) {
+                var aInv = gameState.allianceInvitations.shift();
+                if (aInv && !gameState.areAllies(gameState.myCountryId, aInv.from)) {
+                    var fromInfo = getCountryInfo(aInv.from);
+                    gameState.isGameActive = false;
+                    var aContent = document.getElementById('window-content');
+                    var aHtml = '<div style="padding:16px;">';
+                    aHtml += '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:24px;margin-bottom:8px;">🤝</div>';
+                    aHtml += '<div style="font-size:14px;font-weight:bold;color:#22c55e;">' + fromInfo.name.toUpperCase() + '</div>';
+                    aHtml += '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">' + t('diplomacy.proposeAllyToYou') + '</div></div>';
+                    aHtml += '<button onclick="window._acceptAlliance(\'' + aInv.from + '\')" style="width:100%;padding:12px;background:#15803d;color:white;border:2px solid #22c55e;border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:bold;font-size:13px;">🤝 ' + t('diplomacy.acceptAlliance') + '</button>';
+                    aHtml += '<button onclick="window._declineAlliance(\'' + aInv.from + '\')" style="width:100%;padding:10px;background:#374151;color:white;border:1px solid #4b5563;border-radius:8px;cursor:pointer;">❌ ' + t('diplomacy.decline') + '</button>';
+                    aHtml += '</div>';
+                    aContent.innerHTML = aHtml;
+                    document.getElementById('window-title').innerText = '🤝 ' + t('diplomacy.allianceProposal');
                     document.getElementById('info-window').classList.remove('hidden');
                 }
             }

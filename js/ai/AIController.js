@@ -402,8 +402,19 @@ export class AIController {
             const nbp = PROFILES[nb];
             if (!nbp || (nbp.ideology !== profile.ideology && nbp.ideology !== 'neutral')) continue;
             if (Math.random() < 0.25) {
-                this.gs.addAlliance(id, nb);
-                addNotification(`🤝 ${id} и ${nb} заключили альянс!`, 'info');
+                // Если игрок — показываем приглашение
+                if (nb === this.gs.myCountryId) {
+                    if (!this.gs._allianceInvites) this.gs._allianceInvites = {};
+                    if (!this.gs._allianceInvites[id]) this.gs._allianceInvites[id] = {};
+                    var declined = this.gs._declinedAlliance || {};
+                    if (!declined[id] || this.gs.days >= declined[id]) {
+                        this.gs.allianceInvitations = this.gs.allianceInvitations || [];
+                        this.gs.allianceInvitations.push({ from: id, time: Date.now() });
+                    }
+                } else {
+                    this.gs.addAlliance(id, nb);
+                    addNotification('🤝 ' + id + ' и ' + nb + ' заключили альянс!', 'info');
+                }
                 break;
             }
         }

@@ -26,6 +26,7 @@ export class GameState {
         this.warStartCells = {}; // { countryId: originalCellCount }
         this.warOriginalCells = {};
         this.warInvitations = []; // [{ from, enemy, time }]
+        this.allianceInvitations = []; // [{ from, time }]
         this.ideologyChange = null;
         this.justifications = null; // { target, daysLeft, totalDays }
         
@@ -191,6 +192,7 @@ export class GameState {
             warStartCells: { ...this.warStartCells },
             warOriginalCells: this.warOriginalCells || {},
             warInvitations: this.warInvitations || [],
+            allianceInvitations: this.allianceInvitations || [],
             activeFocus: this.activeFocus ? { ...this.activeFocus } : null,
             completedFocuses: [...this.completedFocuses],
             selectedUnitId: this.selectedUnitId,
@@ -222,6 +224,7 @@ export class GameState {
         this.warStartCells = data.warStartCells || {};
         this.warOriginalCells = data.warOriginalCells || {};
         this.warInvitations = data.warInvitations || [];
+        this.allianceInvitations = data.allianceInvitations || [];
         this.activeFocus = data.activeFocus;
         this.completedFocuses = new Set(data.completedFocuses || []);
         this.selectedUnitId = data.selectedUnitId;

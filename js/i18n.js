@@ -120,6 +120,11 @@ const translations = {
             declareWarOn: 'Объявить войну ',
             neutralWarningFull: 'Нейтралы не могут объявлять войну! Только через призыв союзника.',
             justificationRequired: 'Демократия требует обоснование! Начните в дипломатии.',
+            proposeAllyToYou: 'предлагает вам альянс. Принять?',
+            acceptAlliance: 'ПРИНЯТЬ АЛЬЯНС',
+            allianceAccepted: 'альянс принят!',
+            allianceDeclined: 'Вы отказались. Предложение повторится через 30 дней.',
+            allianceProposal: 'ПРЕДЛОЖЕНИЕ АЛЬЯНСА',
         },
         build: {
             title: '🏗️ СТРОИТЕЛЬСТВО',
@@ -454,6 +459,11 @@ const translations = {
             declareWarOn: 'Declare war on ',
             neutralWarningFull: 'Neutrals cannot declare war! Only through ally\'s call.',
             justificationRequired: 'Democracy requires justification! Start in diplomacy.',
+            proposeAllyToYou: 'proposes an alliance. Accept?',
+            acceptAlliance: 'ACCEPT ALLIANCE',
+            allianceAccepted: 'alliance accepted!',
+            allianceDeclined: 'You declined. The proposal will repeat in 30 days.',
+            allianceProposal: 'ALLIANCE PROPOSAL',
         },
         build: {
             title: '🏗️ CONSTRUCTION',
