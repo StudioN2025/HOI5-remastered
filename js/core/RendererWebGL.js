@@ -45,26 +45,23 @@ export class RendererWebGL {
             img.onload = () => { this.unitImages[country] = img; };
         }
 
-        // Флаги — только идеологические варианты
+        // Флаги — загружаем только по требованию, лениво
         this.flags = {};
-        const flagCountries = [
-            'austria','albania','belgium','bulgaria','czechoslovakia','denmark',
-            'estonia','finland','france','germany','greece','hungary',
-            'iran','iraq','ireland','italy','latvia','lithuania',
-            'luxembourg','netherlands','norway','poland','portugal',
-            'romania','saudi_arabia','slovakia','spain','sweden',
-            'switzerland','turkey','uk','ussr','yugoslavia'
-        ];
-        const ideologies = ['democratic', 'communist', 'neutral', 'fascist'];
-        for (const c of flagCountries) {
-            for (const ideo of ideologies) {
-                const img = new Image();
-                img.onerror = function() {};
-                img.src = `assets/flags/${c}_${ideo}.png`;
-                const key = c + '_' + ideo;
-                img.onload = () => { this.flags[key] = img; };
-            }
-        }
+        this._flagLoadQueue = [];
+        this._flagsLoaded = false;
+    }
+
+    _loadFlag(key) {
+        if (this.flags[key]) return this.flags[key];
+        if (this._flagLoadQueue.indexOf(key) !== -1) return null;
+        this._flagLoadQueue.push(key);
+        const self = this;
+        const img = new Image();
+        img.onload = function() { self.flags[key] = img; };
+        img.onerror = function() { self.flags[key] = null; };
+        img.src = `assets/flags/${key}.png`;
+        this.flags[key] = null;
+        return null;
     }
 
     _initColorCache() {
@@ -291,11 +288,12 @@ export class RendererWebGL {
                 var flagKey = owner;
                 if (window._COUNTRIES_MAP && window._COUNTRIES_MAP[owner]) {
                     var cdata = window._COUNTRIES_MAP[owner];
-                    if (cdata.ideologies && cdata.ideologies[cdata.ideology] && cdata.ideologies[cdata.ideology].flag) {
-                        flagKey = cdata.ideologies[cdata.ideology].flag;
+                    if (cdata.ideologies && cdata.ideologies[cdata.ideology]) {
+                        var ideoData = cdata.ideologies[cdata.ideology];
+                        if (ideoData.flag) flagKey = ideoData.flag;
                     }
                 }
-                const flag = this.flags[flagKey] || this.flags[owner];
+                const flag = this._loadFlag(flagKey) || this._loadFlag(owner);
                 if (flag && flag.complete && flag.naturalWidth > 0) {
                     const fSize = Math.max(6, Math.floor(size * 0.4));
                     ctx.drawImage(flag, screenX, screenY, fSize, Math.floor(fSize * 0.67));

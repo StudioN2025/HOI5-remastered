@@ -573,6 +573,12 @@ function setupEvents() {
                 if (data.leader) c.leader = data.leader;
                 if (data.color) c.color = data.color;
             }
+            // Принудительно загружаем новый флаг
+            if (renderer && data && data.flag) {
+                var newFlag = new Image();
+                newFlag.onload = function() { renderer.flags[data.flag] = newFlag; };
+                newFlag.src = 'assets/flags/' + data.flag + '.png?t=' + Date.now();
+            }
         }
         gameState.ideologyChange = null;
         if (renderer) renderer._polygonCache = null;
