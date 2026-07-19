@@ -972,7 +972,12 @@ function handleCanvasRightClick(e) {
 
 function handleCanvasWheel(e) {
     e.preventDefault();
-    renderer.zoom(e.deltaY, e.clientX, e.clientY);
+    // Ctrl+wheel = pinch на тачпаде (масштаб)
+    if (e.ctrlKey) {
+        renderer.zoom(e.deltaY * 3, e.clientX, e.clientY);
+    } else {
+        renderer.zoom(e.deltaY, e.clientX, e.clientY);
+    }
 }
 
 function handleKeyDown(e) {
@@ -1002,6 +1007,15 @@ function handleKeyDown(e) {
     }
     if (e.code === 'KeyD' || e.code === 'ArrowRight') {
         renderer.camera.x += speed;
+        moved = true;
+    }
+    // Зум клавишами +/- и = (на ноутбуках без мышки)
+    if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'Plus') {
+        renderer.zoom(-100, renderer.canvas.width / 2, renderer.canvas.height / 2);
+        moved = true;
+    }
+    if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+        renderer.zoom(100, renderer.canvas.width / 2, renderer.canvas.height / 2);
         moved = true;
     }
     
