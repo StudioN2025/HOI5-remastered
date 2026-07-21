@@ -109,7 +109,6 @@ export class GameState {
         }
 
         // Приглашение игроку — только если союзник воюет и враг не игрок и не вассал игрока
-        const my = this.myCountryId;
         if (my && a !== my && b !== my) {
             for (const side of [a, b]) {
                 const enemy = side === a ? b : a;
